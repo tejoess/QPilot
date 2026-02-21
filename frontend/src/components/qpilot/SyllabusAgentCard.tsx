@@ -8,19 +8,16 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import {
     Card,
     CardContent,
     CardHeader,
-    CardTitle,
-    CardFooter
+    CardTitle
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
 import {
     FileUp,
     Type,
@@ -32,7 +29,7 @@ import {
 } from "lucide-react";
 import { useSyllabusStore } from "@/store/syllabusStore";
 import { useQPilotStore } from "@/store/qpilotStore";
-import { extractSyllabus, getSyllabusStatus } from "@/lib/projectApi";
+import { extractSyllabus } from "@/lib/projectApi";
 import { cn } from "@/lib/utils";
 
 interface SyllabusAgentCardProps {
@@ -56,50 +53,16 @@ export function SyllabusAgentCard({ projectId }: SyllabusAgentCardProps) {
         setAgentStatus,
         emitMessage,
         setActiveAgentIndex,
-        activeAgentIndex,
         triggerNextAgent
     } = useQPilotStore();
 
     const status = agentStatuses.syllabus;
 
-    const [activeTab, setActiveTab] = useState<"pdf" | "text" | any>("pdf");
+    const [activeTab, setActiveTab] = useState<"pdf" | "text">("pdf");
     const fileInputRef = useRef<HTMLInputElement>(null);
     const pollingRef = useRef<NodeJS.Timeout | null>(null);
 
-    useEffect(() => {
-        if (textContent.length > 50 && !fileName) {
-            setActiveTab("text");
-        }
-    }, [textContent, fileName]);
-
-    // Auto-trigger when data is available
-    useEffect(() => {
-        const hasData = activeTab === "pdf" ? fileName : textContent.length > 50;
-        if (hasData && status === "idle") {
-            handleStart();
-        }
-    }, [fileName, textContent, activeTab, status]);
-
-    // Clean up polling on unmount
-    useEffect(() => {
-        return () => {
-            if (pollingRef.current) clearInterval(pollingRef.current);
-        };
-    }, []);
-
-    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (file) {
-            if (file.type !== "application/pdf") {
-                setError("Please upload a PDF file.");
-                return;
-            }
-            setFileName(file.name);
-            setError(null);
-        }
-    };
-
-    const handleStart = async () => {
+    const handleStart = useCallback(async () => {
         if (status === "running" || status === "completed") return;
 
         if (activeTab === "pdf" && !fileName) {
@@ -117,11 +80,11 @@ export function SyllabusAgentCard({ projectId }: SyllabusAgentCardProps) {
 
         // Orchestrator Logs
         emitMessage("Orchestrator", "orchestrator", "Initializing Syllabus Agent pipeline...");
-        emitMessage("Syllabus Agent", "agent", `Starting extraction from ${activeTab === 'pdf' ? 'PDF' : 'manuscript'}...`); // Changed "file" to "pdf"
+        emitMessage("Syllabus Agent", "agent", `Starting extraction from ${activeTab === 'pdf' ? 'PDF' : 'manuscript'}...`);
 
         try {
             // Trigger API
-            const response = await extractSyllabus({
+            await extractSyllabus({
                 projectId,
                 sourceType: activeTab,
                 content: activeTab === "text" ? textContent : undefined,
@@ -130,19 +93,14 @@ export function SyllabusAgentCard({ projectId }: SyllabusAgentCardProps) {
             // Start Polling
             let stepCounter = 0;
             pollingRef.current = setInterval(async () => {
-                // In real integration, we'd call getSyllabusStatus(response.jobId)
-                // Here we simulate the progression locally for the demonstration
                 stepCounter++;
 
                 if (stepCounter <= steps.length) {
-                    // Mark previous as completed
                     if (stepCounter > 1) {
                         updateStep(stepCounter - 2, "completed");
                     }
-                    // Mark current as running
                     if (stepCounter < steps.length + 1) {
                         updateStep(stepCounter - 1, "running");
-                        // Emit subprocess chat updates
                         emitMessage("Syllabus Agent", "agent", `${steps[stepCounter - 1].label} in progress...`);
                     }
                 }
@@ -158,12 +116,46 @@ export function SyllabusAgentCard({ projectId }: SyllabusAgentCardProps) {
                 }
             }, 2000);
 
-        } catch (err: any) {
-            setError(err?.message || "Extraction failed.");
+        } catch (err) {
+            const error = err as { message?: string };
+            setError(error?.message || "Extraction failed.");
             setAgentStatus("syllabus", "failed");
             emitMessage("Syllabus Agent", "agent", "Critical error during extraction. Retrying recommended.");
         }
+    }, [status, activeTab, fileName, textContent, setAgentStatus, setError, setActiveAgentIndex, emitMessage, projectId, steps, updateStep, triggerNextAgent]);
+
+    useEffect(() => {
+        if (textContent.length > 50 && !fileName) {
+            setActiveTab("text");
+        }
+    }, [textContent, fileName]);
+
+    // Auto-trigger when data is available
+    useEffect(() => {
+        const hasData = activeTab === "pdf" ? fileName : textContent.length > 50;
+        if (hasData && status === "idle") {
+            handleStart();
+        }
+    }, [fileName, textContent, activeTab, status, handleStart]);
+
+    // Clean up polling on unmount
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) {
+            if (file.type !== "application/pdf") {
+                setError("Please upload a PDF file.");
+                return;
+            }
+            setFileName(file.name);
+            setError(null);
+        }
     };
+
+    useEffect(() => {
+        return () => {
+            if (pollingRef.current) clearInterval(pollingRef.current);
+        };
+    }, []);
 
     return (
         <Card className="w-full border-border/60 shadow-md">

@@ -5,11 +5,9 @@
  */
 
 import { useQPilotStore } from "@/store/qpilotStore";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Sparkles, FileText, BadgeCheck, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
 export function LivePaperView() {

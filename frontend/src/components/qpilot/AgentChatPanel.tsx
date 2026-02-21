@@ -8,8 +8,7 @@
  */
 
 import { useEffect, useRef } from "react";
-import { useQPilotStore, type ChatMessage } from "@/store/qpilotStore";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import { useQPilotStore } from "@/store/qpilotStore";
 import { Bot, User, Loader2, Sparkles, BadgeCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
 

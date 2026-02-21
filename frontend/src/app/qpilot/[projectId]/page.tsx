@@ -40,6 +40,7 @@ export default function QPilotExecutionPage() {
                     board: project.board
                 });
             } catch (err) {
+                console.error("Agent session init error:", err);
                 toast.error("Failed to initialize project session.");
             } finally {
                 setIsInitializing(false);
@@ -50,7 +51,7 @@ export default function QPilotExecutionPage() {
     }, [projectId, reset]);
 
     // 2. Integration Hook
-    const { runGeneration } = useQPilotInterface(projectId as string, requestData);
+    useQPilotInterface(projectId as string, requestData);
 
     // 3. Manual initialization is now handled by event-driven orchestrator
     // in the individual agent cards.

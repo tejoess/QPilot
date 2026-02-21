@@ -62,7 +62,6 @@ export function BlooxanomyAgentCard({ projectId }: BlooxanomyAgentCardProps) {
         setAgentStatus,
         emitMessage,
         setActiveAgentIndex,
-        activeAgentIndex,
         triggerNextAgent
     } = useQPilotStore();
 
@@ -119,8 +118,9 @@ export function BlooxanomyAgentCard({ projectId }: BlooxanomyAgentCardProps) {
                 }
             }, 1500);
 
-        } catch (err: any) {
-            setError(err?.message || "Bloom's mapping failed.");
+        } catch (err) {
+            const error = err as { message?: string };
+            setError(error?.message || "Bloom's mapping failed.");
             setAgentStatus("bloom", "failed");
             emitMessage("Blooxanomy Agent", "agent", "Mapping interrupted. Semantic constraints violation detected.");
         }

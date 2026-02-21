@@ -8,7 +8,7 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import {
     Card,
     CardContent,
@@ -73,7 +73,7 @@ export function PyqAgentCard({ projectId }: PyqAgentCardProps) {
 
     const status = agentStatuses.pyq;
 
-    const [activeTab, setActiveTab] = useState<"pdf" | "text" | any>("pdf");
+    const [activeTab, setActiveTab] = useState<"pdf" | "text">("pdf");
     const fileInputRef = useRef<HTMLInputElement>(null);
     const pollingRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -83,33 +83,7 @@ export function PyqAgentCard({ projectId }: PyqAgentCardProps) {
         }
     }, [textContent, fileName]);
 
-    // Auto-trigger when data is available
-    useEffect(() => {
-        const hasData = activeTab === "pdf" ? fileName : textContent.length > 50;
-        if (hasData && status === "idle" && activeAgentIndex === 1) {
-            handleStart();
-        }
-    }, [fileName, textContent, activeTab, status, activeAgentIndex]);
-
-    useEffect(() => {
-        return () => {
-            if (pollingRef.current) clearInterval(pollingRef.current);
-        };
-    }, []);
-
-    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (file) {
-            if (file.type !== "application/pdf") {
-                setError("Please upload a PDF file.");
-                return;
-            }
-            setFileName(file.name);
-            setError(null);
-        }
-    };
-
-    const handleStart = async () => {
+    const handleStart = useCallback(async () => {
         if (status === "running" || status === "completed") return;
 
         setAgentStatus("pyq", "running");
@@ -149,10 +123,51 @@ export function PyqAgentCard({ projectId }: PyqAgentCardProps) {
                 }
             }, 2000);
 
-        } catch (err: any) {
-            setError(err?.message || "PYQ processing failed.");
+        } catch (err) {
+            const error = err as { message?: string };
+            setError(error?.message || "PYQ processing failed.");
             setAgentStatus("pyq", "failed");
             emitMessage("PYQ Agent", "agent", "Encountered a hurdle during data processing. Awaiting recovery.");
+        }
+    }, [
+        status,
+        setAgentStatus,
+        setError,
+        setActiveAgentIndex,
+        emitMessage,
+        year,
+        board,
+        projectId,
+        activeTab,
+        textContent,
+        steps,
+        updateStep,
+        triggerNextAgent
+    ]);
+
+    // Auto-trigger when data is available
+    useEffect(() => {
+        const hasData = activeTab === "pdf" ? fileName : textContent.length > 50;
+        if (hasData && status === "idle" && activeAgentIndex === 1) {
+            handleStart();
+        }
+    }, [fileName, textContent, activeTab, status, activeAgentIndex, handleStart]);
+
+    useEffect(() => {
+        return () => {
+            if (pollingRef.current) clearInterval(pollingRef.current);
+        };
+    }, []);
+
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) {
+            if (file.type !== "application/pdf") {
+                setError("Please upload a PDF file.");
+                return;
+            }
+            setFileName(file.name);
+            setError(null);
         }
     };
 

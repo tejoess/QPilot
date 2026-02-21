@@ -12,7 +12,6 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Separator } from "@/components/ui/separator";
 import {
     AlertDialog,
     AlertDialogAction,
@@ -81,6 +80,7 @@ export function SectionList({ projectId, sections, isLoading }: SectionListProps
             addSectionLocal(saved);
             toast.success("Section added.");
         } catch (err) {
+            console.error("Add section error:", err);
             removeSectionLocal(tempId);
             toast.error("Failed to add section.");
         } finally {
@@ -105,6 +105,7 @@ export function SectionList({ projectId, sections, isLoading }: SectionListProps
             updateSectionLocal(saved);
             toast.success("Section updated.");
         } catch (err) {
+            console.error("Edit section error:", err);
             updateSectionLocal(editTarget);
             toast.error("Failed to update section.");
         } finally {
@@ -123,6 +124,7 @@ export function SectionList({ projectId, sections, isLoading }: SectionListProps
             await deleteSection(projectId, deleteTarget.id);
             toast.success("Section deleted.");
         } catch (err) {
+            console.error("Delete section error:", err);
             snapshot.forEach((s) => addSectionLocal(s));
             toast.error("Failed to delete section.");
         } finally {
@@ -164,12 +166,12 @@ export function SectionList({ projectId, sections, isLoading }: SectionListProps
                         </div>
                     ) : sections.length === 0 ? (
                         <div className="flex flex-col items-center justify-center gap-3 py-10 text-center border-2 border-dashed rounded-xl">
-                            <p className="text-sm text-muted-foreground">No sections yet. Click "Add Section" to begin.</p>
+                            <p className="text-sm text-muted-foreground">No sections yet. Click &quot;Add Section&quot; to begin.</p>
                         </div>
                     ) : (
                         <ScrollArea className="max-h-[400px] pr-4">
                             <div className="space-y-2">
-                                {sections.map((section, idx) => (
+                                {sections.map((section) => (
                                     <div
                                         key={section.id}
                                         className="group flex items-center gap-3 rounded-xl border border-border/50 bg-card p-3 transition-all hover:border-primary/30"
@@ -213,6 +215,7 @@ export function SectionList({ projectId, sections, isLoading }: SectionListProps
             </CardContent>
 
             <SectionDialog
+                key={`add-section-${sections.length}`}
                 mode="add"
                 open={addOpen}
                 onOpenChange={setAddOpen}
@@ -222,6 +225,7 @@ export function SectionList({ projectId, sections, isLoading }: SectionListProps
             />
 
             <SectionDialog
+                key={editTarget?.id || "edit-section-dialog"}
                 mode="edit"
                 open={!!editTarget}
                 onOpenChange={(o) => !o && setEditTarget(null)}
@@ -234,7 +238,7 @@ export function SectionList({ projectId, sections, isLoading }: SectionListProps
                 <AlertDialogContent>
                     <AlertDialogHeader>
                         <AlertDialogTitle>Delete Section?</AlertDialogTitle>
-                        <AlertDialogDescription>Permanently remove "{deleteTarget?.name}".</AlertDialogDescription>
+                        <AlertDialogDescription>Permanently remove &quot;{deleteTarget?.name}&quot;.</AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
                         <AlertDialogCancel>Cancel</AlertDialogCancel>

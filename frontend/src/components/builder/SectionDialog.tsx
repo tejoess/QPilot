@@ -50,14 +50,6 @@ interface SectionDialogProps {
     nextOrder?: number;
 }
 
-const DEFAULT_FORM: CreateSectionPayload = {
-    name: "",
-    type: "mcq",
-    numQuestions: 10,
-    marksPerQuestion: 1,
-    difficulty: "medium",
-    order: 1,
-};
 
 export function SectionDialog({
     mode,
@@ -68,9 +60,17 @@ export function SectionDialog({
     isSubmitting = false,
     nextOrder = 1,
 }: SectionDialogProps) {
-    const [form, setForm] = useState<CreateSectionPayload>({ ...DEFAULT_FORM });
+    const [form, setForm] = useState<CreateSectionPayload>({
+        name: initial?.name ?? "",
+        type: initial?.type ?? "mcq",
+        numQuestions: initial?.numQuestions ?? 10,
+        marksPerQuestion: initial?.marksPerQuestion ?? 1,
+        difficulty: initial?.difficulty ?? "medium",
+        order: initial?.order ?? nextOrder,
+    });
     const [errors, setErrors] = useState<Record<string, string>>({});
 
+    // Reset form when dialog opens or initial values change
     useEffect(() => {
         if (open) {
             setForm({
@@ -201,7 +201,7 @@ export function SectionDialog({
                     </div>
 
                     <DialogFooter>
-                        <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
+                        <Button variant="outline" type="button" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
                             Cancel
                         </Button>
                         <Button type="submit" disabled={isSubmitting}>

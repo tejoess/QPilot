@@ -32,7 +32,7 @@ interface MetadataFormProps {
         duration: string;
         instructions: string;
     };
-    onChange: (updates: any) => void;
+    onChange: (updates: Partial<MetadataFormProps["data"]>) => void;
     onSave: () => void;
     isSaving: boolean;
     isLoading: boolean;

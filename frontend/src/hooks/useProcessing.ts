@@ -5,7 +5,7 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
-import { useEffect, useRef, useCallback } from "react";
+import { useRef, useCallback } from "react";
 import { useProcessingStore } from "@/store/processingStore";
 import { generatePaper } from "@/lib/projectApi";
 import type { PaperGenerationRequest } from "@/types/api";
@@ -83,8 +83,9 @@ export function useProcessing(projectId: string, requestData: PaperGenerationReq
             } else {
                 setError("Generation failed on backend.");
             }
-        } catch (err: any) {
-            setError(err?.message || "Failed to trigger generation.");
+        } catch (err) {
+            const error = err as { message?: string };
+            setError(error?.message || "Failed to trigger generation.");
         } finally {
             if (ws.readyState === WebSocket.OPEN) {
                 // Optional: wait a bit before closing to ensure logs arrive

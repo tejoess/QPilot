@@ -26,8 +26,7 @@ import {
     SelectTrigger,
     SelectValue
 } from "@/components/ui/select";
-import { Layers, Plus, Pencil, Trash2, ChevronRight, AlertCircle } from "lucide-react";
-import { Separator } from "@/components/ui/separator";
+import { Layers, Plus, Pencil, Trash2, AlertCircle } from "lucide-react";
 
 const QUESTION_TYPES: { value: QuestionType; label: string }[] = [
     { value: "mcq", label: "MCQ" },
@@ -122,7 +121,7 @@ export function QPilotSectionConfig() {
                                                     {section.type.replace('_', ' ')}
                                                 </Badge>
                                                 <Badge className={`text-[9px] uppercase tracking-tighter h-4 font-bold ${section.difficulty === 'easy' ? 'bg-green-500' :
-                                                        section.difficulty === 'hard' ? 'bg-destructive' : 'bg-amber-500'
+                                                    section.difficulty === 'hard' ? 'bg-destructive' : 'bg-amber-500'
                                                     }`}>
                                                     {section.difficulty}
                                                 </Badge>

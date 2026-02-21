@@ -11,7 +11,7 @@ import { useGenerationStore } from "@/store/generationStore";
 import { cn } from "@/lib/utils";
 
 export function AutoFillButton() {
-    const { status, runAutoFillDemo, setAgentStatus, setActiveAgentIndex, emitMessage } = useQPilotStore();
+    const { status, runAutoFillDemo, setActiveAgentIndex } = useQPilotStore();
 
     // External Store Actions
     const setSyllabusText = useSyllabusStore(s => s.setTextContent);

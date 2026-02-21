@@ -5,7 +5,6 @@
  */
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
 import {
@@ -14,7 +13,7 @@ import {
     ChartTooltipContent,
     type ChartConfig
 } from "@/components/ui/chart";
-import { Pie, PieChart, Cell, ResponsiveContainer } from "recharts";
+import { Pie, PieChart, Cell } from "recharts";
 import {
     TrendingUp,
     FileCheck,

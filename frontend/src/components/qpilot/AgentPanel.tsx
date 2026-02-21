@@ -8,8 +8,8 @@ import { useQPilotStore, type AgentStatus } from "@/store/qpilotStore";
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { VerticalProgressBar } from "@/components/qpilot/VerticalProgressBar";
+import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { CheckCircle2, CircleDashed, Loader2, XCircle } from "lucide-react";
 import { SyllabusAgentCard } from "./SyllabusAgentCard";
@@ -23,7 +23,7 @@ import { usePatternStore } from "@/store/patternStore";
 import { useQPilotConfigStore } from "@/store/qpilotConfigStore";
 import { useEffect } from "react";
 
-const STATUS_CONFIG: Record<AgentStatus, { icon: any; color: string; variant: any }> = {
+const STATUS_CONFIG: Record<AgentStatus, { icon: LucideIcon; color: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
     idle: { icon: CircleDashed, color: "text-muted-foreground", variant: "outline" },
     running: { icon: Loader2, color: "text-primary animate-spin", variant: "default" },
     completed: { icon: CheckCircle2, color: "text-green-500", variant: "secondary" },

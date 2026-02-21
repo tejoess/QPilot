@@ -25,7 +25,6 @@ import {
     SelectTrigger,
     SelectValue
 } from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import {
     Layers,
@@ -36,8 +35,7 @@ import {
     CheckCircle2,
     AlertCircle,
     Hash,
-    Award,
-    ChevronRight
+    Award
 } from "lucide-react";
 import { usePatternStore } from "@/store/patternStore";
 import { useQPilotStore } from "@/store/qpilotStore";
@@ -74,7 +72,6 @@ export function PaperPatternAgentCard({ projectId }: PaperPatternAgentCardProps)
         setAgentStatus,
         emitMessage,
         setActiveAgentIndex,
-        activeAgentIndex,
         triggerNextAgent
     } = useQPilotStore();
 
@@ -85,7 +82,6 @@ export function PaperPatternAgentCard({ projectId }: PaperPatternAgentCardProps)
     const totalAllocated = getTotalAllocated();
     const isMatched = totalAllocated === totalMarks;
     const isExceeded = totalAllocated > totalMarks;
-    const isUnder = totalAllocated < totalMarks;
 
     useEffect(() => {
         return () => {
@@ -151,8 +147,9 @@ export function PaperPatternAgentCard({ projectId }: PaperPatternAgentCardProps)
                 }
             }, 1500);
 
-        } catch (err: any) {
-            setError(err?.message || "Pattern application failed.");
+        } catch (err) {
+            const error = err as { message?: string };
+            setError(error?.message || "Pattern application failed.");
             setAgentStatus("pattern", "failed");
             emitMessage("Paper Pattern Agent", "agent", "Validation failure: Structural constraints not met.");
         }

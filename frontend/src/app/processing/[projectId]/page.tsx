@@ -31,7 +31,6 @@ import { ProcessingProgress } from "@/components/processing/ProcessingProgress";
 
 import { useProcessing } from "@/hooks/useProcessing";
 import { useProcessingStore } from "@/store/processingStore";
-import { useProjectStore } from "@/store/projectStore";
 import { getProject } from "@/lib/projectApi";
 import type { PaperGenerationRequest } from "@/types/api";
 
@@ -54,6 +53,7 @@ export default function ProcessingPage() {
                     board: project.board
                 });
             } catch (err) {
+                console.error("Project load error:", err);
                 toast.error("Could not load project metadata.");
             } finally {
                 setIsInitializing(false);

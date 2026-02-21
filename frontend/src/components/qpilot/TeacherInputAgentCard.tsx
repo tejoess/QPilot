@@ -55,8 +55,7 @@ export function TeacherInputAgentCard({ projectId }: TeacherInputAgentCardProps)
         setAgentStatus,
         emitMessage,
         setActiveAgentIndex,
-        updateAgent,
-        activeAgentIndex
+        updateAgent
     } = useQPilotStore();
 
     const status = agentStatuses.generation;
@@ -120,8 +119,9 @@ export function TeacherInputAgentCard({ projectId }: TeacherInputAgentCardProps)
                 }
             }, 1800);
 
-        } catch (err: any) {
-            setError(err?.message || "Generation trigger failed.");
+        } catch (err) {
+            const error = err as { message?: string };
+            setError(error?.message || "Generation trigger failed.");
             setAgentStatus("generation", "failed");
             emitMessage("Teacher Input Agent", "agent", "Pipeline synthesis failed. System state preserved.");
         }

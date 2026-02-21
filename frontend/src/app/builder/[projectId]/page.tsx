@@ -17,7 +17,6 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Separator } from "@/components/ui/separator";
 
 import { SectionList } from "@/components/builder/SectionList";
 import { MetadataForm } from "@/components/builder/MetadataForm";
@@ -34,7 +33,7 @@ import {
     useProjectStore,
 } from "@/store/projectStore";
 
-import type { UpdateProjectPayload } from "@/types/api";
+import type { UpdateProjectPayload, Project } from "@/types/api";
 
 const STATUS_VARIANT: Record<string, string> = {
     draft: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300",
@@ -60,7 +59,6 @@ export default function BuilderPage() {
         setLoadingProject,
         setLoadingSections,
         setSavingProject,
-        setProjectError,
         resetBuilder,
         updateProjectLocal,
         isValid
@@ -81,6 +79,7 @@ export default function BuilderPage() {
             const data = await getProject(projectId);
             setProject(data);
         } catch (err) {
+            console.error("Project fetch error:", err);
             toast.error("Could not load project.");
         } finally {
             setLoadingProject(false);
@@ -94,6 +93,7 @@ export default function BuilderPage() {
             const data = await getSections(projectId);
             setSections(data);
         } catch (err) {
+            console.error("Sections fetch error:", err);
             toast.error("Could not load sections.");
         } finally {
             setLoadingSections(false);
@@ -105,11 +105,11 @@ export default function BuilderPage() {
         fetchSections();
     }, [fetchProject, fetchSections]);
 
-    const handleMetadataChange = (updates: any) => {
+    const handleMetadataChange = (updates: Partial<Project>) => {
         updateProjectLocal(updates);
     };
 
-    const handleSettingsChange = (updates: any) => {
+    const handleSettingsChange = (updates: Partial<Project["settings"]>) => {
         if (!project) return;
         updateProjectLocal({
             settings: { ...project.settings, ...updates }
@@ -124,6 +124,7 @@ export default function BuilderPage() {
             setProject(saved);
             toast.success("Project updated.");
         } catch (err) {
+            console.error("Save error:", err);
             toast.error("Failed to save.");
         } finally {
             setSavingProject(false);
@@ -154,6 +155,7 @@ export default function BuilderPage() {
                 toast.error("Failed to start generation.");
             }
         } catch (err) {
+            console.error("Generation error:", err);
             toast.error("Backend error. Is the server running?");
         } finally {
             setIsGenerating(false);

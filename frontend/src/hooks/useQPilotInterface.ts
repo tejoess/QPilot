@@ -112,7 +112,8 @@ export function useQPilotInterface(projectId: string, requestData: PaperGenerati
             } else {
                 setStatus("failed");
             }
-        } catch (err: any) {
+        } catch (err) {
+            console.error("Generation error:", err);
             setStatus("failed");
         } finally {
             if (ws.readyState === WebSocket.OPEN) {

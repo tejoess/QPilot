@@ -68,8 +68,9 @@ export default function QPilotConfigPage() {
                 toast.error("Backend Error", { id, description: "The server failed to initialize the session." });
                 setSubmitting(false);
             }
-        } catch (err: any) {
-            toast.error("Connection Failed", { id, description: err?.message || "Ensure backend is running on port 8000." });
+        } catch (err) {
+            const error = err as { message?: string };
+            toast.error("Connection Failed", { id, description: error?.message || "Ensure backend is running on port 8000." });
             setSubmitting(false);
         }
     };

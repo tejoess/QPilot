@@ -31,7 +31,7 @@ const NAV_ITEMS = [
 
 export function QPilotSidebar() {
     const pathname = usePathname();
-    const { state, toggleSidebar, isMobile } = useSidebar();
+    const { state, toggleSidebar } = useSidebar();
     const isCollapsed = state === "collapsed";
 
     return (

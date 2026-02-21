@@ -76,7 +76,7 @@ export function FloatingOrchestrator() {
                             </div>
                             <div className="bg-muted/50 p-5 rounded-2xl rounded-tl-none border border-border/20 shadow-sm max-w-[85%]">
                                 <p className="text-sm font-medium leading-relaxed text-foreground">
-                                    Hi, I'm <span className="font-black text-primary">QPilot</span>. How can I help you generate your question paper today?
+                                    Hi, I&apos;m <span className="font-black text-primary">QPilot</span>. How can I help you generate your question paper today?
                                 </p>
                             </div>
                         </div>

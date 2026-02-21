@@ -20,7 +20,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Project, ProjectStatus } from "@/types/api";
-import { MoreHorizontal, FileText, Download, Eye, Clock } from "lucide-react";
+import { MoreHorizontal, FileText, Download, Eye } from "lucide-react";
 import { format } from "date-fns";
 import Link from "next/link";
 
@@ -29,7 +29,7 @@ interface RecentPapersTableProps {
     isLoading: boolean;
 }
 
-const STATUS_MAP: Record<ProjectStatus, { label: string; variant: any }> = {
+const STATUS_MAP: Record<ProjectStatus, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
     draft: { label: "Draft", variant: "outline" },
     processing: { label: "Generating", variant: "default" },
     done: { label: "Generated", variant: "secondary" },

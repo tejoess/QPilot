@@ -7,9 +7,10 @@
 import { CheckCircle2, CircleDashed, Loader2, XCircle } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { useProcessingStore, type PipelineStep, type StepStatus } from "@/store/processingStore";
+import { useProcessingStore, type StepStatus } from "@/store/processingStore";
+import type { LucideIcon } from "lucide-react";
 
-const STATUS_CONFIG: Record<StepStatus, { icon: any; color: string; label: string }> = {
+const STATUS_CONFIG: Record<StepStatus, { icon: LucideIcon; color: string; label: string }> = {
     pending: { icon: CircleDashed, color: "text-muted-foreground", label: "Pending" },
     running: { icon: Loader2, color: "text-primary animate-spin", label: "Processing" },
     completed: { icon: CheckCircle2, color: "text-green-500", label: "Completed" },
