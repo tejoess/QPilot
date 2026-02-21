@@ -1,126 +1,123 @@
 # app/services/pyq_service.py
+# app/services/pyq_service.py
+
 import json
-import re
 import os
-from typing import List, Dict, Any
+from typing import Dict, Any
 from backend.services.llm_service import gemini_llm as llm
 from langchain_core.messages import HumanMessage
 
 
-def format_pyqs(pyq_text: str = "") -> str:
+def format_pyqs(pyq_text: str = "", syllabus_json: Dict[str, Any] = None) -> str:
     """
-    Takes raw PYQ text, splits it into chunks, and extracts questions with high fidelity.
-    Focuses on Question Text, Topic, Subtopic, and Marks.
+    Takes raw PYQ text + syllabus JSON and extracts questions in a single pass (no chunking).
+    Topics/Subtopics are forced strictly from syllabus labels.
     """
-    print(f"\n🛠️  [GRAPH NODE] Formatting PYQ JSON (High Quality Mode)...")
-    
+
+    print("\n🛠️  [GRAPH NODE] Formatting PYQ JSON (Syllabus-Constrained Mode)...")
+
     if not pyq_text:
-        return json.dumps({"error": "No text available."})
+        return json.dumps({"error": "No PYQ text available."})
 
-    # Chunk size config
-    chunk_size = 6000  
-    overlap = 1000  # Increased overlap to capture context for topics
-    
-    all_questions = []
-    
-    # Split text into chunks
-    chunks = []
-    if len(pyq_text) <= chunk_size:
-        chunks = [pyq_text]
-    else:
-        for i in range(0, len(pyq_text), chunk_size - overlap):
-            chunks.append(pyq_text[i:i+chunk_size])
-            
-    print(f"   📊 Processing {len(chunks)} chunks for {len(pyq_text)} chars...")
-    
-    for i, chunk in enumerate(chunks):
-        print(f"   🔄 Processing Chunk {i+1}/{len(chunks)}...")
-        
-        prompt = f"""
-        You are an expert exam extraction system. Extract valid academic questions from the text below.
-        
-        STRICT RULES:
-        1. **Question Text**: Extract the FULL, COMPLETE question text. Do NOT include the question number or any parenthesized parts like "(a)" in the text.
-        2. **Filter Noise**: 
-           - IGNORE exam instructions like "Attempt any", "compulsory", "Time allow", "Max marks".
-           - IGNORE headers, footers, page numbers, or section titles.
-           - IGNORE statements that are not questions (e.g., "The input to the layer has 32 channels...").
-           - **ONLY extract items that are actual questions** starting with or containing action verbs/interrogatives (e.g., Explain, Define, Calculate, Discuss, Design, Differentiate, What, Why, How).
-        3. **Topic/Subtopic**: Infer the technical Topic and Subtopic. Use specific technical terms (e.g., "CNN Architecture", "Gradient Descent", "GANs").
-        4. **Marks**: Extract marks if explicitly present (e.g. "[10]", "10"). 
-            if marks are not explicitly mentioned, mark it 2,5 or 10 based on the complexity of the question.
-        5. **Cleanliness**: Fix broken words (e.g. "Net- work" -> "Network").
-        
-        Ignored Fields: Do NOT extract Question Numbers.
-        
-        Return a JSON object with this EXACT structure:
+    if not syllabus_json:
+        return json.dumps({"error": "Syllabus JSON not provided."})
+
+    syllabus_text = json.dumps(syllabus_json, indent=2)
+
+    prompt = f"""
+You are an expert academic exam extraction system.
+
+Your job:
+Extract ONLY valid academic questions from PYQ text and label them using the provided syllabus.
+
+STRICT RULES:
+
+1. Question Text:
+   - Extract FULL, COMPLETE question text.
+   - Do NOT include question numbers or parenthesized parts like "(a)".
+   - Fix broken words if present.
+
+2. Filter Noise:
+   - IGNORE instructions like "Attempt any", "Time allowed", "Max marks".
+   - IGNORE headers, footers, page numbers, and section titles.
+   - IGNORE statements that are not questions.
+   - ONLY extract actual questions containing action verbs/interrogatives.
+
+3. Topic & Subtopic Mapping:
+   - Topics/Subtopics must be mapped strictly from the provided syllabus.
+   - topics/subtopic which you will label should be strictly from syllabus as it is, no change.
+   - Do NOT paraphrase, rename, infer, generalize, or create new labels.
+   - If a match is unclear, choose the closest exact syllabus entry.
+
+4. Marks:
+   - Extract if explicitly present.
+   - If not present, infer only from complexity: 2, 5, or 10.
+
+5. Cleanliness:
+   - Remove numbering artifacts.
+   - Normalize spacing and broken words.
+
+Return JSON in EXACT structure:
+
+{{
+    "questions": [
         {{
-            "questions": [
-                {{
-                    "question": "Full question text here",
-                    "topic": "Specific Technical Topic",
-                    "subtopic": "Specific Sub-concept",
-                    "marks": 10
-                }}
-            ]
+            "question": "Full question text here",
+            "topic": "Exact Topic From Syllabus",
+            "subtopic": "Exact Subtopic From Syllabus",
+            "marks": 10
         }}
-        
-        Text Chunk:
-        ---
-        {chunk}
-        ---
-        
-        Return ONLY valid JSON.
-        """
-        
-        try:
-            response = llm.invoke([HumanMessage(content=prompt)])
-            content = response.content
-            print(content)
-            
-            # json_match = re.search(r'\{[\s\S]*\}', content)
-            
-            # if json_match:
-            #     try:
-            #         data = json.loads(json_match.group(0))
-                    
-            #         if "questions" in data and isinstance(data["questions"], list):
-            #             # Filter out empty or garbage questions
-            #             valid_qs = [
-            #                 q for q in data["questions"] 
-            #                 if q.get("question") and len(str(q["question"])) > 5
-            #             ]
-            #             all_questions.extend(valid_qs)
-            #             print(f"      ✅ Chunk {i+1}: Extracted {len(valid_qs)} questions.")
-            #     except json.JSONDecodeError:
-            #         print(f"      ❌ Chunk {i+1}: JSON Decode Error.")
-            # else:
-            #     print(f"      ❌ Chunk {i+1}: No JSON found.")
-                    
-        except Exception as e:
-            print(f"      ❌ Warning in chunk {i+1}: {e}")
+    ]
+}}
 
-    # Remove duplicates based on question text
-    seen_questions = set()
-    unique_questions = []
-    
-    for q in all_questions:
-        # Normalize text for deduplication comparison (lower case, stripped)
-        q_text_norm = str(q.get("question", "")).strip().lower()
-        if q_text_norm and q_text_norm not in seen_questions:
-            seen_questions.add(q_text_norm)
-            unique_questions.append(q)
-    
-    # Final Output
-    final_output = {
-        "exam_info": {
-            "note": "Aggregated from extracted chunks."
-        },
-        "questions": unique_questions
-    }
-    
-    print(f"✅  [PYQ FORMAT] Completed. Total Unique Questions: {len(unique_questions)}")
-    return json.dumps(final_output, indent=4)
+SYLLABUS:
+---
+{syllabus_text}
+---
+
+PYQ TEXT:
+---
+{pyq_text}
+---
+
+Return ONLY valid JSON.
+"""
+
+    try:
+        response = llm.invoke([HumanMessage(content=prompt)])
+        content = response.content
+        print(content)
+
+        data = json.loads(content)
+
+        if "questions" not in data:
+            return json.dumps({"error": "Invalid JSON structure from LLM."})
+
+        # Deduplicate questions
+        seen = set()
+        unique_questions = []
+
+        for q in data["questions"]:
+            q_text = str(q.get("question", "")).strip().lower()
+            if q_text and q_text not in seen:
+                seen.add(q_text)
+                unique_questions.append(q)
+
+        final_output = {
+            "exam_info": {
+                "note": "Generated using syllabus-constrained labeling."
+            },
+            "questions": unique_questions
+        }
+
+        print(f"✅  [PYQ FORMAT] Completed. Total Unique Questions: {len(unique_questions)}")
+        return json.dumps(final_output, indent=4)
+
+    except json.JSONDecodeError:
+        return json.dumps({"error": "LLM returned invalid JSON."})
+
+    except Exception as e:
+        return json.dumps({"error": str(e)})
 
 
 pyq_text ="""
@@ -333,6 +330,75 @@ Based on the provided documents, here is the extracted text from the previous ye
 Would you like me to solve any of the specific numerical problems or architectural explanations from these papers?
 """
 
+dummy_syllabus = """
+| Course Code:   | Course Title   |   Credit |
+|----------------|----------------|----------|
+| CSC701         | Deep Learning  |        3 |
 
-# pyqs = format_pyqs(pyq_text)
-# print(pyqs)
+| Prerequisite: Basic mathematics and Statistical concepts, Linear algebra, Machine Learning   | Prerequisite: Basic mathematics and Statistical concepts, Linear algebra, Machine Learning                            |
+|----------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------|
+| Course Objectives:                                                                           | Course Objectives:                                                                                                    |
+| 1                                                                                            | To learn the fundamentals of Neural Network.                                                                          |
+| 2                                                                                            | To gain an in-depth understanding of training Deep Neural Networks.                                                   |
+| 3                                                                                            | To acquire knowledge of advanced concepts of Convolution Neural Networks, Autoencoders and Recurrent Neural Networks. |
+| 4                                                                                            | Students should be familiar with the recent trends in Deep Learning.                                                  |
+| Course Outcomes:                                                                             | Course Outcomes:                                                                                                      |
+| 1                                                                                            | Gain basic knowledge of Neural Networks.                                                                              |
+| 2                                                                                            | Acquire in depth understanding of training Deep Neural Networks.                                                      |
+| 3                                                                                            | Design appropriate DNN model for supervised, unsupervised and sequence learning applications.                         |
+| 4                                                                                            | Gain familiarity with recent trends and applications of Deep Learning.                                                |
+
+| Modul e   |     | Content                                                                                                                                                                                                                                                           | 39Hrs   |
+|-----------|-----|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------|
+| 1         |     | Fundamentals of Neural Network                                                                                                                                                                                                                                    | 4       |
+|           | 1.1 | History of Deep Learning, Deep Learning Success Stories, Multilayer Perceptrons (MLPs), Representation Power of MLPs, Sigmoid Neurons, Gradient Descent, Feedforward Neural Networks, Representation Power of Feedforward Neural Networks                         |         |
+|           | 1.2 | Deep Networks: Three Classes of Deep Learning Basic Terminologies of Deep Learning                                                                                                                                                                                |         |
+| 2         |     | Training, Optimization and Regularization of Deep Neural Network                                                                                                                                                                                                  | 10      |
+|           | 2.1 | Training FeedforwardDNN Multi Layered Feed Forward Neural Network, Learning Factors, Activation functions: Tanh, Logistic, Linear, Softmax, ReLU, Leaky ReLU, Loss functions: Squared Error loss, Cross Entropy, Choosing output function and loss function       |         |
+|           | 2.2 | Optimization Learning with backpropagation, Learning Parameters: Gradient Descent (GD), Stochastic and Mini Batch GD, Momentum Based GD, Nesterov Accelerated GD, AdaGrad, Adam, RMSProp                                                                          |         |
+|           | 2.3 | Regularization Overview of Overfitting, Types of biases, Bias Variance Tradeoff Regularization Methods: L1, L2 regularization, Parameter sharing, Dropout, Weight Decay, Batch normalization, Early stopping, Data Augmentation, Adding noise to input and output |         |
+| 3         |     | Autoencoders: Unsupervised Learning                                                                                                                                                                                                                               | 6       |
+|           | 3.1 | Introduction, Linear Autoencoder, Undercomplete Autoencoder, Overcomplete Autoencoders, Regularization in Autoencoders                                                                                                                                            |         |
+
+| 3.2   | Denoising Autoencoders, Sparse Autoencoders, Contractive Autoencoders                                                                                                                                                                                                                    |    |
+|-------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|----|
+| 3.3   | Application of Autoencoders: Image Compression                                                                                                                                                                                                                                           |    |
+|       | Convolutional Neural Networks (CNN): Supervised Learning                                                                                                                                                                                                                                 | 7  |
+| 4.1   | Convolution operation, Padding, Stride, Relation between input, output and filter size, CNN architecture: Convolution layer, Pooling Layer, Weight Sharing in CNN, Fully Connected NN vs CNN, Variants of basic Convolution function, Multichannel convolution operation,2D convolution. |    |
+| 4.2   | Modern Deep Learning Architectures: LeNET: Architecture, AlexNET: Architecture, ResNet : Architecture                                                                                                                                                                                    |    |
+|       | Recurrent Neural Networks (RNN)                                                                                                                                                                                                                                                          | 8  |
+| 5.1   | Sequence Learning Problem, Unfolding Computational graphs, Recurrent Neural Network, Bidirectional RNN, Backpropagation Through Time (BTT), Limitation of ' vanilla RNN' Vanishing and Exploding Gradients, Truncated BTT                                                                |    |
+| 5.2   | Long Short Term Memory(LSTM): Selective Read, Selective write, Selective Forget, Gated Recurrent Unit (GRU)                                                                                                                                                                              |    |
+|       | Recent Trends and Applications                                                                                                                                                                                                                                                           | 4  |
+| 6.1   | Generative Adversarial Network (GAN): Architecture                                                                                                                                                                                                                                       |    |
+| 6.2   | Applications: Image Generation, DeepFake                                                                                                                                                                                                                                                 |    |
+
+| Textbooks:   | Textbooks:                                                                                        |
+|--------------|---------------------------------------------------------------------------------------------------|
+| 1            | Ian Goodfellow, Yoshua Bengio, Aaron Courville. -Deep Learningǁ, MIT Press Ltd, 2016              |
+| 2            | Li Deng and Dong Yu, -Deep Learning Methods and Applicationsǁ, Publishers Inc.                    |
+| 3            | Satish Kumar "Neural Networks AClassroom Approach" Tata McGraw-Hill.                              |
+| 4            | JM Zurada -Introduction to Artificial Neural Systemsǁ, Jaico Publishing House                     |
+| 5            | M. J. Kochenderfer, Tim A. Wheeler. -Algorithms for Optimizationǁ, MIT Press.                     |
+| References:  | References:                                                                                       |
+| 1            | Deep Learning from Scratch: Building with Python from First Principles- Seth Weidman by O`Reilley |
+| 2            | François Chollet. -Deep learning with Python -(Vol. 361). 2018 New York: Manning.                 |
+| 3            | Douwe Osinga. -Deep Learning Cookbookǁ, O'REILLY, SPDPublishers, Delhi.                           |
+| 4            | Simon Haykin, Neural Network-A Comprehensive Foundation- Prentice Hall International, Inc         |
+| 5            | S.N.Sivanandam and S.N.Deepa, Principles of soft computing-Wiley India                            |
+
+## Assessment:
+
+## Internal Assessment:
+
+The assessment consists of two class tests of 20 marks each. The first class test is to be conducted when approx. 40% syllabus is completed and second class test when additional 40% syllabus is completed. Duration of each test shall be one hour.
+
+## End Semester Theory Examination:
+
+- 1 Question paper will comprise a total of six questions.
+- 2 All questions carry equal marks.
+- 3 Question 1 and question 6 will have questions from all modules. Remaining 4 questions will be based on the remaining 4 modules.
+
+"""
+pyqs = format_pyqs(pyq_text, dummy_syllabus)
+print(pyqs)
