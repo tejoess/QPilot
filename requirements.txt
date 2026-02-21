@@ -1,0 +1,9 @@
+fastapi
+langchain
+langchain_core
+openai
+langchain_openai
+langchain_google_genai
+pydantic 
+websocket
+langgraph

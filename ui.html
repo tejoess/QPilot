@@ -1,0 +1,645 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PaperFlow | Minimalist Builder</title>
+    <style>
+        :root {
+            --bg-color: #f8f9fa;
+            --sidebar-bg: #ffffff;
+            --primary: #6366f1;
+            --primary-hover: #4f46e5;
+            --text-main: #1f2937;
+            --text-muted: #6b7280;
+            --border: #e5e7eb;
+            --sidebar-width: 320px;
+            --radius: 12px;
+            --shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* Sidebar Styles */
+        aside {
+            width: var(--sidebar-width);
+            background: var(--sidebar-bg);
+            border-right: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            flex-shrink: 0;
+            z-index: 10;
+        }
+
+        .sidebar-header {
+            padding: 24px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .logo {
+            font-size: 1.25rem;
+            font-weight: 800;
+            letter-spacing: -0.025em;
+            color: var(--primary);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .sidebar-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 24px;
+        }
+
+        .sidebar-section {
+            margin-bottom: 32px;
+        }
+
+        .sidebar-section h3 {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-muted);
+            margin-bottom: 16px;
+        }
+
+        /* Form Controls */
+        .control-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            font-size: 0.875rem;
+            font-weight: 500;
+            margin-bottom: 8px;
+        }
+
+        input[type="text"], select {
+            width: 100%;
+            padding: 10px 12px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            font-size: 0.875rem;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        input:focus, select:focus {
+            border-color: var(--primary);
+        }
+
+        .toggle-container {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            cursor: pointer;
+        }
+
+        .toggle {
+            width: 40px;
+            height: 20px;
+            background: #d1d5db;
+            border-radius: 20px;
+            position: relative;
+            transition: background 0.3s;
+        }
+
+        .toggle::after {
+            content: '';
+            position: absolute;
+            width: 16px;
+            height: 16px;
+            background: white;
+            border-radius: 50%;
+            top: 2px;
+            left: 2px;
+            transition: transform 0.3s;
+        }
+
+        .toggle-input:checked + .toggle {
+            background: var(--primary);
+        }
+
+        .toggle-input:checked + .toggle::after {
+            transform: translateX(20px);
+        }
+
+        .toggle-input {
+            display: none;
+        }
+
+        /* Main Area */
+        main {
+            flex: 1;
+            position: relative;
+            overflow-y: auto;
+            padding: 40px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .stage-container {
+            width: 100%;
+            max-width: 900px;
+            display: none;
+            animation: fadeInSlide 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+
+        .stage-container.active {
+            display: block;
+        }
+
+        @keyframes fadeInSlide {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Stage 1: Builder */
+        .builder-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 24px;
+        }
+
+        .card {
+            background: white;
+            border-radius: var(--radius);
+            padding: 24px;
+            border: 1px solid var(--border);
+            box-shadow: var(--shadow);
+        }
+
+        .full-width {
+            grid-column: span 2;
+        }
+
+        /* Stage 2: Processing */
+        .status-header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        .progress-bar-container {
+            width: 100%;
+            height: 8px;
+            background: var(--border);
+            border-radius: 4px;
+            margin: 20px 0;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: var(--primary);
+            width: 0%;
+            transition: width 0.4s ease;
+        }
+
+        .step-list {
+            list-style: none;
+            margin-top: 32px;
+        }
+
+        .step-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 16px;
+            color: var(--text-muted);
+            transition: color 0.3s;
+        }
+
+        .step-item.active {
+            color: var(--text-main);
+            font-weight: 600;
+        }
+
+        .step-item.completed {
+            color: #10b981;
+        }
+
+        .step-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: currentColor;
+        }
+
+        .log-terminal {
+            background: #111827;
+            color: #10b981;
+            padding: 20px;
+            border-radius: 8px;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 0.8125rem;
+            height: 200px;
+            overflow-y: auto;
+            margin-top: 24px;
+        }
+
+        /* Stage 3: Output */
+        .paper-preview {
+            background: white;
+            width: 100%;
+            aspect-ratio: 1 / 1.414; /* A4 Ratio */
+            border: 1px solid var(--border);
+            box-shadow: 0 10px 25px -5px rgba(0,0,0,0.1);
+            padding: 60px;
+            margin-bottom: 32px;
+        }
+
+        .preview-header {
+            border-bottom: 2px solid #000;
+            padding-bottom: 20px;
+            margin-bottom: 40px;
+            text-align: center;
+        }
+
+        .preview-content {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .preview-skeleton {
+            height: 12px;
+            background: #f3f4f6;
+            border-radius: 4px;
+        }
+
+        /* Buttons */
+        .btn {
+            padding: 12px 24px;
+            border-radius: 8px;
+            border: none;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.875rem;
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: var(--primary-hover);
+            transform: translateY(-1px);
+        }
+
+        .btn-secondary {
+            background: white;
+            border: 1px solid var(--border);
+            color: var(--text-main);
+        }
+
+        .btn-secondary:hover {
+            background: var(--bg-color);
+        }
+
+        .action-footer {
+            margin-top: auto;
+            display: flex;
+            justify-content: flex-end;
+            gap: 12px;
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #d1d5db;
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #9ca3af;
+        }
+
+        /* Mobile Overlay */
+        @media (max-width: 768px) {
+            aside {
+                display: none; /* Simplification for brief UI demo */
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- PERSISTENT SIDEBAR -->
+    <aside>
+        <div class="sidebar-header">
+            <div class="logo">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+                PaperFlow
+            </div>
+        </div>
+        
+        <div class="sidebar-content">
+            <div class="sidebar-section">
+                <h3>General Settings</h3>
+                <div class="control-group">
+                    <label>Project Name</label>
+                    <input type="text" id="projName" placeholder="Untitled Exam Paper">
+                </div>
+                <div class="control-group">
+                    <label>Paper Size</label>
+                    <select>
+                        <option>A4 (Standard)</option>
+                        <option>US Letter</option>
+                        <option>Legal</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="sidebar-section">
+                <h3>Configuration</h3>
+                <div class="control-group">
+                    <label class="toggle-container">
+                        <span>Auto-Layout</span>
+                        <input type="checkbox" class="toggle-input" checked>
+                        <div class="toggle"></div>
+                    </label>
+                </div>
+                <div class="control-group">
+                    <label class="toggle-container">
+                        <span>Include Header</span>
+                        <input type="checkbox" class="toggle-input" checked>
+                        <div class="toggle"></div>
+                    </label>
+                </div>
+                <div class="control-group">
+                    <label class="toggle-container">
+                        <span>High Contrast</span>
+                        <input type="checkbox" class="toggle-input">
+                        <div class="toggle"></div>
+                    </label>
+                </div>
+            </div>
+
+            <div class="sidebar-section">
+                <h3>Export Format</h3>
+                <div class="control-group">
+                    <label>Primary Output</label>
+                    <select>
+                        <option>PDF Document</option>
+                        <option>LaTeX Source</option>
+                        <option>Rich Text (RTF)</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <div class="sidebar-header" style="border-top: 1px solid var(--border); border-bottom: none;">
+            <p style="font-size: 0.75rem; color: var(--text-muted); text-align: center;">v1.0.4 stable</p>
+        </div>
+    </aside>
+
+    <!-- DYNAMIC MAIN CONTENT -->
+    <main>
+        
+        <!-- STAGE 1: BUILDER -->
+        <div id="stage1" class="stage-container active">
+            <div style="margin-bottom: 32px;">
+                <h1 style="font-size: 1.875rem; font-weight: 700;">Paper Pattern Builder</h1>
+                <p style="color: var(--text-muted);">Define the structure and sections for your generated document.</p>
+            </div>
+
+            <div class="builder-grid">
+                <div class="card full-width">
+                    <label>Paper Title</label>
+                    <input type="text" value="Annual Examination 2024 - Mathematics" style="font-size: 1.125rem; font-weight: 600;">
+                </div>
+                
+                <div class="card">
+                    <h4 style="margin-bottom: 12px; font-size: 0.875rem;">Objective Section</h4>
+                    <p style="font-size: 0.8125rem; color: var(--text-muted); margin-bottom: 16px;">Multiple choice and true/false questions.</p>
+                    <div style="display: flex; gap: 8px;">
+                        <input type="text" placeholder="Quantity" style="width: 80px;">
+                        <button class="btn btn-secondary" style="padding: 8px 12px;">Add Rule</button>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h4 style="margin-bottom: 12px; font-size: 0.875rem;">Subjective Section</h4>
+                    <p style="font-size: 0.8125rem; color: var(--text-muted); margin-bottom: 16px;">Long answer and diagrammatic questions.</p>
+                    <div style="display: flex; gap: 8px;">
+                        <input type="text" placeholder="Quantity" style="width: 80px;">
+                        <button class="btn btn-secondary" style="padding: 8px 12px;">Add Rule</button>
+                    </div>
+                </div>
+
+                <div class="card full-width" style="border-style: dashed; background: transparent; display: flex; justify-content: center; align-items: center; height: 100px; cursor: pointer;">
+                    <span style="color: var(--primary); font-weight: 600;">+ Add New Pattern Block</span>
+                </div>
+            </div>
+
+            <div class="action-footer">
+                <button class="btn btn-secondary">Save Draft</button>
+                <button class="btn btn-primary" onclick="goToStage(2)">
+                    Process Next
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
+                </button>
+            </div>
+        </div>
+
+        <!-- STAGE 2: PROCESSING -->
+        <div id="stage2" class="stage-container">
+            <div class="card" style="max-width: 600px; margin: 0 auto;">
+                <div class="status-header">
+                    <h2 id="statusTitle">Generating Paper...</h2>
+                    <p style="color: var(--text-muted);">Please wait while we assemble your pattern rules.</p>
+                </div>
+
+                <div class="progress-bar-container">
+                    <div id="progressFill" class="progress-fill"></div>
+                </div>
+
+                <ul class="step-list">
+                    <li class="step-item" id="step1">
+                        <div class="step-dot"></div>
+                        Validating rule constraints
+                    </li>
+                    <li class="step-item" id="step2">
+                        <div class="step-dot"></div>
+                        Applying typography styles
+                    </li>
+                    <li class="step-item" id="step3">
+                        <div class="step-dot"></div>
+                        Generating PDF binary
+                    </li>
+                </ul>
+
+                <div class="log-terminal" id="logTerminal">
+                    > Initializing engine...<br>
+                    > Reading config.json...<br>
+                    > Parsing mathematical expressions...<br>
+                </div>
+            </div>
+        </div>
+
+        <!-- STAGE 3: OUTPUT -->
+        <div id="stage3" class="stage-container">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 32px;">
+                <div>
+                    <h1 style="font-size: 1.875rem; font-weight: 700;">Final Output</h1>
+                    <p style="color: var(--text-muted);">Your paper is ready for review and export.</p>
+                </div>
+                <div style="display: flex; gap: 12px;">
+                    <button class="btn btn-secondary" onclick="goToStage(1)">Edit Pattern</button>
+                    <button class="btn btn-primary">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                        Download PDF
+                    </button>
+                </div>
+            </div>
+
+            <div class="paper-preview">
+                <div class="preview-header">
+                    <h2 id="previewProjName">Mathematics Annual Exam</h2>
+                    <p style="margin-top: 8px; font-weight: 500;">Time: 3 Hours | Max Marks: 100</p>
+                </div>
+                <div class="preview-content">
+                    <div style="font-weight: bold; margin-bottom: 10px;">SECTION A: OBJECTIVES</div>
+                    <div class="preview-skeleton" style="width: 90%;"></div>
+                    <div class="preview-skeleton" style="width: 85%;"></div>
+                    <div class="preview-skeleton" style="width: 40%; margin-bottom: 20px;"></div>
+
+                    <div style="font-weight: bold; margin-bottom: 10px;">SECTION B: SUBJECTIVE</div>
+                    <div class="preview-skeleton" style="width: 95%;"></div>
+                    <div class="preview-skeleton" style="width: 92%;"></div>
+                    <div class="preview-skeleton" style="width: 88%;"></div>
+                    <div class="preview-skeleton" style="width: 90%;"></div>
+                    <div class="preview-skeleton" style="width: 30%;"></div>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <script>
+        const stages = ['stage1', 'stage2', 'stage3'];
+        let currentStageIndex = 0;
+
+        function goToStage(index) {
+            // Subtracting 1 if the input is human-readable stage number (1-based)
+            const targetIndex = index - 1;
+            
+            // Hide all stages
+            stages.forEach(id => {
+                document.getElementById(id).classList.remove('active');
+            });
+
+            // Show target stage
+            const targetId = stages[targetIndex];
+            document.getElementById(targetId).classList.add('active');
+
+            // Handle specific stage logic
+            if (targetIndex === 1) { // Stage 2: Processing
+                startProcessingSimulation();
+            }
+
+            if (targetIndex === 2) { // Stage 3: Output
+                updatePreview();
+            }
+        }
+
+        function startProcessingSimulation() {
+            const bar = document.getElementById('progressFill');
+            const log = document.getElementById('logTerminal');
+            const title = document.getElementById('statusTitle');
+            const steps = [
+                document.getElementById('step1'),
+                document.getElementById('step2'),
+                document.getElementById('step3')
+            ];
+
+            let progress = 0;
+            bar.style.width = '0%';
+            
+            // Reset steps
+            steps.forEach(s => s.className = 'step-item');
+
+            const interval = setInterval(() => {
+                progress += Math.random() * 15;
+                if (progress > 100) progress = 100;
+                
+                bar.style.width = progress + '%';
+
+                // Simulate steps status
+                if (progress > 10) {
+                    steps[0].classList.add('active');
+                    if (progress > 35) steps[0].className = 'step-item completed';
+                }
+                if (progress > 40) {
+                    steps[1].classList.add('active');
+                    if (progress > 75) steps[1].className = 'step-item completed';
+                }
+                if (progress > 80) {
+                    steps[2].classList.add('active');
+                }
+
+                // Append logs
+                if (Math.random() > 0.7) {
+                    const messages = [
+                        "Optimizing vector paths...",
+                        "Calculating page breaks...",
+                        "Embedding font subsets...",
+                        "Compiling pattern definitions...",
+                        "Finalizing layout engine..."
+                    ];
+                    const msg = messages[Math.floor(Math.random() * messages.length)];
+                    log.innerHTML += `> ${msg}<br>`;
+                    log.scrollTop = log.scrollHeight;
+                }
+
+                if (progress === 100) {
+                    clearInterval(interval);
+                    steps[2].className = 'step-item completed';
+                    title.innerText = "Process Complete!";
+                    
+                    setTimeout(() => {
+                        goToStage(3);
+                    }, 800);
+                }
+            }, 300);
+        }
+
+        function updatePreview() {
+            const nameInput = document.getElementById('projName').value;
+            const previewTitle = document.getElementById('previewProjName');
+            if (nameInput.trim() !== "") {
+                previewTitle.innerText = nameInput;
+            }
+        }
+
+        // Initialize with Stage 1
+        window.onload = () => {
+            goToStage(1);
+        };
+    </script>
+</body>
+</html>

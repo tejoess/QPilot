@@ -1,0 +1,1922 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Folio — Paper Pattern Studio</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=DM+Mono:wght@300;400;500&family=Jost:wght@300;400;500;600&display=swap" rel="stylesheet" />
+<style>
+  /* ─── RESET & TOKENS ───────────────────────────────────────────── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:       #0e0e0e;
+    --surface:  #151515;
+    --card:     #1c1c1c;
+    --border:   #2a2a2a;
+    --border2:  #333;
+    --text:     #e8e2d8;
+    --muted:    #6b6560;
+    --accent:   #d4a95a;
+    --accent2:  #c0856e;
+    --green:    #5db38a;
+    --red:      #c06060;
+    --sidebar-w: 290px;
+    --radius:   10px;
+    --transition: 0.32s cubic-bezier(0.4,0,0.2,1);
+  }
+
+  html, body { height: 100%; overflow: hidden; }
+
+  body {
+    font-family: 'Jost', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    display: flex;
+    font-size: 14px;
+    font-weight: 400;
+    letter-spacing: 0.01em;
+  }
+
+  /* ─── SCROLLBAR ─────────────────────────────────────────────────── */
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 4px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+
+  /* ─── SIDEBAR ───────────────────────────────────────────────────── */
+  #sidebar {
+    width: var(--sidebar-w);
+    min-width: var(--sidebar-w);
+    height: 100vh;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    position: relative;
+    z-index: 10;
+  }
+
+  .sidebar-glow {
+    position: absolute; top: 0; left: 0; right: 0; height: 160px;
+    background: radial-gradient(ellipse at 50% -10%, rgba(212,169,90,0.12) 0%, transparent 70%);
+    pointer-events: none;
+  }
+
+  .sidebar-logo {
+    padding: 28px 24px 20px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+
+  .logo-mark {
+    display: flex; align-items: center; gap: 10px;
+  }
+
+  .logo-icon {
+    width: 32px; height: 32px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 15px;
+    box-shadow: 0 4px 12px rgba(212,169,90,0.3);
+  }
+
+  .logo-text {
+    font-family: 'Playfair Display', serif;
+    font-size: 20px; font-weight: 700;
+    color: var(--text);
+    letter-spacing: 0.02em;
+  }
+
+  .logo-sub {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    margin-top: 4px;
+  }
+
+  .sidebar-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px 20px 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  /* ─── SIDEBAR SECTION ───────────────────────────────────────────── */
+  .s-section { display: flex; flex-direction: column; gap: 10px; }
+
+  .s-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 9.5px;
+    font-weight: 500;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    display: flex; align-items: center; gap: 6px;
+  }
+
+  .s-label::after {
+    content: '';
+    flex: 1; height: 1px;
+    background: var(--border);
+  }
+
+  /* ─── INPUTS ────────────────────────────────────────────────────── */
+  .s-row { display: flex; gap: 8px; }
+
+  .s-field {
+    display: flex; flex-direction: column; gap: 5px; flex: 1;
+  }
+
+  .field-label {
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 0.04em;
+  }
+
+  input[type="text"],
+  input[type="number"],
+  select,
+  textarea {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    color: var(--text);
+    font-family: 'Jost', sans-serif;
+    font-size: 13px;
+    padding: 9px 12px;
+    outline: none;
+    transition: border-color var(--transition), box-shadow var(--transition);
+    width: 100%;
+    appearance: none;
+    -webkit-appearance: none;
+  }
+
+  input[type="text"]:focus,
+  input[type="number"]:focus,
+  select:focus,
+  textarea:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(212,169,90,0.12);
+  }
+
+  select {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%236b6560' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    padding-right: 32px;
+    cursor: pointer;
+  }
+
+  select option { background: var(--card); }
+
+  textarea {
+    resize: none;
+    height: 70px;
+    font-size: 12px;
+    line-height: 1.6;
+  }
+
+  /* ─── TOGGLE SWITCH ─────────────────────────────────────────────── */
+  .toggle-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 8px 12px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+  }
+
+  .toggle-info { display: flex; flex-direction: column; gap: 2px; }
+  .toggle-name { font-size: 13px; }
+  .toggle-desc { font-size: 10.5px; color: var(--muted); }
+
+  .toggle {
+    width: 38px; height: 20px;
+    background: var(--border2);
+    border-radius: 12px;
+    position: relative; cursor: pointer;
+    transition: background var(--transition);
+    flex-shrink: 0;
+  }
+  .toggle.on { background: var(--accent); }
+  .toggle::after {
+    content: '';
+    position: absolute;
+    top: 2px; left: 2px;
+    width: 16px; height: 16px;
+    background: white;
+    border-radius: 50%;
+    transition: transform var(--transition);
+    box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+  }
+  .toggle.on::after { transform: translateX(18px); }
+
+  /* ─── CHIP SELECTOR ─────────────────────────────────────────────── */
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+
+  .chip {
+    padding: 5px 12px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    font-size: 11.5px;
+    color: var(--muted);
+    cursor: pointer;
+    transition: all var(--transition);
+    user-select: none;
+  }
+  .chip:hover { border-color: var(--border2); color: var(--text); }
+  .chip.active {
+    background: rgba(212,169,90,0.12);
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  /* ─── RANGE INPUT ───────────────────────────────────────────────── */
+  .range-wrap { display: flex; align-items: center; gap: 10px; }
+
+  input[type="range"] {
+    flex: 1;
+    -webkit-appearance: none;
+    background: var(--border);
+    height: 3px;
+    border-radius: 3px;
+    outline: none;
+    cursor: pointer;
+    border: none; padding: 0;
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 0 3px rgba(212,169,90,0.2);
+    transition: box-shadow var(--transition);
+  }
+  input[type="range"]::-webkit-slider-thumb:hover {
+    box-shadow: 0 0 0 6px rgba(212,169,90,0.2);
+  }
+
+  .range-val {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: var(--accent);
+    min-width: 28px;
+    text-align: right;
+  }
+
+  /* ─── COLOR PICKER ROW ──────────────────────────────────────────── */
+  .color-swatches { display: flex; gap: 7px; align-items: center; }
+
+  .swatch {
+    width: 24px; height: 24px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: transform var(--transition), box-shadow var(--transition);
+    border: 2px solid transparent;
+    position: relative;
+  }
+  .swatch:hover { transform: scale(1.15); }
+  .swatch.active {
+    border-color: var(--text);
+    box-shadow: 0 0 0 2px rgba(232,226,216,0.2);
+  }
+
+  /* ─── SIDEBAR ACTION BTNS ───────────────────────────────────────── */
+  .sidebar-actions {
+    padding: 0 20px 24px;
+    display: flex; flex-direction: column; gap: 8px;
+    flex-shrink: 0;
+    border-top: 1px solid var(--border);
+    padding-top: 16px;
+    margin-top: 4px;
+  }
+
+  .btn {
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    padding: 12px 20px;
+    border-radius: 9px;
+    border: none; cursor: pointer;
+    font-family: 'Jost', sans-serif;
+    font-size: 13px;
+    font-weight: 500;
+    letter-spacing: 0.04em;
+    transition: all var(--transition);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .btn::after {
+    content: '';
+    position: absolute; inset: 0;
+    background: white;
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+  .btn:active::after { opacity: 0.08; }
+
+  .btn-primary {
+    background: linear-gradient(135deg, var(--accent), #c9973e);
+    color: #0e0e0e;
+    box-shadow: 0 4px 16px rgba(212,169,90,0.3);
+  }
+  .btn-primary:hover {
+    box-shadow: 0 6px 24px rgba(212,169,90,0.45);
+    transform: translateY(-1px);
+  }
+
+  .btn-ghost {
+    background: var(--card);
+    color: var(--muted);
+    border: 1px solid var(--border);
+  }
+  .btn-ghost:hover {
+    border-color: var(--border2);
+    color: var(--text);
+    background: var(--border);
+  }
+
+  .btn-icon { font-size: 15px; }
+
+  /* ─── MAIN SCREEN ───────────────────────────────────────────────── */
+  #main {
+    flex: 1;
+    height: 100vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+  }
+
+  /* ─── TOP BAR ───────────────────────────────────────────────────── */
+  .topbar {
+    height: 58px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center;
+    padding: 0 28px;
+    gap: 16px;
+    flex-shrink: 0;
+  }
+
+  .stage-crumbs {
+    display: flex; align-items: center; gap: 4px;
+    flex: 1;
+  }
+
+  .crumb {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 12px;
+    color: var(--muted);
+    font-family: 'DM Mono', monospace;
+    letter-spacing: 0.06em;
+    padding: 4px 10px;
+    border-radius: 6px;
+    transition: all var(--transition);
+  }
+  .crumb.active {
+    color: var(--accent);
+    background: rgba(212,169,90,0.08);
+  }
+  .crumb.done { color: var(--green); }
+
+  .crumb-dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: currentColor;
+    flex-shrink: 0;
+  }
+
+  .crumb-sep { color: var(--border2); font-size: 16px; }
+
+  .topbar-right {
+    display: flex; align-items: center; gap: 10px;
+  }
+
+  .stage-badge {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 4px 10px;
+    border-radius: 20px;
+    background: rgba(212,169,90,0.1);
+    border: 1px solid rgba(212,169,90,0.25);
+    color: var(--accent);
+  }
+
+  /* ─── STAGE PANELS ──────────────────────────────────────────────── */
+  .stage-panel {
+    flex: 1;
+    overflow-y: auto;
+    padding: 32px;
+    display: none;
+    opacity: 0;
+    transform: translateY(10px);
+    transition: opacity 0.4s ease, transform 0.4s ease;
+  }
+
+  .stage-panel.active {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .stage-panel.visible {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  /* ─── STAGE 1: PATTERN BUILDER ──────────────────────────────────── */
+  .builder-header {
+    margin-bottom: 28px;
+  }
+
+  .page-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--text);
+    line-height: 1.2;
+  }
+
+  .page-sub {
+    font-size: 13px;
+    color: var(--muted);
+    margin-top: 5px;
+  }
+
+  .builder-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: auto auto;
+    gap: 16px;
+    flex: 1;
+  }
+
+  .builder-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 22px;
+    position: relative;
+    overflow: hidden;
+    transition: border-color var(--transition);
+  }
+  .builder-card:hover { border-color: var(--border2); }
+
+  .builder-card.full-width { grid-column: 1 / -1; }
+
+  .card-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 16px;
+  }
+
+  .card-title {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .card-badge {
+    font-family: 'DM Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    border-radius: 12px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    color: var(--muted);
+  }
+
+  /* ─── PATTERN CANVAS ────────────────────────────────────────────── */
+  .pattern-canvas-wrap {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    height: 180px;
+    position: relative;
+    overflow: hidden;
+    cursor: crosshair;
+  }
+
+  .pattern-canvas-wrap canvas {
+    width: 100%; height: 100%;
+    display: block;
+  }
+
+  .canvas-overlay {
+    position: absolute; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    flex-direction: column; gap: 6px;
+    background: rgba(14,14,14,0.6);
+    backdrop-filter: blur(2px);
+    transition: opacity var(--transition);
+    pointer-events: none;
+  }
+
+  .canvas-icon { font-size: 28px; opacity: 0.4; }
+  .canvas-hint { font-size: 11px; color: var(--muted); letter-spacing: 0.04em; }
+
+  /* ─── SECTION LAYOUT EDITOR ─────────────────────────────────────── */
+  .section-list {
+    display: flex; flex-direction: column; gap: 7px;
+  }
+
+  .sec-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 14px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    transition: border-color var(--transition), background var(--transition);
+    cursor: grab;
+  }
+  .sec-item:hover { border-color: var(--border2); background: #1e1e1e; }
+  .sec-item.dragging { opacity: 0.5; border-style: dashed; }
+
+  .sec-drag { color: var(--border2); font-size: 14px; }
+  .sec-name { flex: 1; font-size: 13px; }
+  .sec-size {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+  }
+  .sec-bar {
+    width: 36px; height: 5px;
+    border-radius: 3px;
+  }
+
+  .sec-del {
+    background: none; border: none; cursor: pointer;
+    color: var(--border2); font-size: 14px;
+    transition: color var(--transition);
+    padding: 2px;
+  }
+  .sec-del:hover { color: var(--red); }
+
+  .add-section-btn {
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+    padding: 9px;
+    background: transparent;
+    border: 1px dashed var(--border2);
+    border-radius: 8px;
+    color: var(--muted);
+    cursor: pointer;
+    font-size: 12px;
+    transition: all var(--transition);
+    width: 100%;
+  }
+  .add-section-btn:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: rgba(212,169,90,0.04);
+  }
+
+  /* ─── TYPOGRAPHY PANEL ──────────────────────────────────────────── */
+  .type-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+  .type-sample {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px;
+    cursor: pointer;
+    transition: border-color var(--transition);
+  }
+  .type-sample:hover { border-color: var(--border2); }
+  .type-sample.active { border-color: var(--accent); background: rgba(212,169,90,0.05); }
+
+  .type-name { font-size: 9px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); margin-bottom: 5px; font-family: 'DM Mono', monospace; }
+  .type-preview { font-size: 17px; line-height: 1.2; color: var(--text); }
+
+  /* ─── PROCESS NEXT BTN ──────────────────────────────────────────── */
+  .process-bar {
+    margin-top: 24px;
+    display: flex; align-items: center; justify-content: flex-end; gap: 12px;
+    flex-shrink: 0;
+  }
+
+  .btn-process {
+    padding: 14px 32px;
+    border-radius: 10px;
+    border: none; cursor: pointer;
+    font-family: 'Jost', sans-serif;
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    background: linear-gradient(135deg, var(--accent) 0%, var(--accent2) 100%);
+    color: #0e0e0e;
+    box-shadow: 0 6px 24px rgba(212,169,90,0.35), 0 2px 8px rgba(192,133,110,0.2);
+    transition: all var(--transition);
+    display: flex; align-items: center; gap: 10px;
+    position: relative; overflow: hidden;
+  }
+  .btn-process::before {
+    content: '';
+    position: absolute; top: 0; left: -100%;
+    width: 100%; height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.15), transparent);
+    transition: left 0.5s ease;
+  }
+  .btn-process:hover::before { left: 100%; }
+  .btn-process:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 32px rgba(212,169,90,0.45), 0 4px 12px rgba(192,133,110,0.25);
+  }
+  .btn-process:active { transform: translateY(0); }
+
+  .process-note { font-size: 11.5px; color: var(--muted); }
+
+  /* ─── STAGE 2: PROCESSING ───────────────────────────────────────── */
+  .status-hero {
+    display: flex; flex-direction: column; align-items: center;
+    padding: 40px 0 32px;
+    text-align: center;
+  }
+
+  .spinner-ring {
+    width: 72px; height: 72px;
+    border-radius: 50%;
+    border: 2px solid var(--border);
+    border-top: 2px solid var(--accent);
+    border-right: 2px solid var(--accent2);
+    animation: spin 1.2s linear infinite;
+    position: relative;
+    margin-bottom: 20px;
+  }
+  .spinner-ring::after {
+    content: '';
+    position: absolute; inset: 6px;
+    border-radius: 50%;
+    border: 1px solid var(--border);
+    border-top: 1px solid rgba(212,169,90,0.4);
+    animation: spin 0.8s linear infinite reverse;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .status-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 22px; font-weight: 700;
+    margin-bottom: 6px;
+  }
+
+  .status-sub { font-size: 13px; color: var(--muted); }
+
+  .status-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+    margin-bottom: 20px;
+  }
+
+  .step-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 18px;
+    display: flex; align-items: center; gap: 14px;
+    transition: border-color var(--transition);
+  }
+
+  .step-icon {
+    width: 40px; height: 40px;
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px;
+    flex-shrink: 0;
+    background: var(--card);
+    border: 1px solid var(--border);
+    transition: all var(--transition);
+  }
+
+  .step-card.done .step-icon {
+    background: rgba(93,179,138,0.12);
+    border-color: rgba(93,179,138,0.3);
+  }
+  .step-card.active .step-icon {
+    background: rgba(212,169,90,0.1);
+    border-color: rgba(212,169,90,0.3);
+    animation: pulse 1.5s ease infinite;
+  }
+
+  @keyframes pulse {
+    0%,100% { box-shadow: 0 0 0 0 rgba(212,169,90,0.3); }
+    50% { box-shadow: 0 0 0 6px rgba(212,169,90,0); }
+  }
+
+  .step-card.done { border-color: rgba(93,179,138,0.25); }
+  .step-card.active { border-color: rgba(212,169,90,0.3); }
+
+  .step-info { flex: 1; min-width: 0; }
+  .step-name { font-size: 13px; font-weight: 500; margin-bottom: 3px; }
+  .step-status {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px; letter-spacing: 0.08em;
+  }
+  .step-card.done .step-status { color: var(--green); }
+  .step-card.active .step-status { color: var(--accent); }
+  .step-card.pending .step-status { color: var(--muted); }
+
+  .step-check {
+    font-size: 16px;
+    flex-shrink: 0;
+    opacity: 0;
+    transition: opacity 0.3s, transform 0.3s;
+    transform: scale(0.5);
+  }
+  .step-card.done .step-check { opacity: 1; transform: scale(1); }
+
+  /* ─── PROGRESS BAR ──────────────────────────────────────────────── */
+  .progress-section {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px;
+    margin-bottom: 16px;
+  }
+
+  .progress-top {
+    display: flex; justify-content: space-between; align-items: baseline;
+    margin-bottom: 12px;
+  }
+  .progress-label { font-size: 13px; font-weight: 500; }
+  .progress-pct {
+    font-family: 'DM Mono', monospace;
+    font-size: 13px; color: var(--accent);
+  }
+
+  .progress-track {
+    height: 6px;
+    background: var(--card);
+    border-radius: 6px;
+    overflow: hidden;
+  }
+  .progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    border-radius: 6px;
+    transition: width 0.5s cubic-bezier(0.4,0,0.2,1);
+    position: relative;
+  }
+  .progress-fill::after {
+    content: '';
+    position: absolute; top: 0; right: 0;
+    width: 20px; height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3));
+    animation: shimmer 1.5s ease infinite;
+  }
+
+  @keyframes shimmer {
+    0% { opacity: 0; }
+    50% { opacity: 1; }
+    100% { opacity: 0; }
+  }
+
+  /* ─── LOG TERMINAL ──────────────────────────────────────────────── */
+  .log-panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    flex: 1;
+    min-height: 140px;
+  }
+
+  .log-header {
+    background: var(--card);
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 8px;
+  }
+
+  .log-dot { width: 8px; height: 8px; border-radius: 50%; }
+  .log-dot.r { background: #e06c75; }
+  .log-dot.y { background: #e5c07b; }
+  .log-dot.g { background: #98c379; }
+
+  .log-title {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px; letter-spacing: 0.1em;
+    text-transform: uppercase; color: var(--muted);
+    margin-left: 4px;
+  }
+
+  .log-body {
+    padding: 14px 16px;
+    font-family: 'DM Mono', monospace;
+    font-size: 11.5px;
+    line-height: 1.8;
+    max-height: 160px;
+    overflow-y: auto;
+  }
+
+  .log-line { display: flex; gap: 10px; }
+  .log-ts { color: var(--muted); flex-shrink: 0; }
+  .log-msg.ok { color: var(--green); }
+  .log-msg.info { color: var(--text); }
+  .log-msg.warn { color: var(--accent); }
+  .log-cursor {
+    display: inline-block;
+    width: 7px; height: 13px;
+    background: var(--accent);
+    margin-left: 2px;
+    animation: blink 1s steps(1) infinite;
+    vertical-align: middle;
+  }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+
+  /* ─── STAGE 3: OUTPUT ───────────────────────────────────────────── */
+  .output-success {
+    display: flex; flex-direction: column; align-items: center;
+    padding: 32px 0 24px;
+    text-align: center;
+  }
+
+  .check-circle {
+    width: 70px; height: 70px;
+    border-radius: 50%;
+    background: rgba(93,179,138,0.12);
+    border: 2px solid rgba(93,179,138,0.4);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 28px;
+    margin-bottom: 18px;
+    animation: pop 0.5s cubic-bezier(0.34,1.56,0.64,1);
+  }
+  @keyframes pop {
+    0% { transform: scale(0); opacity: 0; }
+    100% { transform: scale(1); opacity: 1; }
+  }
+
+  .output-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 24px; font-weight: 700; margin-bottom: 5px;
+  }
+
+  .output-sub { font-size: 13px; color: var(--muted); }
+
+  .paper-preview {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    margin-bottom: 18px;
+    flex: 1;
+  }
+
+  .paper-topbar {
+    background: var(--card);
+    border-bottom: 1px solid var(--border);
+    padding: 10px 16px;
+    display: flex; align-items: center; gap: 8px;
+  }
+
+  .paper-fname {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: var(--text);
+    letter-spacing: 0.06em;
+  }
+
+  .paper-info {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    margin-left: auto;
+  }
+
+  .paper-body {
+    padding: 28px;
+    min-height: 240px;
+  }
+
+  .paper-header-mock {
+    border-bottom: 2px solid var(--border);
+    padding-bottom: 14px;
+    margin-bottom: 18px;
+  }
+
+  .mock-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 22px; font-weight: 700;
+    color: var(--text);
+    margin-bottom: 6px;
+  }
+
+  .mock-meta {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px; color: var(--muted);
+    letter-spacing: 0.08em;
+  }
+
+  .mock-abstract {
+    background: var(--card);
+    border-left: 3px solid var(--accent);
+    padding: 12px 16px;
+    font-size: 12.5px;
+    line-height: 1.7;
+    color: var(--muted);
+    border-radius: 0 6px 6px 0;
+    margin-bottom: 16px;
+  }
+
+  .mock-lines {
+    display: flex; flex-direction: column; gap: 7px;
+  }
+
+  .mock-line {
+    height: 10px;
+    background: var(--border);
+    border-radius: 5px;
+  }
+
+  .mock-section-head {
+    font-family: 'Playfair Display', serif;
+    font-size: 14px; font-weight: 700;
+    color: var(--text);
+    margin: 16px 0 8px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .mock-section-head::after {
+    content: ''; flex: 1; height: 1px;
+    background: var(--border);
+  }
+
+  /* ─── OUTPUT ACTIONS ────────────────────────────────────────────── */
+  .output-actions {
+    display: grid;
+    grid-template-columns: 2fr 1fr 1fr;
+    gap: 10px;
+  }
+
+  .btn-download {
+    padding: 14px 20px;
+    border-radius: 10px;
+    border: none; cursor: pointer;
+    font-family: 'Jost', sans-serif;
+    font-size: 13px; font-weight: 600;
+    letter-spacing: 0.06em;
+    background: linear-gradient(135deg, var(--accent) 0%, var(--accent2) 100%);
+    color: #0e0e0e;
+    box-shadow: 0 4px 20px rgba(212,169,90,0.3);
+    transition: all var(--transition);
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+  }
+  .btn-download:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 28px rgba(212,169,90,0.4);
+  }
+
+  .btn-export {
+    padding: 14px 16px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    cursor: pointer;
+    font-family: 'Jost', sans-serif;
+    font-size: 12.5px; font-weight: 500;
+    background: var(--surface);
+    color: var(--text);
+    transition: all var(--transition);
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+  }
+  .btn-export:hover {
+    border-color: var(--border2);
+    background: var(--card);
+  }
+
+  /* ─── META STRIP ─────────────────────────────────────────────────── */
+  .meta-strip {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+    margin-bottom: 18px;
+  }
+
+  .meta-tile {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 9px;
+    padding: 14px;
+    text-align: center;
+  }
+
+  .meta-val {
+    font-family: 'DM Mono', monospace;
+    font-size: 18px;
+    font-weight: 500;
+    color: var(--accent);
+  }
+
+  .meta-key {
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 0.06em;
+    margin-top: 3px;
+  }
+
+  /* ─── UTILITIES ──────────────────────────────────────────────────── */
+  .gap-h { flex: 1; }
+
+  /* ─── BG GRID ────────────────────────────────────────────────────── */
+  #main::before {
+    content: '';
+    position: absolute; inset: 0;
+    background-image:
+      linear-gradient(rgba(255,255,255,0.015) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.015) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .stage-panel { position: relative; z-index: 1; }
+  .topbar { position: relative; z-index: 2; }
+
+  /* ─── TOAST ──────────────────────────────────────────────────────── */
+  .toast {
+    position: fixed; bottom: 28px; right: 28px;
+    background: var(--card);
+    border: 1px solid var(--border2);
+    border-radius: 10px;
+    padding: 14px 18px;
+    font-size: 13px;
+    display: flex; align-items: center; gap: 10px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+    transform: translateY(80px);
+    opacity: 0;
+    transition: all 0.35s cubic-bezier(0.34,1.56,0.64,1);
+    z-index: 100;
+    pointer-events: none;
+  }
+  .toast.show { transform: translateY(0); opacity: 1; }
+  .toast-icon { font-size: 16px; }
+
+  /* ─── RESPONSIVE ─────────────────────────────────────────────────── */
+  @media(max-width: 900px) {
+    :root { --sidebar-w: 260px; }
+    .builder-grid { grid-template-columns: 1fr; }
+    .builder-card.full-width { grid-column: 1; }
+    .status-grid { grid-template-columns: 1fr; }
+    .meta-strip { grid-template-columns: 1fr 1fr; }
+    .output-actions { grid-template-columns: 1fr 1fr; }
+  }
+
+  @media(max-width: 680px) {
+    :root { --sidebar-w: 0px; }
+    #sidebar { display: none; }
+    .stage-panel { padding: 20px; }
+  }
+
+  /* ─── ENTER ANIMATIONS ───────────────────────────────────────────── */
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(16px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .anim-enter { animation: fadeUp 0.4s ease both; }
+
+  .anim-enter:nth-child(1) { animation-delay: 0.05s; }
+  .anim-enter:nth-child(2) { animation-delay: 0.1s; }
+  .anim-enter:nth-child(3) { animation-delay: 0.15s; }
+  .anim-enter:nth-child(4) { animation-delay: 0.2s; }
+  .anim-enter:nth-child(5) { animation-delay: 0.25s; }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     SIDEBAR (persistent)
+══════════════════════════════════════════════════════════════════ -->
+<aside id="sidebar">
+  <div class="sidebar-glow"></div>
+
+  <!-- Logo -->
+  <div class="sidebar-logo">
+    <div class="logo-mark">
+      <div class="logo-icon">📄</div>
+      <div>
+        <div class="logo-text">Folio</div>
+      </div>
+    </div>
+    <div class="logo-sub">Paper Pattern Studio</div>
+  </div>
+
+  <!-- Controls -->
+  <div class="sidebar-body">
+
+    <!-- Document -->
+    <div class="s-section">
+      <div class="s-label">Document</div>
+      <div class="s-field">
+        <div class="field-label">Title</div>
+        <input type="text" value="Untitled Research Paper" />
+      </div>
+      <div class="s-row">
+        <div class="s-field">
+          <div class="field-label">Type</div>
+          <select>
+            <option>Research Paper</option>
+            <option>Review Article</option>
+            <option>Case Study</option>
+            <option>White Paper</option>
+            <option>Technical Report</option>
+          </select>
+        </div>
+        <div class="s-field">
+          <div class="field-label">Pages</div>
+          <input type="number" value="12" min="1" max="200" />
+        </div>
+      </div>
+      <div class="s-field">
+        <div class="field-label">Abstract</div>
+        <textarea>Enter a brief description of the paper's content and objectives...</textarea>
+      </div>
+    </div>
+
+    <!-- Layout -->
+    <div class="s-section">
+      <div class="s-label">Layout</div>
+      <div class="s-field">
+        <div class="field-label">Page Size</div>
+        <select>
+          <option>A4 — 210 × 297mm</option>
+          <option>Letter — 8.5 × 11in</option>
+          <option>A3 — 297 × 420mm</option>
+          <option>Legal — 8.5 × 14in</option>
+        </select>
+      </div>
+      <div class="s-field">
+        <div class="field-label">Columns</div>
+        <div class="chips">
+          <div class="chip active" onclick="selectChip(this)">Single</div>
+          <div class="chip" onclick="selectChip(this)">Double</div>
+          <div class="chip" onclick="selectChip(this)">Triple</div>
+        </div>
+      </div>
+      <div class="s-field">
+        <div class="field-label">Margin</div>
+        <div class="range-wrap">
+          <input type="range" min="10" max="40" value="22" oninput="this.nextElementSibling.textContent=this.value+'mm'" />
+          <span class="range-val">22mm</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Typography -->
+    <div class="s-section">
+      <div class="s-label">Typography</div>
+      <div class="s-field">
+        <div class="field-label">Font Family</div>
+        <select>
+          <option>Times New Roman</option>
+          <option>Helvetica</option>
+          <option>Garamond</option>
+          <option>Palatino</option>
+          <option>Computer Modern</option>
+        </select>
+      </div>
+      <div class="s-row">
+        <div class="s-field">
+          <div class="field-label">Body Size</div>
+          <input type="number" value="11" min="8" max="16" />
+        </div>
+        <div class="s-field">
+          <div class="field-label">Line Height</div>
+          <input type="number" value="1.6" min="1" max="3" step="0.1" />
+        </div>
+      </div>
+    </div>
+
+    <!-- Citation Style -->
+    <div class="s-section">
+      <div class="s-label">Citations</div>
+      <div class="s-field">
+        <div class="field-label">Style</div>
+        <div class="chips">
+          <div class="chip active" onclick="selectChip(this)">APA</div>
+          <div class="chip" onclick="selectChip(this)">MLA</div>
+          <div class="chip" onclick="selectChip(this)">IEEE</div>
+          <div class="chip" onclick="selectChip(this)">Chicago</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Options -->
+    <div class="s-section">
+      <div class="s-label">Options</div>
+      <div class="toggle-row">
+        <div class="toggle-info">
+          <div class="toggle-name">Table of Contents</div>
+          <div class="toggle-desc">Auto-generate TOC</div>
+        </div>
+        <div class="toggle on" onclick="this.classList.toggle('on')"></div>
+      </div>
+      <div class="toggle-row">
+        <div class="toggle-info">
+          <div class="toggle-name">Page Numbers</div>
+          <div class="toggle-desc">Add footer numbering</div>
+        </div>
+        <div class="toggle on" onclick="this.classList.toggle('on')"></div>
+      </div>
+      <div class="toggle-row">
+        <div class="toggle-info">
+          <div class="toggle-name">Watermark</div>
+          <div class="toggle-desc">Draft overlay</div>
+        </div>
+        <div class="toggle" onclick="this.classList.toggle('on')"></div>
+      </div>
+      <div class="toggle-row">
+        <div class="toggle-info">
+          <div class="toggle-name">Compress Output</div>
+          <div class="toggle-desc">Optimize file size</div>
+        </div>
+        <div class="toggle" onclick="this.classList.toggle('on')"></div>
+      </div>
+    </div>
+
+    <!-- Accent Color -->
+    <div class="s-section">
+      <div class="s-label">Accent Color</div>
+      <div class="color-swatches">
+        <div class="swatch active" style="background:#d4a95a" onclick="selectSwatch(this)"></div>
+        <div class="swatch" style="background:#5db38a" onclick="selectSwatch(this)"></div>
+        <div class="swatch" style="background:#7b9fd4" onclick="selectSwatch(this)"></div>
+        <div class="swatch" style="background:#c06060" onclick="selectSwatch(this)"></div>
+        <div class="swatch" style="background:#a07bcc" onclick="selectSwatch(this)"></div>
+        <div class="swatch" style="background:#c0856e" onclick="selectSwatch(this)"></div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Sidebar Bottom Actions -->
+  <div class="sidebar-actions">
+    <button class="btn btn-ghost" onclick="resetToStage1()">
+      <span class="btn-icon">↺</span> Reset
+    </button>
+    <button class="btn btn-primary" onclick="saveConfig()">
+      <span class="btn-icon">⊙</span> Save Config
+    </button>
+  </div>
+</aside>
+
+
+<!-- ═══════════════════════════════════════════════════════════════
+     MAIN SCREEN
+══════════════════════════════════════════════════════════════════ -->
+<main id="main">
+
+  <!-- Topbar -->
+  <div class="topbar">
+    <div class="stage-crumbs">
+      <div class="crumb active" id="crumb-0">
+        <div class="crumb-dot"></div> Pattern Builder
+      </div>
+      <div class="crumb-sep">›</div>
+      <div class="crumb" id="crumb-1">
+        <div class="crumb-dot"></div> Processing
+      </div>
+      <div class="crumb-sep">›</div>
+      <div class="crumb" id="crumb-2">
+        <div class="crumb-dot"></div> Output
+      </div>
+    </div>
+    <div class="topbar-right">
+      <div class="stage-badge" id="stage-badge">Stage 1 / 3</div>
+    </div>
+  </div>
+
+  <!-- ─── STAGE 1: BUILDER ─────────────────────────────────────── -->
+  <div class="stage-panel active visible" id="stage-1">
+
+    <div class="builder-header anim-enter">
+      <div class="page-title">Pattern Builder</div>
+      <div class="page-sub">Configure your paper layout, sections, and structure below.</div>
+    </div>
+
+    <div class="builder-grid">
+
+      <!-- Canvas Preview -->
+      <div class="builder-card anim-enter" style="grid-column:1/2; grid-row:1/2;">
+        <div class="card-header">
+          <div class="card-title">Pattern Canvas</div>
+          <div class="card-badge">Interactive</div>
+        </div>
+        <div class="pattern-canvas-wrap" id="canvasWrap">
+          <canvas id="patternCanvas"></canvas>
+          <div class="canvas-overlay" id="canvasOverlay">
+            <div class="canvas-icon">⊹</div>
+            <div class="canvas-hint">Click to place elements</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Section Manager -->
+      <div class="builder-card anim-enter" style="grid-column:2/3; grid-row:1/2;">
+        <div class="card-header">
+          <div class="card-title">Sections</div>
+          <div class="card-badge" id="sec-count">6 sections</div>
+        </div>
+        <div class="section-list" id="sectionList"></div>
+        <br/>
+        <button class="add-section-btn" onclick="addSection()">
+          ＋ Add Section
+        </button>
+      </div>
+
+      <!-- Typography -->
+      <div class="builder-card anim-enter" style="grid-column:1/2; grid-row:2/3;">
+        <div class="card-header">
+          <div class="card-title">Typography Style</div>
+        </div>
+        <div class="type-grid">
+          <div class="type-sample active" onclick="selectType(this)">
+            <div class="type-name">Serif Classic</div>
+            <div class="type-preview" style="font-family:Georgia">Aa Bb Cc</div>
+          </div>
+          <div class="type-sample" onclick="selectType(this)">
+            <div class="type-name">Sans Modern</div>
+            <div class="type-preview" style="font-family:Helvetica">Aa Bb Cc</div>
+          </div>
+          <div class="type-sample" onclick="selectType(this)">
+            <div class="type-name">Mono Technical</div>
+            <div class="type-preview" style="font-family:monospace;font-size:14px">Aa Bb Cc</div>
+          </div>
+          <div class="type-sample" onclick="selectType(this)">
+            <div class="type-name">Humanist</div>
+            <div class="type-preview" style="font-family:Palatino">Aa Bb Cc</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Config Summary -->
+      <div class="builder-card anim-enter" style="grid-column:2/3; grid-row:2/3;">
+        <div class="card-header">
+          <div class="card-title">Configuration Summary</div>
+        </div>
+        <div class="section-list">
+          <div class="sec-item" style="cursor:default">
+            <div class="sec-drag" style="color:var(--green)">✓</div>
+            <div class="sec-name" style="font-size:12px; color:var(--muted)">Page Format</div>
+            <div class="sec-size">A4 Portrait</div>
+          </div>
+          <div class="sec-item" style="cursor:default">
+            <div class="sec-drag" style="color:var(--green)">✓</div>
+            <div class="sec-name" style="font-size:12px; color:var(--muted)">Column Layout</div>
+            <div class="sec-size">Single</div>
+          </div>
+          <div class="sec-item" style="cursor:default">
+            <div class="sec-drag" style="color:var(--green)">✓</div>
+            <div class="sec-name" style="font-size:12px; color:var(--muted)">Citation Style</div>
+            <div class="sec-size">APA 7th</div>
+          </div>
+          <div class="sec-item" style="cursor:default">
+            <div class="sec-drag" style="color:var(--green)">✓</div>
+            <div class="sec-name" style="font-size:12px; color:var(--muted)">Typography</div>
+            <div class="sec-size">Serif, 11pt</div>
+          </div>
+          <div class="sec-item" style="cursor:default">
+            <div class="sec-drag" style="color:var(--accent)">⚠</div>
+            <div class="sec-name" style="font-size:12px; color:var(--muted)">References</div>
+            <div class="sec-size" style="color:var(--accent)">Empty</div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /builder-grid -->
+
+    <div class="process-bar">
+      <span class="process-note">All required fields are configured</span>
+      <button class="btn-process" onclick="goToStage2()">
+        Process Pattern
+        <span>→</span>
+      </button>
+    </div>
+
+  </div><!-- /stage-1 -->
+
+  <!-- ─── STAGE 2: PROCESSING ─────────────────────────────────────── -->
+  <div class="stage-panel" id="stage-2">
+
+    <div class="status-hero anim-enter">
+      <div class="spinner-ring" id="spinnerRing"></div>
+      <div class="status-title">Generating Paper Pattern</div>
+      <div class="status-sub" id="statusSub">Analyzing configuration and building structure…</div>
+    </div>
+
+    <div class="progress-section anim-enter">
+      <div class="progress-top">
+        <span class="progress-label">Overall Progress</span>
+        <span class="progress-pct" id="pctLabel">0%</span>
+      </div>
+      <div class="progress-track">
+        <div class="progress-fill" id="progressFill" style="width:0%"></div>
+      </div>
+    </div>
+
+    <div class="status-grid" id="stepsGrid"></div>
+
+    <div class="log-panel anim-enter">
+      <div class="log-header">
+        <div class="log-dot r"></div>
+        <div class="log-dot y"></div>
+        <div class="log-dot g"></div>
+        <div class="log-title">Process Log</div>
+      </div>
+      <div class="log-body" id="logBody"></div>
+    </div>
+
+  </div><!-- /stage-2 -->
+
+  <!-- ─── STAGE 3: OUTPUT ──────────────────────────────────────────── -->
+  <div class="stage-panel" id="stage-3">
+
+    <div class="output-success anim-enter">
+      <div class="check-circle">✓</div>
+      <div class="output-title">Paper Pattern Ready</div>
+      <div class="output-sub">Your document has been generated successfully — ready to download.</div>
+    </div>
+
+    <div class="meta-strip anim-enter">
+      <div class="meta-tile">
+        <div class="meta-val">12</div>
+        <div class="meta-key">Pages</div>
+      </div>
+      <div class="meta-tile">
+        <div class="meta-val">6</div>
+        <div class="meta-key">Sections</div>
+      </div>
+      <div class="meta-tile">
+        <div class="meta-val">3.4s</div>
+        <div class="meta-key">Build Time</div>
+      </div>
+      <div class="meta-tile">
+        <div class="meta-val">284kb</div>
+        <div class="meta-key">File Size</div>
+      </div>
+    </div>
+
+    <div class="paper-preview anim-enter">
+      <div class="paper-topbar">
+        <span>📄</span>
+        <span class="paper-fname">untitled-research-paper.pdf</span>
+        <span class="paper-info">A4 · 12pp · PDF 1.7</span>
+      </div>
+      <div class="paper-body">
+        <div class="paper-header-mock">
+          <div class="mock-title">Untitled Research Paper</div>
+          <div class="mock-meta">Author Name · Affiliation · Submitted 2025 · APA 7th Edition</div>
+        </div>
+        <div class="mock-section-head">Abstract</div>
+        <div class="mock-abstract">
+          This paper presents a structured framework for analyzing and presenting academic research findings. The methodology combines qualitative and quantitative approaches to yield reproducible results across diverse study populations…
+        </div>
+        <div class="mock-section-head">1. Introduction</div>
+        <div class="mock-lines">
+          <div class="mock-line" style="width:100%"></div>
+          <div class="mock-line" style="width:93%"></div>
+          <div class="mock-line" style="width:97%"></div>
+          <div class="mock-line" style="width:85%"></div>
+          <div class="mock-line" style="width:100%"></div>
+          <div class="mock-line" style="width:72%"></div>
+        </div>
+        <div class="mock-section-head">2. Methodology</div>
+        <div class="mock-lines">
+          <div class="mock-line" style="width:100%"></div>
+          <div class="mock-line" style="width:88%"></div>
+          <div class="mock-line" style="width:95%"></div>
+          <div class="mock-line" style="width:60%"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="output-actions anim-enter">
+      <button class="btn-download" onclick="showToast('⬇ Download started!', 'download')">
+        ⬇ Download PDF
+      </button>
+      <button class="btn-export" onclick="showToast('📋 Copied to clipboard', 'copy')">
+        📋 Copy Link
+      </button>
+      <button class="btn-export" onclick="showToast('🔁 Opened in new tab', 'open')">
+        ↗ Export
+      </button>
+    </div>
+
+    <div class="process-bar" style="margin-top:16px">
+      <button class="btn-process" style="background:linear-gradient(135deg,#3a3a3a,#2a2a2a);color:var(--text);box-shadow:none; font-size:13px; padding:12px 24px;" onclick="resetToStage1()">
+        ← Start New Pattern
+      </button>
+    </div>
+
+  </div><!-- /stage-3 -->
+
+</main>
+
+<!-- TOAST -->
+<div class="toast" id="toast">
+  <span class="toast-icon" id="toastIcon">✓</span>
+  <span id="toastMsg">Action completed</span>
+</div>
+
+
+<script>
+/* ════════════════════════════════════════════════════════════════
+   STATE
+═══════════════════════════════════════════════════════════════ */
+let currentStage = 1;
+let processingTimer = null;
+let progressVal = 0;
+
+const STEPS = [
+  { name: 'Parse Configuration',  icon: '⚙', id: 'step-0' },
+  { name: 'Build Section Tree',   icon: '🌳', id: 'step-1' },
+  { name: 'Apply Typography',     icon: '🔤', id: 'step-2' },
+  { name: 'Render Layout Grid',   icon: '◫', id: 'step-3' },
+  { name: 'Compile Citations',    icon: '📚', id: 'step-4' },
+  { name: 'Export to PDF',        icon: '📄', id: 'step-5' },
+];
+
+const SECTIONS_INIT = [
+  { name: 'Abstract',     size: '~200w',  color: '#d4a95a' },
+  { name: 'Introduction', size: '~800w',  color: '#5db38a' },
+  { name: 'Methodology',  size: '~600w',  color: '#7b9fd4' },
+  { name: 'Results',      size: '~900w',  color: '#c0856e' },
+  { name: 'Discussion',   size: '~700w',  color: '#a07bcc' },
+  { name: 'References',   size: '~12 ref',color: '#6b6560' },
+];
+
+const LOG_MSGS = [
+  ['info', 'Initializing Folio Pattern Engine v2.3…'],
+  ['ok',   'Configuration validated — 0 errors'],
+  ['info', 'Loading typography manifest…'],
+  ['ok',   'Font stack resolved: Times New Roman, 11pt'],
+  ['info', 'Parsing section definitions…'],
+  ['ok',   'Section tree compiled: 6 nodes'],
+  ['info', 'Applying column layout (single-column)…'],
+  ['ok',   'Grid rendered: 12 pages × A4'],
+  ['warn', 'Reference list is empty — placeholder inserted'],
+  ['info', 'Building citation index (APA 7th)…'],
+  ['ok',   'Citation engine ready'],
+  ['info', 'Rendering header and footer templates…'],
+  ['ok',   'Page numbering applied'],
+  ['info', 'Compiling final PDF output…'],
+  ['ok',   'PDF/A-1b compliant output written'],
+  ['ok',   '✓ Generation complete in 3.4s'],
+];
+
+/* ════════════════════════════════════════════════════════════════
+   INIT
+═══════════════════════════════════════════════════════════════ */
+document.addEventListener('DOMContentLoaded', () => {
+  renderSections();
+  initCanvas();
+});
+
+/* ════════════════════════════════════════════════════════════════
+   SECTIONS
+═══════════════════════════════════════════════════════════════ */
+let sections = [...SECTIONS_INIT];
+
+function renderSections() {
+  const list = document.getElementById('sectionList');
+  list.innerHTML = '';
+  sections.forEach((sec, i) => {
+    const el = document.createElement('div');
+    el.className = 'sec-item';
+    el.draggable = true;
+    el.dataset.idx = i;
+    el.innerHTML = `
+      <span class="sec-drag">⠿</span>
+      <div class="sec-bar" style="background:${sec.color};opacity:0.7"></div>
+      <span class="sec-name">${sec.name}</span>
+      <span class="sec-size">${sec.size}</span>
+      <button class="sec-del" onclick="removeSection(${i})" title="Remove">✕</button>
+    `;
+    addDragHandlers(el, i);
+    list.appendChild(el);
+  });
+  document.getElementById('sec-count').textContent = sections.length + ' sections';
+}
+
+function addSection() {
+  const names = ['Background', 'Literature Review', 'Conclusion', 'Appendix', 'Acknowledgements'];
+  const colors = ['#d4a95a','#5db38a','#7b9fd4','#c0856e','#a07bcc'];
+  const n = sections.length;
+  sections.push({ name: names[n % names.length], size: '~400w', color: colors[n % colors.length] });
+  renderSections();
+  showToast('＋ Section added', 'add');
+}
+
+function removeSection(i) {
+  if (sections.length <= 1) { showToast('⚠ Need at least 1 section', 'warn'); return; }
+  sections.splice(i, 1);
+  renderSections();
+}
+
+/* ── Drag ── */
+let dragSrc = null;
+function addDragHandlers(el, i) {
+  el.addEventListener('dragstart', e => { dragSrc = i; el.classList.add('dragging'); e.dataTransfer.effectAllowed = 'move'; });
+  el.addEventListener('dragend', () => { el.classList.remove('dragging'); });
+  el.addEventListener('dragover', e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; });
+  el.addEventListener('drop', e => {
+    e.preventDefault();
+    if (dragSrc !== null && dragSrc !== i) {
+      const moved = sections.splice(dragSrc, 1)[0];
+      sections.splice(i, 0, moved);
+      renderSections();
+    }
+  });
+}
+
+/* ════════════════════════════════════════════════════════════════
+   PATTERN CANVAS
+═══════════════════════════════════════════════════════════════ */
+function initCanvas() {
+  const wrap = document.getElementById('canvasWrap');
+  const canvas = document.getElementById('patternCanvas');
+  const overlay = document.getElementById('canvasOverlay');
+  const ctx = canvas.getContext('2d');
+
+  let dots = [];
+  let started = false;
+
+  function resize() {
+    canvas.width = wrap.offsetWidth;
+    canvas.height = wrap.offsetHeight;
+    drawCanvas();
+  }
+
+  function drawCanvas() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    // Grid
+    ctx.strokeStyle = 'rgba(255,255,255,0.04)';
+    ctx.lineWidth = 1;
+    for (let x = 0; x < canvas.width; x += 24) {
+      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke();
+    }
+    for (let y = 0; y < canvas.height; y += 24) {
+      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
+    }
+
+    // Section bars
+    const barH = (canvas.height - 20) / Math.max(sections.length, 1);
+    sections.forEach((sec, i) => {
+      const y = 10 + i * barH;
+      const w = canvas.width * (0.5 + Math.random() * 0.4);
+      const grad = ctx.createLinearGradient(0, 0, w, 0);
+      grad.addColorStop(0, sec.color + 'cc');
+      grad.addColorStop(1, sec.color + '22');
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.roundRect(10, y + 2, w - 20, barH - 6, 4);
+      ctx.fill();
+
+      ctx.fillStyle = 'rgba(255,255,255,0.7)';
+      ctx.font = '9px DM Mono, monospace';
+      ctx.fillText(sec.name.toUpperCase(), 18, y + barH / 2 + 3);
+    });
+
+    // Placed dots
+    dots.forEach(d => {
+      ctx.beginPath();
+      ctx.arc(d.x, d.y, 5, 0, Math.PI * 2);
+      ctx.fillStyle = '#d4a95a88';
+      ctx.fill();
+      ctx.strokeStyle = '#d4a95a';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+    });
+  }
+
+  wrap.addEventListener('click', e => {
+    if (!started) {
+      started = true;
+      overlay.style.opacity = '0';
+      setTimeout(() => overlay.style.display = 'none', 300);
+    }
+    const rect = canvas.getBoundingClientRect();
+    const x = (e.clientX - rect.left) * (canvas.width / rect.width);
+    const y = (e.clientY - rect.top) * (canvas.height / rect.height);
+    dots.push({ x, y });
+    if (dots.length > 8) dots.shift();
+    drawCanvas();
+  });
+
+  new ResizeObserver(resize).observe(wrap);
+  resize();
+}
+
+/* ════════════════════════════════════════════════════════════════
+   STAGE NAVIGATION
+═══════════════════════════════════════════════════════════════ */
+function setStage(n) {
+  ['stage-1','stage-2','stage-3'].forEach((id, i) => {
+    const el = document.getElementById(id);
+    el.classList.remove('active','visible');
+    if (i + 1 === n) {
+      el.style.display = '';
+      el.classList.add('active');
+      requestAnimationFrame(() => requestAnimationFrame(() => el.classList.add('visible')));
+    } else {
+      el.style.display = '';
+    }
+  });
+
+  ['crumb-0','crumb-1','crumb-2'].forEach((id, i) => {
+    const el = document.getElementById(id);
+    el.classList.remove('active','done');
+    if (i + 1 < n) el.classList.add('done');
+    else if (i + 1 === n) el.classList.add('active');
+  });
+
+  document.getElementById('stage-badge').textContent = `Stage ${n} / 3`;
+  currentStage = n;
+}
+
+/* ════════════════════════════════════════════════════════════════
+   STAGE 2 PROCESSING
+═══════════════════════════════════════════════════════════════ */
+function goToStage2() {
+  setStage(2);
+  renderSteps();
+  renderLog();
+  startProcessing();
+}
+
+function renderSteps() {
+  const grid = document.getElementById('stepsGrid');
+  grid.innerHTML = '';
+  STEPS.forEach((s, i) => {
+    const el = document.createElement('div');
+    el.className = 'step-card pending';
+    el.id = s.id;
+    el.innerHTML = `
+      <div class="step-icon">${s.icon}</div>
+      <div class="step-info">
+        <div class="step-name">${s.name}</div>
+        <div class="step-status">PENDING</div>
+      </div>
+      <div class="step-check">✓</div>
+    `;
+    grid.appendChild(el);
+  });
+}
+
+function renderLog() {
+  document.getElementById('logBody').innerHTML = '<span class="log-cursor"></span>';
+}
+
+let logIndex = 0;
+let stepIndex = 0;
+
+function startProcessing() {
+  progressVal = 0;
+  logIndex = 0;
+  stepIndex = 0;
+
+  const totalDuration = 3400;
+  const interval = 200;
+  const totalSteps = Math.ceil(totalDuration / interval);
+  let tick = 0;
+
+  processingTimer = setInterval(() => {
+    tick++;
+    progressVal = Math.min(100, Math.round((tick / totalSteps) * 100));
+    document.getElementById('progressFill').style.width = progressVal + '%';
+    document.getElementById('pctLabel').textContent = progressVal + '%';
+
+    // update status text
+    const subs = [
+      'Analyzing configuration and building structure…',
+      'Parsing section definitions…',
+      'Applying typography settings…',
+      'Rendering layout grid…',
+      'Compiling citation index…',
+      'Exporting final PDF…',
+    ];
+    const subIdx = Math.min(5, Math.floor((progressVal / 100) * 6));
+    document.getElementById('statusSub').textContent = subs[subIdx];
+
+    // Advance steps
+    const targetStep = Math.floor((progressVal / 100) * STEPS.length);
+    while (stepIndex < targetStep && stepIndex < STEPS.length) {
+      activateStep(stepIndex);
+      stepIndex++;
+    }
+
+    // Add log lines
+    const targetLog = Math.floor((progressVal / 100) * LOG_MSGS.length);
+    while (logIndex < targetLog && logIndex < LOG_MSGS.length) {
+      appendLog(logIndex);
+      logIndex++;
+    }
+
+    if (progressVal >= 100) {
+      clearInterval(processingTimer);
+      // Complete all steps
+      for (let i = stepIndex; i < STEPS.length; i++) completeStep(i);
+      appendLog(LOG_MSGS.length - 1);
+
+      // Hide spinner
+      document.getElementById('spinnerRing').style.animation = 'none';
+      document.getElementById('spinnerRing').style.borderColor = 'var(--green)';
+      document.getElementById('statusSub').textContent = 'All tasks completed successfully.';
+
+      setTimeout(() => setStage(3), 900);
+    }
+  }, interval);
+}
+
+function activateStep(i) {
+  const el = document.getElementById(STEPS[i].id);
+  if (!el) return;
+  el.className = 'step-card active';
+  el.querySelector('.step-status').textContent = 'PROCESSING…';
+  setTimeout(() => completeStep(i), 500);
+}
+
+function completeStep(i) {
+  const el = document.getElementById(STEPS[i] ? STEPS[i].id : null);
+  if (!el) return;
+  el.className = 'step-card done';
+  el.querySelector('.step-status').textContent = 'COMPLETE';
+}
+
+function appendLog(idx) {
+  if (idx >= LOG_MSGS.length) return;
+  const [type, msg] = LOG_MSGS[idx];
+  const body = document.getElementById('logBody');
+  const now = new Date();
+  const ts = now.toTimeString().slice(0,8);
+
+  const cur = body.querySelector('.log-cursor');
+  if (cur) cur.remove();
+
+  const line = document.createElement('div');
+  line.className = 'log-line';
+  line.innerHTML = `<span class="log-ts">${ts}</span><span class="log-msg ${type}">${msg}</span>`;
+  body.appendChild(line);
+
+  const cursor = document.createElement('span');
+  cursor.className = 'log-cursor';
+  body.appendChild(cursor);
+  body.scrollTop = body.scrollHeight;
+}
+
+/* ════════════════════════════════════════════════════════════════
+   RESET
+═══════════════════════════════════════════════════════════════ */
+function resetToStage1() {
+  if (processingTimer) clearInterval(processingTimer);
+  document.getElementById('spinnerRing').style.animation = '';
+  document.getElementById('spinnerRing').style.borderColor = '';
+  document.getElementById('progressFill').style.width = '0%';
+  document.getElementById('pctLabel').textContent = '0%';
+  setStage(1);
+}
+
+/* ════════════════════════════════════════════════════════════════
+   UI HELPERS
+═══════════════════════════════════════════════════════════════ */
+function selectChip(el) {
+  const parent = el.closest('.chips');
+  parent.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+  el.classList.add('active');
+}
+
+function selectSwatch(el) {
+  document.querySelectorAll('.swatch').forEach(s => s.classList.remove('active'));
+  el.classList.add('active');
+}
+
+function selectType(el) {
+  document.querySelectorAll('.type-sample').forEach(s => s.classList.remove('active'));
+  el.classList.add('active');
+}
+
+function saveConfig() { showToast('💾 Configuration saved', 'save'); }
+
+/* ── TOAST ── */
+let toastTimer = null;
+function showToast(msg, type) {
+  const toast = document.getElementById('toast');
+  const icons = { download: '⬇', copy: '📋', open: '↗', add: '＋', save: '💾', warn: '⚠', start: '→' };
+  document.getElementById('toastIcon').textContent = icons[type] || '✓';
+  document.getElementById('toastMsg').textContent = msg;
+  toast.classList.add('show');
+  if (toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => toast.classList.remove('show'), 2400);
+}
+</script>
+</body>
+</html>
