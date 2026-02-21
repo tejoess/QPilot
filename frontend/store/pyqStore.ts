@@ -39,11 +39,10 @@ interface PyqState {
 }
 
 const INITIAL_STEPS: SubprocessStep[] = [
-    { id: 0, label: "Uploading", status: "pending" },
-    { id: 1, label: "Extracting Questions", status: "pending" },
-    { id: 2, label: "Categorizing by Topic", status: "pending" },
-    { id: 3, label: "Tagging Difficulty", status: "pending" },
-    { id: 4, label: "Completed", status: "pending" },
+    { id: 0, label: "Validating Distribution", status: "pending" },
+    { id: 1, label: "Mapping Questions to Levels", status: "pending" },
+    { id: 2, label: "Adjusting Difficulty", status: "pending" },
+    { id: 3, label: "Completed", status: "pending" },
 ];
 
 export const usePyqStore = create<PyqState>((set) => ({

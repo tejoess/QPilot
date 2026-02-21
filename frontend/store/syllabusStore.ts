@@ -35,11 +35,10 @@ interface SyllabusState {
 }
 
 const INITIAL_STEPS: SubprocessStep[] = [
-    { id: 0, label: "Uploading", status: "pending" },
-    { id: 1, label: "Extracting", status: "pending" },
-    { id: 2, label: "Formatting", status: "pending" },
-    { id: 3, label: "Structuring Topics", status: "pending" },
-    { id: 4, label: "Completed", status: "pending" },
+    { id: 0, label: "Validating Distribution", status: "pending" },
+    { id: 1, label: "Mapping Questions to Levels", status: "pending" },
+    { id: 2, label: "Adjusting Difficulty", status: "pending" },
+    { id: 3, label: "Completed", status: "pending" },
 ];
 
 export const useSyllabusStore = create<SyllabusState>((set) => ({

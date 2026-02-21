@@ -50,7 +50,10 @@ export default function SettingsPage() {
     const { theme, setTheme } = useTheme();
 
     return (
-        <SidebarProvider>
+        <SidebarProvider style={{
+            "--sidebar-width": "240px",
+            "--sidebar-width-icon": "70px"
+        } as React.CSSProperties}>
             <div className="flex h-screen w-full bg-background overflow-hidden">
                 <QPilotSidebar />
 

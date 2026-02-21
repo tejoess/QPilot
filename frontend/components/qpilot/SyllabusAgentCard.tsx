@@ -31,6 +31,7 @@ import {
     FileText
 } from "lucide-react";
 import { useSyllabusStore } from "@/store/syllabusStore";
+import { useQPilotStore } from "@/store/qpilotStore";
 import { extractSyllabus, getSyllabusStatus } from "@/lib/projectApi";
 import { cn } from "@/lib/utils";
 
@@ -40,23 +41,44 @@ interface SyllabusAgentCardProps {
 
 export function SyllabusAgentCard({ projectId }: SyllabusAgentCardProps) {
     const {
-        status,
-        steps,
-        currentStepIndex,
         fileName,
         textContent,
-        setStatus,
         setFileName,
         setTextContent,
         updateStep,
-        startExtraction,
+        error,
         setError,
-        error
+        steps
     } = useSyllabusStore();
 
-    const [activeTab, setActiveTab] = useState<"pdf" | "text">("pdf");
+    const {
+        agentStatuses,
+        setAgentStatus,
+        emitMessage,
+        setActiveAgentIndex,
+        activeAgentIndex,
+        triggerNextAgent
+    } = useQPilotStore();
+
+    const status = agentStatuses.syllabus;
+
+    const [activeTab, setActiveTab] = useState<"pdf" | "text" | any>("pdf");
     const fileInputRef = useRef<HTMLInputElement>(null);
     const pollingRef = useRef<NodeJS.Timeout | null>(null);
+
+    useEffect(() => {
+        if (textContent.length > 50 && !fileName) {
+            setActiveTab("text");
+        }
+    }, [textContent, fileName]);
+
+    // Auto-trigger when data is available
+    useEffect(() => {
+        const hasData = activeTab === "pdf" ? fileName : textContent.length > 50;
+        if (hasData && status === "idle") {
+            handleStart();
+        }
+    }, [fileName, textContent, activeTab, status]);
 
     // Clean up polling on unmount
     useEffect(() => {
@@ -78,6 +100,8 @@ export function SyllabusAgentCard({ projectId }: SyllabusAgentCardProps) {
     };
 
     const handleStart = async () => {
+        if (status === "running" || status === "completed") return;
+
         if (activeTab === "pdf" && !fileName) {
             setError("Please select a PDF file first.");
             return;
@@ -87,7 +111,13 @@ export function SyllabusAgentCard({ projectId }: SyllabusAgentCardProps) {
             return;
         }
 
-        startExtraction();
+        setAgentStatus("syllabus", "running");
+        setError(null);
+        setActiveAgentIndex(0);
+
+        // Orchestrator Logs
+        emitMessage("Orchestrator", "orchestrator", "Initializing Syllabus Agent pipeline...");
+        emitMessage("Syllabus Agent", "agent", `Starting extraction from ${activeTab === 'pdf' ? 'PDF' : 'manuscript'}...`); // Changed "file" to "pdf"
 
         try {
             // Trigger API
@@ -112,24 +142,31 @@ export function SyllabusAgentCard({ projectId }: SyllabusAgentCardProps) {
                     // Mark current as running
                     if (stepCounter < steps.length + 1) {
                         updateStep(stepCounter - 1, "running");
+                        // Emit subprocess chat updates
+                        emitMessage("Syllabus Agent", "agent", `${steps[stepCounter - 1].label} in progress...`);
                     }
                 }
 
                 if (stepCounter === steps.length + 1) {
                     updateStep(steps.length - 1, "completed");
-                    setStatus("completed");
+                    setAgentStatus("syllabus", "completed");
+                    emitMessage("Syllabus Agent", "agent", "Syllabus extraction finalized. Knowledge base updated.");
+                    emitMessage("Orchestrator", "orchestrator", "Syllabus complete. Transitioning to PYQ Agent...");
+                    triggerNextAgent();
+
                     if (pollingRef.current) clearInterval(pollingRef.current);
                 }
             }, 2000);
 
         } catch (err: any) {
             setError(err?.message || "Extraction failed.");
-            setStatus("failed");
+            setAgentStatus("syllabus", "failed");
+            emitMessage("Syllabus Agent", "agent", "Critical error during extraction. Retrying recommended.");
         }
     };
 
     return (
-        <Card className="max-w-md border-border/60 shadow-md">
+        <Card className="w-full border-border/60 shadow-md">
             <CardHeader className="pb-3 px-4">
                 <div className="flex items-center justify-between">
                     <CardTitle className="text-sm font-bold flex items-center gap-2">
@@ -154,7 +191,7 @@ export function SyllabusAgentCard({ projectId }: SyllabusAgentCardProps) {
                             <Button
                                 variant={activeTab === "pdf" ? "secondary" : "ghost"}
                                 size="sm"
-                                className="flex-1 text-xs h-8"
+                                className="flex-1 text-xs h-8 font-bold"
                                 onClick={() => setActiveTab("pdf")}
                             >
                                 <FileUp className="h-3.5 w-3.5 mr-2" />
@@ -163,7 +200,7 @@ export function SyllabusAgentCard({ projectId }: SyllabusAgentCardProps) {
                             <Button
                                 variant={activeTab === "text" ? "secondary" : "ghost"}
                                 size="sm"
-                                className="flex-1 text-xs h-8"
+                                className="flex-1 text-xs h-8 font-bold"
                                 onClick={() => setActiveTab("text")}
                             >
                                 <Type className="h-3.5 w-3.5 mr-2" />
@@ -182,79 +219,87 @@ export function SyllabusAgentCard({ projectId }: SyllabusAgentCardProps) {
                                 />
                                 <Button
                                     variant="outline"
-                                    className="w-full h-20 border-dashed flex flex-col gap-2 hover:bg-primary/5 hover:border-primary/50"
+                                    className="w-full h-16 border-dashed flex flex-col gap-1 hover:bg-primary/5 hover:border-primary/50"
                                     onClick={() => fileInputRef.current?.click()}
                                 >
-                                    <FileUp className="h-5 w-5 text-muted-foreground" />
-                                    <span className="text-xs font-medium text-muted-foreground">
-                                        {fileName || "Click to upload Syllabus PDF"}
+                                    <FileUp className="h-4 w-4 text-muted-foreground" />
+                                    <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-tight">
+                                        {fileName || "Syllabus PDF"}
                                     </span>
                                 </Button>
                             </div>
                         ) : (
                             <Textarea
                                 placeholder="Paste syllabus content here..."
-                                className="text-xs min-h-[100px] resize-none"
+                                className="text-[11px] min-h-[90px] resize-none focus:ring-1"
                                 value={textContent}
                                 onChange={(e) => setTextContent(e.target.value)}
                             />
                         )}
-
-                        {error && (
-                            <div className="flex items-center gap-2 text-xs text-destructive bg-destructive/5 p-2 rounded border border-destructive/20">
-                                <AlertCircle className="h-3.5 w-3.5" />
-                                {error}
-                            </div>
-                        )}
-
-                        <Button className="w-full h-9 font-bold tracking-wide" onClick={handleStart}>
-                            <Play className="h-3.5 w-3.5 mr-2" />
-                            Start Extraction
-                        </Button>
                     </div>
                 ) : (
-                    <div className="space-y-5 py-2 animate-in slide-in-from-bottom-2 duration-400">
-                        {/* Subprocess Steps */}
-                        <div className="space-y-3">
+                    <div className="space-y-4 py-2 animate-in fade-in duration-400">
+                        <div className="space-y-2.5">
                             {steps.map((step, idx) => {
                                 const isActive = step.status === "running";
                                 const isDone = step.status === "completed";
                                 const isFail = step.status === "failed";
 
                                 return (
-                                    <div key={idx} className="flex items-center justify-between group">
-                                        <div className="flex items-center gap-3">
-                                            <div className={cn(
-                                                "h-2 w-2 rounded-full transition-all duration-300",
-                                                isActive ? "bg-primary animate-pulse scale-125 shadow-[0_0_8px_var(--primary)]" : "bg-border",
-                                                isDone ? "bg-green-500" : "",
-                                                isFail ? "bg-destructive" : ""
-                                            )} />
-                                            <span className={cn(
-                                                "text-xs font-medium transition-colors",
-                                                isActive ? "text-foreground" : "text-muted-foreground",
-                                                isDone ? "text-muted-foreground/60" : ""
-                                            )}>
-                                                {step.label}
-                                            </span>
-                                        </div>
-                                        {isActive && <Loader2 className="h-3 w-3 animate-spin text-primary" />}
-                                        {isDone && <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />}
+                                    <div key={idx} className="flex items-center gap-3 px-1">
+                                        <div className={cn(
+                                            "h-1.5 w-1.5 rounded-full transition-all duration-300",
+                                            isActive ? "bg-blue-500 animate-pulse ring-4 ring-blue-500/20" : "bg-muted-foreground/30",
+                                            isDone ? "bg-green-500" : "",
+                                            isFail ? "bg-red-500" : ""
+                                        )} />
+                                        <span className={cn(
+                                            "text-[10px] font-bold uppercase tracking-widest transition-colors",
+                                            isActive ? "text-blue-600" : "text-muted-foreground/60",
+                                            isDone ? "text-green-600/70" : ""
+                                        )}>
+                                            {step.label}
+                                        </span>
+                                        {isActive && <Loader2 className="h-3 w-3 animate-spin text-blue-500 ml-auto" />}
                                     </div>
                                 );
                             })}
                         </div>
-
-                        {status === "completed" && (
-                            <div className="p-3 bg-green-500/5 rounded-lg border border-green-200/50 flex items-center gap-3 animate-in zoom-in-95">
-                                <CheckCircle2 className="h-4 w-4 text-green-600" />
-                                <p className="text-[11px] font-medium text-green-700">
-                                    Syllabus extracted and mapped to project successfully.
-                                </p>
-                            </div>
-                        )}
                     </div>
                 )}
+
+                {error && (
+                    <div className="flex items-center gap-2 text-[10px] font-bold text-destructive bg-destructive/5 p-2 rounded border border-destructive/20 uppercase tracking-tight">
+                        <AlertCircle className="h-3 w-3" />
+                        {error}
+                    </div>
+                )}
+
+                <Button
+                    className={cn(
+                        "w-full h-10 font-black text-[11px] uppercase tracking-[0.15em] transition-all",
+                        status === "running" || status === "completed" ? "bg-green-600 hover:bg-green-700 disabled:opacity-100" : "bg-primary"
+                    )}
+                    onClick={handleStart}
+                    disabled={status === "running" || status === "completed"}
+                >
+                    {status === "running" ? (
+                        <>
+                            <Loader2 className="h-3.5 w-3.5 mr-2 animate-spin" />
+                            Extracting...
+                        </>
+                    ) : status === "completed" ? (
+                        <>
+                            <CheckCircle2 className="h-3.5 w-3.5 mr-2" />
+                            Completed
+                        </>
+                    ) : (
+                        <>
+                            <Play className="h-3 w-3 mr-2" />
+                            Start Extraction
+                        </>
+                    )}
+                </Button>
             </CardContent>
         </Card>
     );

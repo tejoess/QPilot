@@ -17,37 +17,8 @@ export function LivePaperView() {
 
     return (
         <div className="flex flex-col h-full bg-slate-50/50 dark:bg-slate-950/20">
-            <div className="px-6 py-4 border-b border-border/50 bg-background flex items-center justify-between sticky top-0 z-10">
-                <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-lg bg-primary/5 border border-primary/10 text-primary">
-                        <FileText className="h-5 w-5" />
-                    </div>
-                    <div>
-                        <h2 className="text-sm font-bold text-foreground">Live Question Paper Generation</h2>
-                        <p className="text-xs text-muted-foreground flex items-center gap-1.5">
-                            {status === 'running' ? (
-                                <>
-                                    <Sparkles className="h-3 w-3 animate-pulse text-amber-500" />
-                                    Agents are actively synthesizing content...
-                                </>
-                            ) : status === 'completed' ? (
-                                <>
-                                    <BadgeCheck className="h-3 w-3 text-green-500" />
-                                    Paper generation finalized.
-                                </>
-                            ) : (
-                                "Waiting for pipeline start..."
-                            )}
-                        </p>
-                    </div>
-                </div>
 
-                {status === 'completed' && (
-                    <Badge className="bg-green-500 hover:bg-green-600 animate-in zoom-in-95">Finalized</Badge>
-                )}
-            </div>
-
-            <ScrollArea className="flex-1">
+            <div className="flex-1 overflow-y-auto">
                 <div className="max-w-[800px] mx-auto p-8 lg:p-12 min-h-full bg-card shadow-sm border-x border-border/40">
                     {paperContent.length === 0 ? (
                         <div className="space-y-12 py-10">
@@ -117,7 +88,7 @@ export function LivePaperView() {
                         </div>
                     )}
                 </div>
-            </ScrollArea>
+            </div>
         </div>
     );
 }

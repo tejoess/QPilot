@@ -17,6 +17,7 @@ import { PyqAgentCard } from "./PyqAgentCard";
 import { BlooxanomyAgentCard } from "./BlooxanomyAgentCard";
 import { PaperPatternAgentCard } from "./PaperPatternAgentCard";
 import { TeacherInputAgentCard } from "./TeacherInputAgentCard";
+import { AutoFillButton } from "./AutoFillButton";
 import { useParams } from "next/navigation";
 import { usePatternStore } from "@/store/patternStore";
 import { useQPilotConfigStore } from "@/store/qpilotConfigStore";
@@ -43,15 +44,17 @@ export function AgentPanel() {
     }, [metadata.totalMarks, setTotalMarks]);
 
     return (
-        <div className="flex h-full gap-4 p-4 overflow-hidden">
+        <div className="flex h-full overflow-hidden">
             {/* 1. Far Left Vertical Process Bar */}
-            <div className="h-full pt-1">
+            <div className="h-full pt-4 px-4 border-r border-border/20 bg-muted/5">
                 <VerticalProgressBar />
             </div>
 
-            {/* 2. Agents Cards List */}
-            <ScrollArea className="flex-1">
-                <div className="space-y-4 pr-3">
+            {/* 2. Agents Cards List & Chat Panel */}
+            <div className="flex-1 flex flex-col min-w-0 h-full">
+                {/* Agent List - Scrollable */}
+                <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar">
+                    <AutoFillButton />
                     {agents.map((agent, index) => {
                         const isActive = activeAgentIndex === index;
 
@@ -79,7 +82,7 @@ export function AgentPanel() {
                             <Card
                                 key={agent.id}
                                 className={cn(
-                                    "border-border/40 transition-all duration-300 shadow-none",
+                                    "border-border/40 transition-all duration-300 shadow-none w-full",
                                     isActive ? "ring-1 ring-primary/40 bg-primary/5" : "bg-card/50"
                                 )}
                                 aria-current={isActive ? "step" : undefined}
@@ -111,7 +114,8 @@ export function AgentPanel() {
                         );
                     })}
                 </div>
-            </ScrollArea>
+
+            </div>
         </div>
     );
 }

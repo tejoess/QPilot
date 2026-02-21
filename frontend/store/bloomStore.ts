@@ -34,6 +34,7 @@ interface BloomState {
 
     // Actions
     setLevel: (level: keyof BloomLevels, value: number) => void;
+    setBloomLevels: (levels: BloomLevels) => void;
     setStatus: (status: BloomStatus) => void;
     updateStep: (index: number, status: SubprocessStep["status"]) => void;
     reset: () => void;
@@ -68,6 +69,8 @@ export const useBloomStore = create<BloomState>((set, get) => ({
     setLevel: (level, value) => set((state) => ({
         bloomLevels: { ...state.bloomLevels, [level]: Math.max(0, value) }
     })),
+
+    setBloomLevels: (bloomLevels) => set({ bloomLevels }),
 
     setStatus: (status) => set({ status }),
 
