@@ -6,14 +6,72 @@ Generates question paper blueprint from syllabus, PYQ analysis, and requirements
 import json
 import re
 from typing import Dict, List
-from backend.services.llm_service import gemini_llm as llm
+from backend.services.llm_service import openai_llm as llm
 from langchain_core.messages import HumanMessage
+
+
+def create_fallback_blueprint(paper_pattern: Dict) -> Dict:
+    """
+    Create a minimal valid blueprint when LLM fails
+    """
+    print("⚠️ Creating fallback blueprint...")
+    
+    sections = []
+    for section_pattern in paper_pattern.get('sections', []):
+        questions = []
+        for i in range(section_pattern.get('question_count', 1)):
+            questions.append({
+                "question_number": f"{section_pattern['section_name']}-Q{i+1}",
+                "module": "Module 1",
+                "topic": "General Topic",
+                "subtopic": "General Subtopic",
+                "marks": section_pattern.get('marks_per_question', 5),
+                "bloom_level": "Understand",
+                "is_pyq": False,
+                "rationale": "Fallback"
+            })
+        
+        sections.append({
+            "section_name": section_pattern['section_name'],
+            "section_description": section_pattern.get('section_description', ''),
+            "questions": questions
+        })
+    
+    return {
+        "blueprint_metadata": {
+            "total_marks": paper_pattern['total_marks'],
+            "total_questions": paper_pattern['total_questions'],
+            "bloom_distribution": {
+                "Remember": 0.2,
+                "Understand": 0.3,
+                "Apply": 0.3,
+                "Analyze": 0.2,
+                "Evaluate": 0.0,
+                "Create": 0.0
+            },
+            "module_distribution": {"Module 1": 1.0},
+            "pyq_usage": {
+                "actual_pyq_count": 0,
+                "new_question_count": paper_pattern['total_questions'],
+                "pyq_percentage": 0.0
+            }
+        },
+        "sections": sections
+    }
 
 
 def fix_incomplete_json(json_str: str) -> str:
     """
     Attempt to fix incomplete JSON by adding missing closing brackets
     """
+    # Try to extract JSON from text
+    # Look for first { and try to find matching }
+    start_idx = json_str.find('{')
+    if start_idx == -1:
+        return json_str
+    
+    json_str = json_str[start_idx:]
+    
     # Count opening and closing brackets
     open_braces = json_str.count('{')
     close_braces = json_str.count('}')
@@ -185,21 +243,36 @@ Now generate the blueprint:"""
             # Extract content
             response_text = response.content.strip()
             
+            print(f"\n📥 LLM Response Length: {len(response_text)} characters")
+            print(f"📥 First 200 chars: {response_text[:200]}")
+            
             # Remove markdown code blocks if present
             if response_text.startswith("```json"):
                 response_text = response_text.replace("```json", "").replace("```", "").strip()
             elif response_text.startswith("```"):
                 response_text = response_text.replace("```", "").strip()
             
+            # Try to extract JSON using regex
+            json_match = re.search(r'\{[\s\S]*\}', response_text)
+            if json_match:
+                response_text = json_match.group(0)
+                print(f"✅ Extracted JSON from response")
+            
             # Try parsing JSON
             try:
                 blueprint = json.loads(response_text)
-            except json.JSONDecodeError:
+                print(f"✅ Successfully parsed JSON directly")
+            except json.JSONDecodeError as parse_error:
                 # Try fixing incomplete JSON
+                print(f"⚠️ Initial parse failed: {parse_error}")
                 print(f"⚠️ Attempting to fix incomplete JSON...")
                 fixed_json = fix_incomplete_json(response_text)
                 blueprint = json.loads(fixed_json)
                 print(f"✅ Successfully fixed and parsed JSON")
+            
+            # Validate blueprint structure
+            if not isinstance(blueprint, dict) or 'sections' not in blueprint:
+                raise ValueError("Invalid blueprint structure: missing 'sections' key")
             
             # Validate blueprint
             validation_errors = validate_blueprint(blueprint, paper_pattern)
@@ -211,20 +284,23 @@ Now generate the blueprint:"""
             print(f"✅ Successfully generated blueprint on attempt {attempt + 1}")
             return blueprint
             
-        except json.JSONDecodeError as e:
-            print(f"\n❌ Attempt {attempt + 1}/{max_retries} failed: JSON parsing error")
+        except (json.JSONDecodeError, ValueError) as e:
+            print(f"\n❌ Attempt {attempt + 1}/{max_retries} failed: {type(e).__name__}")
             print(f"Error: {e}")
             
             if attempt < max_retries - 1:
                 print(f"🔄 Retrying with adjusted prompt...")
                 # Add instruction to keep response concise
-                prompt += "\n\nCRITICAL: Response is being truncated. Make rationale MAX 5 words. Keep JSON compact."
+                prompt += "\n\nCRITICAL: Return ONLY valid JSON. No explanations. Keep rationale SHORT (max 3 words). Ensure JSON is complete and properly closed."
             else:
                 print(f"\n❌ ERROR: Failed to parse LLM response after {max_retries} attempts")
-                print(f"\nLLM Response (first 1000 chars):\n{response_text[:1000]}")
-                print(f"\nLLM Response (last 500 chars):\n...{response_text[-500:]}")
+                print(f"\nLLM Response (first 500 chars):\n{response_text[:500]}")
+                print(f"\nLLM Response (last 300 chars):\n...{response_text[-300:]}")
                 print(f"\nTotal length: {len(response_text)} characters")
-                raise Exception(f"Failed to generate valid blueprint after {max_retries} attempts: {e}")
+                
+                # Return a minimal valid blueprint instead of crashing
+                print("\n🔧 Returning minimal fallback blueprint...")
+                return create_fallback_blueprint(paper_pattern)
 
 
 def validate_blueprint(blueprint: Dict, paper_pattern: Dict) -> List[str]:
@@ -469,32 +545,32 @@ SAMPLE_PAPER_PATTERN = {
 # TEST EXECUTION
 # ============================================================================
 
-if __name__ == "__main__":
-    print("🚀 Starting Blueprint Generation...")
-    print("="*80)
+# if __name__ == "__main__":
+#     print("🚀 Starting Blueprint Generation...")
+#     print("="*80)
     
-    try:
-        # Generate blueprint
-        blueprint = generate_blueprint(
-            syllabus=SAMPLE_SYLLABUS,
-            pyq_analysis=SAMPLE_PYQ_ANALYSIS,
-            bloom_coverage=SAMPLE_BLOOM_COVERAGE,
-            teacher_input=SAMPLE_TEACHER_INPUT,
-            paper_pattern=SAMPLE_PAPER_PATTERN
-        )
+#     try:
+#         # Generate blueprint
+#         blueprint = generate_blueprint(
+#             syllabus=SAMPLE_SYLLABUS,
+#             pyq_analysis=SAMPLE_PYQ_ANALYSIS,
+#             bloom_coverage=SAMPLE_BLOOM_COVERAGE,
+#             teacher_input=SAMPLE_TEACHER_INPUT,
+#             paper_pattern=SAMPLE_PAPER_PATTERN
+#         )
         
-        # Print summary
-        print_blueprint_summary(blueprint)
+#         # Print summary
+#         print_blueprint_summary(blueprint)
         
-        # Save to file
-        output_file = "generated_blueprint.json"
-        with open(output_file, 'w') as f:
-            json.dump(blueprint, f, indent=2)
+#         # Save to file
+#         output_file = "generated_blueprint.json"
+#         with open(output_file, 'w') as f:
+#             json.dump(blueprint, f, indent=2)
         
-        print(f"\n✅ Blueprint saved to: {output_file}")
-        print("="*80)
+#         print(f"\n✅ Blueprint saved to: {output_file}")
+#         print("="*80)
         
-    except Exception as e:
-        print(f"\n❌ ERROR: {e}")
-        import traceback
-        traceback.print_exc()
+#     except Exception as e:
+#         print(f"\n❌ ERROR: {e}")
+#         import traceback
+#         traceback.print_exc()

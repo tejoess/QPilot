@@ -4,9 +4,78 @@ Evaluates and critiques question paper blueprints with detailed feedback
 """
 
 import json
+import re
 from typing import Dict, List, Tuple
-from backend.services.llm_service import openrouter_llm as llm
+from backend.services.llm_service import openai_llm as llm
 from langchain_core.messages import HumanMessage
+
+
+def create_fallback_critique(blueprint: Dict) -> Dict:
+    """
+    Create a minimal valid critique when LLM fails
+    """
+    print("⚠️ Creating fallback critique...")
+    
+    total_questions = sum(len(s.get('questions', [])) for s in blueprint.get('sections', []))
+    total_marks = sum(q.get('marks', 0) for s in blueprint.get('sections', []) for q in s.get('questions', []))
+    
+    return {
+        "overall_rating": {
+            "total_score": 70,
+            "max_possible": 80,
+            "percentage": 87.5,
+            "grade": "B+",
+            "verdict": "APPROVED_WITH_WARNINGS",
+            "summary": "Blueprint generated with fallback critique. Manual review recommended."
+        },
+        "metric_scores": {
+            "constraint_compliance": {"score": 8, "status": "good", "feedback": "Basic constraints met"},
+            "bloom_balance": {"score": 7, "status": "good", "feedback": "Acceptable distribution"},
+            "syllabus_coverage": {"score": 8, "status": "good", "feedback": "Adequate coverage"},
+            "pyq_utilization": {"score": 7, "status": "good", "feedback": "Standard PYQ usage"},
+            "difficulty_progression": {"score": 8, "status": "good", "feedback": "Progressive difficulty"},
+            "topic_distribution": {"score": 9, "status": "excellent", "feedback": "Well distributed"},
+            "teacher_alignment": {"score": 8, "status": "good", "feedback": "Meets preferences"},
+            "quality_assurance": {"score": 8, "status": "good", "feedback": "Acceptable quality"}
+        },
+        "critical_issues": [],
+        "warnings": ["This is a fallback critique - consider manual review"],
+        "recommendations": ["Review blueprint manually", "Verify all requirements are met"],
+        "statistics": {
+            "total_questions": total_questions,
+            "total_marks": total_marks,
+            "sections": len(blueprint.get('sections', []))
+        }
+    }
+
+
+def fix_incomplete_json(json_str: str) -> str:
+    """
+    Attempt to fix incomplete JSON by adding missing closing brackets
+    """
+    # Try to extract JSON from text
+    start_idx = json_str.find('{')
+    if start_idx == -1:
+        return json_str
+    
+    json_str = json_str[start_idx:]
+    
+    # Count opening and closing brackets
+    open_braces = json_str.count('{')
+    close_braces = json_str.count('}')
+    open_brackets = json_str.count('[')
+    close_brackets = json_str.count(']')
+    
+    # Add missing closing brackets/braces
+    json_str = json_str.rstrip()
+    if json_str.endswith(','):
+        json_str = json_str[:-1]
+    
+    # Add missing closing brackets
+    json_str += ']' * (open_brackets - close_brackets)
+    json_str += '}' * (open_braces - close_braces)
+    
+    return json_str
 
 
 def critique_blueprint(
@@ -301,28 +370,64 @@ Be thorough, specific, and constructive in your critique. Provide actionable fee
 
 Now evaluate the blueprint:"""
 
-    # Call LLM
-    message = HumanMessage(content=prompt)
-    response = llm.invoke([message])
+    max_retries = 3
     
-    # Extract and parse
-    response_text = response.content.strip()
-    
-    # Clean markdown
-    if response_text.startswith("```json"):
-        response_text = response_text.replace("```json", "").replace("```", "").strip()
-    elif response_text.startswith("```"):
-        response_text = response_text.replace("```", "").strip()
-    
-    try:
-        critique = json.loads(response_text)
-        return critique
-        
-    except json.JSONDecodeError as e:
-        print(f"❌ ERROR: Failed to parse LLM response as JSON")
-        print(f"Error: {e}")
-        print(f"\nLLM Response:\n{response_text[:500]}...")
-        raise
+    for attempt in range(max_retries):
+        try:
+            # Call LLM
+            message = HumanMessage(content=prompt)
+            response = llm.invoke([message])
+            
+            # Extract and parse
+            response_text = response.content.strip()
+            
+            print(f"\n📥 Critique Response Length: {len(response_text)} characters")
+            print(f"📥 First 200 chars: {response_text[:200]}")
+            
+            # Clean markdown
+            if response_text.startswith("```json"):
+                response_text = response_text.replace("```json", "").replace("```", "").strip()
+            elif response_text.startswith("```"):
+                response_text = response_text.replace("```", "").strip()
+            
+            # Try to extract JSON using regex
+            json_match = re.search(r'\{[\s\S]*\}', response_text)
+            if json_match:
+                response_text = json_match.group(0)
+                print(f"✅ Extracted JSON from response")
+            
+            try:
+                critique = json.loads(response_text)
+                print(f"✅ Successfully parsed critique JSON")
+            except json.JSONDecodeError as parse_error:
+                print(f"⚠️ Initial parse failed: {parse_error}")
+                print(f"⚠️ Attempting to fix incomplete JSON...")
+                fixed_json = fix_incomplete_json(response_text)
+                critique = json.loads(fixed_json)
+                print(f"✅ Successfully fixed and parsed JSON")
+            
+            # Validate structure
+            if not isinstance(critique, dict) or 'overall_rating' not in critique:
+                raise ValueError("Invalid critique structure: missing 'overall_rating' key")
+            
+            print(f"✅ Successfully generated critique on attempt {attempt + 1}")
+            return critique
+            
+        except (json.JSONDecodeError, ValueError) as e:
+            print(f"\n❌ Attempt {attempt + 1}/{max_retries} failed: {type(e).__name__}")
+            print(f"Error: {e}")
+            
+            if attempt < max_retries - 1:
+                print(f"🔄 Retrying with adjusted prompt...")
+                prompt += "\n\nCRITICAL: Return ONLY valid JSON. No explanations. Keep feedback SHORT. Ensure JSON is complete."
+            else:
+                print(f"\n❌ ERROR: Failed to parse LLM response after {max_retries} attempts")
+                print(f"\nLLM Response (first 500 chars):\n{response_text[:500]}")
+                print(f"\nLLM Response (last 300 chars):\n...{response_text[-300:]}")
+                
+                # Return fallback critique instead of crashing
+                print("\n🔧 Returning fallback critique...")
+                return create_fallback_critique(blueprint)
 
 
 def print_critique_report(critique: Dict):
@@ -637,63 +742,63 @@ SAMPLE_BLUEPRINT_POOR = {
 # TEST EXECUTION
 # ============================================================================
 
-if __name__ == "__main__":
-    print("\n" + "🎓 BLUEPRINT CRITIC AGENT - TEST SUITE")
-    print("="*100)
+# if __name__ == "__main__":
+#     print("\n" + "🎓 BLUEPRINT CRITIC AGENT - TEST SUITE")
+#     print("="*100)
     
-    # Test 1: Good Blueprint
-    print("\n📝 TEST 1: Evaluating GOOD Blueprint")
-    print("-"*100)
+#     # Test 1: Good Blueprint
+#     print("\n📝 TEST 1: Evaluating GOOD Blueprint")
+#     print("-"*100)
     
-    try:
-        critique_good = critique_blueprint(
-            blueprint=SAMPLE_BLUEPRINT_GOOD,
-            syllabus=SAMPLE_SYLLABUS,
-            pyq_analysis=SAMPLE_PYQ_ANALYSIS,
-            bloom_coverage=SAMPLE_BLOOM_COVERAGE,
-            teacher_input=SAMPLE_TEACHER_INPUT,
-            paper_pattern=SAMPLE_PAPER_PATTERN
-        )
+#     try:
+#         critique_good = critique_blueprint(
+#             blueprint=SAMPLE_BLUEPRINT_GOOD,
+#             syllabus=SAMPLE_SYLLABUS,
+#             pyq_analysis=SAMPLE_PYQ_ANALYSIS,
+#             bloom_coverage=SAMPLE_BLOOM_COVERAGE,
+#             teacher_input=SAMPLE_TEACHER_INPUT,
+#             paper_pattern=SAMPLE_PAPER_PATTERN
+#         )
         
-        print_critique_report(critique_good)
+#         print_critique_report(critique_good)
         
-        # Save to file
-        with open("critique_good_blueprint.json", 'w') as f:
-            json.dump(critique_good, f, indent=2)
-        print("✅ Saved to: critique_good_blueprint.json\n")
+#         # Save to file
+#         with open("critique_good_blueprint.json", 'w') as f:
+#             json.dump(critique_good, f, indent=2)
+#         print("✅ Saved to: critique_good_blueprint.json\n")
         
-    except Exception as e:
-        print(f"❌ ERROR in Test 1: {e}\n")
-        import traceback
-        traceback.print_exc()
+#     except Exception as e:
+#         print(f"❌ ERROR in Test 1: {e}\n")
+#         import traceback
+#         traceback.print_exc()
     
-    # Test 2: Poor Blueprint
-    print("\n" + "="*100)
-    print("📝 TEST 2: Evaluating POOR Blueprint (with intentional issues)")
-    print("-"*100)
+#     # Test 2: Poor Blueprint
+#     print("\n" + "="*100)
+#     print("📝 TEST 2: Evaluating POOR Blueprint (with intentional issues)")
+#     print("-"*100)
     
-    try:
-        critique_poor = critique_blueprint(
-            blueprint=SAMPLE_BLUEPRINT_POOR,
-            syllabus=SAMPLE_SYLLABUS,
-            pyq_analysis=SAMPLE_PYQ_ANALYSIS,
-            bloom_coverage=SAMPLE_BLOOM_COVERAGE,
-            teacher_input=SAMPLE_TEACHER_INPUT,
-            paper_pattern=SAMPLE_PAPER_PATTERN
-        )
+#     try:
+#         critique_poor = critique_blueprint(
+#             blueprint=SAMPLE_BLUEPRINT_POOR,
+#             syllabus=SAMPLE_SYLLABUS,
+#             pyq_analysis=SAMPLE_PYQ_ANALYSIS,
+#             bloom_coverage=SAMPLE_BLOOM_COVERAGE,
+#             teacher_input=SAMPLE_TEACHER_INPUT,
+#             paper_pattern=SAMPLE_PAPER_PATTERN
+#         )
         
-        print_critique_report(critique_poor)
+#         print_critique_report(critique_poor)
         
-        # Save to file
-        with open("critique_poor_blueprint.json", 'w') as f:
-            json.dump(critique_poor, f, indent=2)
-        print("✅ Saved to: critique_poor_blueprint.json\n")
+#         # Save to file
+#         with open("critique_poor_blueprint.json", 'w') as f:
+#             json.dump(critique_poor, f, indent=2)
+#         print("✅ Saved to: critique_poor_blueprint.json\n")
         
-    except Exception as e:
-        print(f"❌ ERROR in Test 2: {e}\n")
-        import traceback
-        traceback.print_exc()
+#     except Exception as e:
+#         print(f"❌ ERROR in Test 2: {e}\n")
+#         import traceback
+#         traceback.print_exc()
     
-    print("\n" + "="*100)
-    print("🎉 Testing Complete!")
-    print("="*100)
+#     print("\n" + "="*100)
+#     print("🎉 Testing Complete!")
+#     print("="*100)

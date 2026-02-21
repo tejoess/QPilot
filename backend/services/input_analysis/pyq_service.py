@@ -400,5 +400,5 @@ The assessment consists of two class tests of 20 marks each. The first class tes
 - 3 Question 1 and question 6 will have questions from all modules. Remaining 4 questions will be based on the remaining 4 modules.
 
 """
-pyqs = format_pyqs(pyq_text, dummy_syllabus)
-print(pyqs)
+# pyqs = format_pyqs(pyq_text, dummy_syllabus)
+# print(pyqs)
