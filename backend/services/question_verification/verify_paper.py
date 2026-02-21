@@ -295,7 +295,6 @@ def verify_question_paper(
     if not ok:
         issues.append(msg)
         suggestions.append(f"Add or remove questions to reach exactly {paper_pattern['total_questions']}")
-
     ok, msg = check_section_structure(paper, paper_pattern)
     det_results["section_structure"] = {"pass": ok, "detail": msg}
     print(f"  {'✅' if ok else '❌'} {msg}")
