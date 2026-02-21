@@ -2,6 +2,35 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
+/* ─── TIEMPOS FONT FAMILY (Academic Premium) ─── */
+@font-face {
+  font-family: 'Tiempos Text';
+  src: url('/tiempos-font-family/TestTiemposText-Regular-BF66457a50cd521.otf') format('opentype');
+  font-weight: 400;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'Tiempos Text';
+  src: url('/tiempos-font-family/TestTiemposText-Bold-BF66457a4f03c40.otf') format('opentype');
+  font-weight: 700;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'Tiempos Headline';
+  src: url('/tiempos-font-family/TestTiemposHeadline-Semibold-BF66457a509040b.otf') format('opentype');
+  font-weight: 600;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'Tiempos Headline';
+  src: url('/tiempos-font-family/TestTiemposHeadline-Black-BF66457a50e385b.otf') format('opentype');
+  font-weight: 900;
+  font-style: normal;
+}
+
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
@@ -38,6 +67,8 @@
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);
   --color-card: var(--card);
+  --font-serif: 'Tiempos Headline', serif;
+  --font-body: 'Tiempos Text', serif;
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
@@ -185,5 +216,15 @@
 
   body {
     @apply bg-background text-foreground;
+    font-family: var(--font-body);
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-family: var(--font-serif);
   }
 }

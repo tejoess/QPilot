@@ -61,7 +61,10 @@ export default function DashboardPage() {
     const lastProjectId = recentPapers.length > 0 ? recentPapers[0].id : null;
 
     return (
-        <SidebarProvider>
+        <SidebarProvider style={{
+            "--sidebar-width": "240px",
+            "--sidebar-width-icon": "70px"
+        } as React.CSSProperties}>
             <div className="flex h-screen w-full bg-background overflow-hidden">
                 <QPilotSidebar />
                 <SidebarInset className="flex-1 overflow-auto bg-slate-50/30 dark:bg-slate-950/20">

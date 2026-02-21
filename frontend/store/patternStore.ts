@@ -35,6 +35,7 @@ interface PatternState {
     // Actions
     setTotalMarks: (marks: number) => void;
     addSection: (section: Omit<PatternSection, "id" | "totalMarks">) => void;
+    setSections: (sections: PatternSection[]) => void;
     updateSection: (id: string, updates: Partial<PatternSection>) => void;
     deleteSection: (id: string) => void;
     setStatus: (status: PatternStatus) => void;
@@ -69,6 +70,8 @@ export const usePatternStore = create<PatternState>((set, get) => ({
         };
         return { sections: [...state.sections, newSection] };
     }),
+
+    setSections: (sections) => set({ sections }),
 
     updateSection: (id, updates) => set((state) => {
         const newSections = state.sections.map((s) => {

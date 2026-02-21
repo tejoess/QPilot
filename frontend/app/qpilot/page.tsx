@@ -75,7 +75,10 @@ export default function QPilotConfigPage() {
     };
 
     return (
-        <SidebarProvider>
+        <SidebarProvider style={{
+            "--sidebar-width": "240px",
+            "--sidebar-width-icon": "70px"
+        } as React.CSSProperties}>
             <div className="flex h-screen w-full bg-background overflow-hidden">
                 {/* 1️⃣ LEFT SIDEBAR */}
                 <QPilotSidebar />

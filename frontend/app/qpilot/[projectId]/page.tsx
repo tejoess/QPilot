@@ -13,7 +13,7 @@ import { useParams, useRouter } from "next/navigation";
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import { QPilotSidebar } from "@/components/qpilot/QPilotSidebar";
 import { AgentPanel } from "@/components/qpilot/AgentPanel";
-import { LivePaperView } from "@/components/qpilot/LivePaperView";
+import { AgentChatPanel } from "@/components/qpilot/AgentChatPanel";
 import { useQPilotStore } from "@/store/qpilotStore";
 import { useQPilotInterface } from "@/hooks/useQPilotInterface";
 import { getProject } from "@/lib/projectApi";
@@ -52,12 +52,8 @@ export default function QPilotExecutionPage() {
     // 2. Integration Hook
     const { runGeneration } = useQPilotInterface(projectId as string, requestData);
 
-    // 3. Auto-start on load
-    useEffect(() => {
-        if (requestData && status === "idle") {
-            runGeneration();
-        }
-    }, [requestData, status, runGeneration]);
+    // 3. Manual initialization is now handled by event-driven orchestrator
+    // in the individual agent cards.
 
     // Handle completion delay & redirect
     useEffect(() => {
@@ -82,7 +78,10 @@ export default function QPilotExecutionPage() {
     }
 
     return (
-        <SidebarProvider>
+        <SidebarProvider style={{
+            "--sidebar-width": "240px",
+            "--sidebar-width-icon": "70px"
+        } as React.CSSProperties}>
             <div className="flex h-screen w-full overflow-hidden bg-background">
                 {/* 1. SIDEBAR */}
                 <QPilotSidebar />
@@ -101,9 +100,9 @@ export default function QPilotExecutionPage() {
                             </div>
                         </div>
 
-                        {/* 3. RIGHT PANEL (Live Rendering View) - Fills remaining space */}
+                        {/* 3. RIGHT PANEL (Orchestrator Chat) - Fills remaining space */}
                         <main className="flex-1 overflow-hidden bg-muted/20">
-                            <LivePaperView />
+                            <AgentChatPanel />
                         </main>
                     </div>
                 </SidebarInset>

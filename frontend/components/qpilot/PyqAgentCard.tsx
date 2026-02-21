@@ -36,6 +36,7 @@ import {
     AlertCircle
 } from "lucide-react";
 import { usePyqStore } from "@/store/pyqStore";
+import { useQPilotStore } from "@/store/qpilotStore";
 import { processPyqs } from "@/lib/projectApi";
 import { cn } from "@/lib/utils";
 
@@ -47,26 +48,48 @@ const YEARS = ["2025", "2024", "2023", "2022", "2021", "2020"];
 
 export function PyqAgentCard({ projectId }: PyqAgentCardProps) {
     const {
-        status,
         steps,
         fileName,
         textContent,
         year,
         board,
-        setStatus,
         setFileName,
         setTextContent,
         setYear,
         setBoard,
         updateStep,
-        startProcessing,
         setError,
         error
     } = usePyqStore();
 
-    const [activeTab, setActiveTab] = useState<"pdf" | "text">("pdf");
+    const {
+        agentStatuses,
+        setAgentStatus,
+        emitMessage,
+        setActiveAgentIndex,
+        activeAgentIndex,
+        triggerNextAgent
+    } = useQPilotStore();
+
+    const status = agentStatuses.pyq;
+
+    const [activeTab, setActiveTab] = useState<"pdf" | "text" | any>("pdf");
     const fileInputRef = useRef<HTMLInputElement>(null);
     const pollingRef = useRef<NodeJS.Timeout | null>(null);
+
+    useEffect(() => {
+        if (textContent.length > 50 && !fileName) {
+            setActiveTab("text");
+        }
+    }, [textContent, fileName]);
+
+    // Auto-trigger when data is available
+    useEffect(() => {
+        const hasData = activeTab === "pdf" ? fileName : textContent.length > 50;
+        if (hasData && status === "idle" && activeAgentIndex === 1) {
+            handleStart();
+        }
+    }, [fileName, textContent, activeTab, status, activeAgentIndex]);
 
     useEffect(() => {
         return () => {
@@ -87,19 +110,17 @@ export function PyqAgentCard({ projectId }: PyqAgentCardProps) {
     };
 
     const handleStart = async () => {
-        if (activeTab === "pdf" && !fileName) {
-            setError("Please select a PDF file first.");
-            return;
-        }
-        if (activeTab === "text" && !textContent.trim()) {
-            setError("Please paste some questions.");
-            return;
-        }
+        if (status === "running" || status === "completed") return;
 
-        startProcessing();
+        setAgentStatus("pyq", "running");
+        setError(null);
+        setActiveAgentIndex(1); // PYQ Agent is index 1
+
+        emitMessage("Orchestrator", "orchestrator", "Initializing PYQ retrieval sequence...");
+        emitMessage("PYQ Agent", "agent", `Processing historical data from ${year} (${board})...`);
 
         try {
-            const response = await processPyqs({
+            await processPyqs({
                 projectId,
                 sourceType: activeTab,
                 content: activeTab === "text" ? textContent : undefined,
@@ -114,23 +135,29 @@ export function PyqAgentCard({ projectId }: PyqAgentCardProps) {
                 if (stepIdx <= steps.length) {
                     if (stepIdx > 1) updateStep(stepIdx - 2, "completed");
                     updateStep(stepIdx - 1, "running");
+                    emitMessage("PYQ Agent", "agent", `${steps[stepIdx - 1].label} in progress...`);
                 }
 
                 if (stepIdx === steps.length + 1) {
                     updateStep(steps.length - 1, "completed");
-                    setStatus("completed");
+                    setAgentStatus("pyq", "completed");
+                    emitMessage("PYQ Agent", "agent", "Historical analysis complete. Patterns identified.");
+                    emitMessage("Orchestrator", "orchestrator", "PYQ processing complete. Calling Blooxanomy Agent...");
+                    triggerNextAgent();
+
                     if (pollingRef.current) clearInterval(pollingRef.current);
                 }
             }, 2000);
 
         } catch (err: any) {
             setError(err?.message || "PYQ processing failed.");
-            setStatus("failed");
+            setAgentStatus("pyq", "failed");
+            emitMessage("PYQ Agent", "agent", "Encountered a hurdle during data processing. Awaiting recovery.");
         }
     };
 
     return (
-        <Card className="max-w-md border-border/60 shadow-md">
+        <Card className="w-full border-border/60 shadow-md">
             <CardHeader className="pb-3 px-4">
                 <div className="flex items-center justify-between">
                     <CardTitle className="text-sm font-bold flex items-center gap-2">
@@ -153,16 +180,16 @@ export function PyqAgentCard({ projectId }: PyqAgentCardProps) {
                         {/* Context Filters */}
                         <div className="grid grid-cols-2 gap-2">
                             <Select value={year} onValueChange={setYear}>
-                                <SelectTrigger className="h-8 text-[11px]">
-                                    <SelectValue placeholder="Select Year" />
+                                <SelectTrigger className="h-8 text-[11px] font-bold">
+                                    <SelectValue placeholder="Year" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    {YEARS.map(y => <SelectItem key={y} value={y} className="text-[11px]">{y}</SelectItem>)}
+                                    {YEARS.map(y => <SelectItem key={y} value={y} className="text-[11px] font-bold">{y}</SelectItem>)}
                                 </SelectContent>
                             </Select>
                             <Input
-                                placeholder="Board (e.g. CBSE)"
-                                className="h-8 text-[11px]"
+                                placeholder="Board"
+                                className="h-8 text-[11px] font-bold"
                                 value={board}
                                 onChange={(e) => setBoard(e.target.value)}
                             />
@@ -173,7 +200,7 @@ export function PyqAgentCard({ projectId }: PyqAgentCardProps) {
                             <Button
                                 variant={activeTab === "pdf" ? "secondary" : "ghost"}
                                 size="sm"
-                                className="flex-1 text-[11px] h-7"
+                                className="flex-1 text-[11px] h-7 font-bold"
                                 onClick={() => setActiveTab("pdf")}
                             >
                                 <FileUp className="h-3 w-3 mr-2" />
@@ -182,7 +209,7 @@ export function PyqAgentCard({ projectId }: PyqAgentCardProps) {
                             <Button
                                 variant={activeTab === "text" ? "secondary" : "ghost"}
                                 size="sm"
-                                className="flex-1 text-[11px] h-7"
+                                className="flex-1 text-[11px] h-7 font-bold"
                                 onClick={() => setActiveTab("text")}
                             >
                                 <Type className="h-3 w-3 mr-2" />
@@ -205,35 +232,22 @@ export function PyqAgentCard({ projectId }: PyqAgentCardProps) {
                                     onClick={() => fileInputRef.current?.click()}
                                 >
                                     <FileUp className="h-4 w-4 text-muted-foreground" />
-                                    <span className="text-[10px] font-medium text-muted-foreground">
-                                        {fileName || "Drop PYQ PDF or click to browse"}
+                                    <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-tight">
+                                        {fileName || "PYQ PDF"}
                                     </span>
                                 </Button>
                             </div>
                         ) : (
                             <Textarea
                                 placeholder="Paste previous year questions here..."
-                                className="text-xs min-h-[80px] resize-none"
+                                className="text-[11px] min-h-[80px] resize-none focus:ring-1"
                                 value={textContent}
                                 onChange={(e) => setTextContent(e.target.value)}
                             />
                         )}
-
-                        {error && (
-                            <div className="flex items-center gap-2 text-[11px] text-destructive bg-destructive/5 p-2 rounded border border-destructive/20">
-                                <AlertCircle className="h-3 w-3" />
-                                {error}
-                            </div>
-                        )}
-
-                        <Button className="w-full h-9 font-bold text-xs" onClick={handleStart}>
-                            <Play className="h-3 w-3 mr-2" />
-                            Process PYQs
-                        </Button>
                     </div>
                 ) : (
-                    <div className="space-y-4 py-1 animate-in slide-in-from-bottom-2 duration-400">
-                        {/* Step List */}
+                    <div className="space-y-4 py-1 animate-in fade-in duration-400">
                         <div className="space-y-2.5">
                             {steps.map((step, idx) => {
                                 const isActive = step.status === "running";
@@ -241,39 +255,60 @@ export function PyqAgentCard({ projectId }: PyqAgentCardProps) {
                                 const isFail = step.status === "failed";
 
                                 return (
-                                    <div key={idx} className="flex items-center justify-between">
-                                        <div className="flex items-center gap-3">
-                                            <div className={cn(
-                                                "h-2 w-2 rounded-full transition-all duration-300",
-                                                isActive ? "bg-amber-500 animate-pulse scale-125 shadow-[0_0_8px_rgba(245,158,11,0.5)]" : "bg-border",
-                                                isDone ? "bg-amber-500" : "",
-                                                isFail ? "bg-destructive" : ""
-                                            )} />
-                                            <span className={cn(
-                                                "text-[11px] font-medium",
-                                                isActive ? "text-foreground" : "text-muted-foreground",
-                                                isDone ? "text-muted-foreground/60" : ""
-                                            )}>
-                                                {step.label}
-                                            </span>
-                                        </div>
-                                        {isActive && <Loader2 className="h-3 w-3 animate-spin text-amber-600" />}
-                                        {isDone && <CheckCircle2 className="h-3 w-3 text-amber-500" />}
+                                    <div key={idx} className="flex items-center gap-3 px-1">
+                                        <div className={cn(
+                                            "h-1.5 w-1.5 rounded-full transition-all duration-300",
+                                            isActive ? "bg-blue-500 animate-pulse ring-4 ring-blue-500/20" : "bg-muted-foreground/30",
+                                            isDone ? "bg-green-500" : "",
+                                            isFail ? "bg-red-500" : ""
+                                        )} />
+                                        <span className={cn(
+                                            "text-[10px] font-bold uppercase tracking-widest transition-colors",
+                                            isActive ? "text-blue-600" : "text-muted-foreground/60",
+                                            isDone ? "text-green-600/70" : ""
+                                        )}>
+                                            {step.label}
+                                        </span>
+                                        {isActive && <Loader2 className="h-3 w-3 animate-spin text-blue-500 ml-auto" />}
                                     </div>
                                 );
                             })}
                         </div>
-
-                        {status === "completed" && (
-                            <div className="p-3 bg-amber-500/5 rounded-lg border border-amber-200/50 flex items-center gap-3 animate-in fade-in duration-500">
-                                <CheckCircle2 className="h-4 w-4 text-amber-600" />
-                                <p className="text-[10px] font-medium text-amber-700 leading-tight">
-                                    Questions extracted, categorized and indexed for generation.
-                                </p>
-                            </div>
-                        )}
                     </div>
                 )}
+
+                {error && (
+                    <div className="flex items-center gap-2 text-[10px] font-bold text-destructive bg-destructive/5 p-2 rounded border border-destructive/20 uppercase tracking-tight">
+                        <AlertCircle className="h-3 w-3" />
+                        {error}
+                    </div>
+                )}
+
+                <Button
+                    className={cn(
+                        "w-full h-10 font-black text-[11px] uppercase tracking-[0.15em] transition-all",
+                        status === "running" || status === "completed" ? "bg-green-600 hover:bg-green-700 disabled:opacity-100" : "bg-primary"
+                    )}
+                    onClick={handleStart}
+                    disabled={status === "running" || status === "completed"}
+                >
+                    {status === "running" ? (
+                        <>
+                            <Loader2 className="h-3.5 w-3.5 mr-2 animate-spin" />
+                            Processing...
+                        </>
+                    ) : status === "completed" ? (
+                        <>
+                            <CheckCircle2 className="h-3.5 w-3.5 mr-2" />
+                            Completed
+                        </>
+                    ) : (
+                        <>
+                            <Play className="h-3 w-3 mr-2" />
+                            Process PYQs
+                        </>
+                    )}
+                </Button>
             </CardContent>
         </Card>
     );
