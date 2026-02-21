@@ -5,7 +5,7 @@ Evaluates and critiques question paper blueprints with detailed feedback
 
 import json
 from typing import Dict, List, Tuple
-from backend.services.llm_service import gemini_llm as llm
+from backend.services.llm_service import openrouter_llm as llm
 from langchain_core.messages import HumanMessage
 
 

@@ -1,0 +1,202 @@
+{
+  "paper_id": "229626ae-d42",
+  "blueprint_metadata": {
+    "total_marks": 80,
+    "total_questions": 8,
+    "bloom_distribution": {
+      "Remember": 0.125,
+      "Understand": 0.25,
+      "Apply": 0.35,
+      "Analyze": 0.2,
+      "Evaluate": 0.05,
+      "Create": 0.025
+    },
+    "module_distribution": {
+      "Module 1": 0.25,
+      "Module 2": 0.25,
+      "Module 3": 0.25,
+      "Module 4": 0.25
+    },
+    "pyq_usage": {
+      "actual_pyq_count": 5,
+      "new_question_count": 3,
+      "pyq_percentage": 0.625
+    }
+  },
+  "sections": [
+    {
+      "section_name": "Section A",
+      "section_description": "Short Answer Questions",
+      "questions": [
+        {
+          "id": "aebd2abd",
+          "question_number": "1",
+          "module": "Module 1",
+          "topic": "ER Modeling",
+          "subtopic": "ER Diagrams",
+          "marks": 5,
+          "bloom_level": "Remember",
+          "question_text": "What is an ER diagram? Explain its components with examples.",
+          "selection_method": "pyq_exact",
+          "source_pyq_id": "pyq_008",
+          "is_pyq_sourced": true
+        },
+        {
+          "id": "388e534e",
+          "question_number": "2",
+          "module": "Module 4",
+          "topic": "Transactions",
+          "subtopic": "ACID Properties",
+          "marks": 10,
+          "bloom_level": "Understand",
+          "question_text": "Describe each of the ACID properties (Atomicity, Consistency, Isolation, and Durability) of database transactions. For each property, provide a practical example and explain its significance in ensuring data integrity and reliability within a transactional system.",
+          "selection_method": "pyq_rephrased_marks",
+          "source_pyq_id": "pyq_005",
+          "is_pyq_sourced": true
+        },
+        {
+          "id": "51a6eb09",
+          "question_number": "3",
+          "module": "Module 3",
+          "topic": "Functional Dependencies",
+          "subtopic": "FD Rules",
+          "marks": 5,
+          "bloom_level": "Apply",
+          "question_text": "Given a relation R with attributes {A, B, C, D, E} and a set of functional dependencies F = {A -> B, BC -> D, D -> E}. Explain the significance of functional dependency closure and, using Armstrong's axioms, determine the closure of the attribute set {A, C} (i.e., {A, C}+), explicitly showing the application of each axiom in your derivation.",
+          "selection_method": "pyq_rephrased_bloom",
+          "source_pyq_id": "pyq_004",
+          "is_pyq_sourced": true
+        },
+        {
+          "id": "71e31ba3",
+          "question_number": "4",
+          "module": "Module 2",
+          "topic": "SQL",
+          "subtopic": "DDL",
+          "marks": 5,
+          "bloom_level": "Remember",
+          "question_text": "List the five main DDL (Data Definition Language) commands in SQL and briefly state the primary function of each.",
+          "selection_method": "generated_direct",
+          "source_pyq_id": null,
+          "is_pyq_sourced": false
+        }
+      ]
+    },
+    {
+      "section_name": "Section B",
+      "section_description": "Long Answer Questions",
+      "questions": [
+        {
+          "id": "6cb72263",
+          "question_number": "5",
+          "module": "Module 1",
+          "topic": "ER Modeling",
+          "subtopic": "ER Diagrams",
+          "marks": 15,
+          "bloom_level": "Apply",
+          "question_text": "Draw an ER diagram for a library management system.",
+          "selection_method": "pyq_exact",
+          "source_pyq_id": "pyq_009",
+          "is_pyq_sourced": true
+        },
+        {
+          "id": "b9e2d332",
+          "question_number": "6",
+          "module": "Module 2",
+          "topic": "Relational Algebra",
+          "subtopic": "Joins",
+          "marks": 15,
+          "bloom_level": "Understand",
+          "question_text": "Explain relational algebra operations: Selection, Projection, and Join with examples.",
+          "selection_method": "pyq_exact",
+          "source_pyq_id": "pyq_012",
+          "is_pyq_sourced": true
+        },
+        {
+          "id": "ed797b3e",
+          "question_number": "7",
+          "module": "Module 3",
+          "topic": "Normalization",
+          "subtopic": "Normal Forms",
+          "marks": 15,
+          "bloom_level": "Apply",
+          "question_text": "Normalize the given relation to BCNF: R(A, B, C, D) with FDs: A\u2192B, B\u2192C, C\u2192D.",
+          "selection_method": "pyq_exact",
+          "source_pyq_id": "pyq_003",
+          "is_pyq_sourced": true
+        },
+        {
+          "id": "5fbd7514",
+          "question_number": "8",
+          "module": "Module 4",
+          "topic": "Concurrency Control",
+          "subtopic": "Deadlock",
+          "marks": 15,
+          "bloom_level": "Analyze",
+          "question_text": "Deadlock handling strategies are broadly categorized into Prevention, Avoidance, and Detection & Recovery. Differentiate between these three approaches by examining their core principles, the conditions they address, and their respective operational overheads. Furthermore, analyze the critical trade-offs involved in selecting one strategy over the others for a given system design, considering factors such as resource utilization, system throughput, and implementation complexity.",
+          "selection_method": "generated_direct",
+          "source_pyq_id": null,
+          "is_pyq_sourced": false
+        }
+      ]
+    }
+  ],
+  "selection_stats": {
+    "total_questions": 8,
+    "pyq_exact_match": 4,
+    "pyq_rephrased_marks": 1,
+    "pyq_rephrased_bloom": 1,
+    "generated_new": 0,
+    "direct_generated": 2
+  },
+  "selection_log": [
+    {
+      "question_number": "1",
+      "method": "pyq_exact",
+      "pyq_id": "pyq_008"
+    },
+    {
+      "question_number": "2",
+      "method": "pyq_rephrased_marks",
+      "pyq_id": "pyq_005"
+    },
+    {
+      "question_number": "3",
+      "method": "pyq_rephrased_bloom",
+      "pyq_id": "pyq_004"
+    },
+    {
+      "question_number": "4",
+      "method": "generated_direct",
+      "pyq_id": null
+    },
+    {
+      "question_number": "5",
+      "method": "pyq_exact",
+      "pyq_id": "pyq_009"
+    },
+    {
+      "question_number": "6",
+      "method": "pyq_exact",
+      "pyq_id": "pyq_012"
+    },
+    {
+      "question_number": "7",
+      "method": "pyq_exact",
+      "pyq_id": "pyq_003"
+    },
+    {
+      "question_number": "8",
+      "method": "generated_direct",
+      "pyq_id": null
+    }
+  ],
+  "used_pyq_ids": [
+    "pyq_005",
+    "pyq_008",
+    "pyq_012",
+    "pyq_009",
+    "pyq_003",
+    "pyq_004"
+  ]
+}

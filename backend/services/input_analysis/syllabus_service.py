@@ -5,7 +5,7 @@ import os
 import json
 import re
 from backend.services.prompts import format_syllabus as SYLLABUS_PROMPT
-from backend.services.llm_service import gemini_llm as llm
+from backend.services.llm_service import openrouter_llm as llm
 from langchain_core.messages import HumanMessage
 
 
@@ -116,4 +116,5 @@ The assessment consists of two class tests of 20 marks each. The first class tes
 """
 
 # Test call - uncomment to test directly
-# get_syllabus_json(SYLLABUS_PROMPT, dummy_syllabus)
+result = get_syllabus_json(SYLLABUS_PROMPT, dummy_syllabus)
+print("Syllabus JSON result:", result)  

@@ -1,0 +1,134 @@
+[
+  {
+    "test": "TEST 1 \u2014 GOOD PAPER (expect ACCEPTED)",
+    "result": {
+      "rating": 9.0,
+      "verdict": "ACCEPTED",
+      "issues": [],
+      "suggestions": [],
+      "summary": "Paper rated 9.0/10 \u2014 ACCEPTED. LLM evaluation unavailable",
+      "detailed_scores": {
+        "deterministic_score": 9.0,
+        "qualitative_avg": 9.0,
+        "qualitative_breakdown": {},
+        "bloom_score": 0.83,
+        "actual_bloom_distribution": {
+          "Remember": 0.125,
+          "Understand": 0.25,
+          "Apply": 0.438,
+          "Analyze": 0.188,
+          "Evaluate": 0.0,
+          "Create": 0.0
+        },
+        "deterministic_checks": {
+          "marks_total": {
+            "pass": true,
+            "detail": "Total marks: 80/80"
+          },
+          "question_count": {
+            "pass": true,
+            "detail": "Question count: 8/8"
+          },
+          "section_structure": {
+            "pass": true,
+            "detail": "Section structure valid"
+          },
+          "allowed_marks": {
+            "pass": true,
+            "detail": "All marks from allowed values"
+          },
+          "module_weightage": {
+            "pass": true,
+            "detail": "Module weightages valid"
+          },
+          "bloom_distribution": {
+            "score": 0.83,
+            "detail": "Bloom deviations: Apply: got 43.8% vs required 30.0%"
+          },
+          "duplicate_topics": {
+            "pass": false,
+            "detail": "Repeated topic/subtopic: ER Modeling/ER Diagrams"
+          },
+          "question_text": {
+            "pass": true,
+            "detail": "All questions have text"
+          }
+        }
+      }
+    }
+  },
+  {
+    "test": "TEST 2 \u2014 BAD PAPER  (expect REJECTED)",
+    "result": {
+      "rating": 2.0,
+      "verdict": "REJECTED",
+      "issues": [
+        "FAIL \u2014 Total marks 78 \u2260 expected 80",
+        "Q1 in Section A: 3M \u2260 expected 5M",
+        "Invalid mark values: Q1(3M)",
+        "Module weightage issues: Module 2: 74.4% (allowed 20%\u201330%)",
+        "Bloom deviations: Remember: got 80.8% vs required 15.0%; Apply: got 0.0% vs required 30.0%; Analyze: got 0.0% vs required 20.0%",
+        "Repeated topic/subtopic: SQL/Queries",
+        "Missing question text: Q3"
+      ],
+      "suggestions": [
+        "Adjust question marks so total equals 80",
+        "Fix section structure to match paper pattern specification",
+        "Use only allowed mark values: [5, 10, 15, 20]",
+        "Redistribute questions to balance module weightages within allowed range",
+        "Adjust question bloom levels to match required distribution",
+        "Replace duplicate topic questions with questions from uncovered topics",
+        "Ensure all questions have question text before submission"
+      ],
+      "summary": "Paper rated 2.0/10 \u2014 REJECTED. LLM evaluation unavailable",
+      "detailed_scores": {
+        "deterministic_score": 2.0,
+        "qualitative_avg": 2.0,
+        "qualitative_breakdown": {},
+        "bloom_score": 0.5,
+        "actual_bloom_distribution": {
+          "Remember": 0.808,
+          "Understand": 0.192,
+          "Apply": 0.0,
+          "Analyze": 0.0,
+          "Evaluate": 0.0,
+          "Create": 0.0
+        },
+        "deterministic_checks": {
+          "marks_total": {
+            "pass": false,
+            "detail": "FAIL \u2014 Total marks 78 \u2260 expected 80"
+          },
+          "question_count": {
+            "pass": true,
+            "detail": "Question count: 8/8"
+          },
+          "section_structure": {
+            "pass": false,
+            "detail": "Q1 in Section A: 3M \u2260 expected 5M"
+          },
+          "allowed_marks": {
+            "pass": false,
+            "detail": "Invalid mark values: Q1(3M)"
+          },
+          "module_weightage": {
+            "pass": false,
+            "detail": "Module weightage issues: Module 2: 74.4% (allowed 20%\u201330%)"
+          },
+          "bloom_distribution": {
+            "score": 0.5,
+            "detail": "Bloom deviations: Remember: got 80.8% vs required 15.0%; Apply: got 0.0% vs required 30.0%; Analyze: got 0.0% vs required 20.0%"
+          },
+          "duplicate_topics": {
+            "pass": false,
+            "detail": "Repeated topic/subtopic: SQL/Queries"
+          },
+          "question_text": {
+            "pass": false,
+            "detail": "Missing question text: Q3"
+          }
+        }
+      }
+    }
+  }
+]
