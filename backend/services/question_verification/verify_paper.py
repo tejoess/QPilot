@@ -12,7 +12,7 @@ Verdict rule: rating >= 8 → ACCEPTED, rating < 8 → REJECTED (with issues)
 
 import json
 from typing import Dict, List, Tuple
-from backend.services.llm_service import openrouter_llm as llm
+from backend.services.llm_service import openai_llm as llm
 from langchain_core.messages import HumanMessage
 
 
@@ -657,39 +657,39 @@ BAD_PAPER = {
 # TEST EXECUTION
 # ============================================================================
 
-if __name__ == "__main__":
-    import sys
+# if __name__ == "__main__":
+#     import sys
 
-    print("🎓 QUESTION PAPER VERIFIER — TEST SUITE")
-    print("="*70)
+#     print("🎓 QUESTION PAPER VERIFIER — TEST SUITE")
+#     print("="*70)
 
-    tests = [
-        ("TEST 1 — GOOD PAPER (expect ACCEPTED)", GOOD_PAPER),
-        ("TEST 2 — BAD PAPER  (expect REJECTED)", BAD_PAPER),
-    ]
+#     tests = [
+#         ("TEST 1 — GOOD PAPER (expect ACCEPTED)", GOOD_PAPER),
+#         ("TEST 2 — BAD PAPER  (expect REJECTED)", BAD_PAPER),
+#     ]
 
-    all_results = []
+#     all_results = []
 
-    for test_name, paper in tests:
-        print(f"\n{'#'*70}")
-        print(f"  {test_name}")
-        print(f"{'#'*70}")
+#     for test_name, paper in tests:
+#         print(f"\n{'#'*70}")
+#         print(f"  {test_name}")
+#         print(f"{'#'*70}")
 
-        result = verify_question_paper(
-            paper=paper,
-            syllabus=SAMPLE_SYLLABUS,
-            pyq_analysis=SAMPLE_PYQ_ANALYSIS,
-            blueprint=SAMPLE_BLUEPRINT,
-            bloom_coverage=SAMPLE_BLOOM_COVERAGE,
-            paper_pattern=SAMPLE_PAPER_PATTERN,
-            teacher_input=SAMPLE_TEACHER_INPUT
-        )
+#         result = verify_question_paper(
+#             paper=paper,
+#             syllabus=SAMPLE_SYLLABUS,
+#             pyq_analysis=SAMPLE_PYQ_ANALYSIS,
+#             blueprint=SAMPLE_BLUEPRINT,
+#             bloom_coverage=SAMPLE_BLOOM_COVERAGE,
+#             paper_pattern=SAMPLE_PAPER_PATTERN,
+#             teacher_input=SAMPLE_TEACHER_INPUT
+#         )
 
-        print_verification_report(result)
-        all_results.append({"test": test_name, "result": result})
+#         print_verification_report(result)
+#         all_results.append({"test": test_name, "result": result})
 
-    # Save results
-    output_file = "verification_results.json"
-    with open(output_file, "w") as f:
-        json.dump(all_results, f, indent=2)
-    print(f"\n✅ Results saved to: {output_file}")
+#     # Save results
+#     output_file = "verification_results.json"
+#     with open(output_file, "w") as f:
+#         json.dump(all_results, f, indent=2)
+#     print(f"\n✅ Results saved to: {output_file}")

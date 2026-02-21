@@ -15,7 +15,7 @@ import json
 import uuid
 import re
 from typing import Dict, List, Optional, Tuple
-from backend.services.llm_service import gemini_llm as llm
+from backend.services.llm_service import openai_llm as llm
 from langchain_core.messages import HumanMessage
 
 
@@ -643,30 +643,30 @@ SAMPLE_BLUEPRINT = {
 # TEST EXECUTION
 # ============================================================================
 
-if __name__ == "__main__":
-    print("🚀 QUESTION SELECTOR AGENT — TEST RUN")
-    print("="*70)
-    print(f"PYQ Bank size  : {len(SAMPLE_PYQ_BANK)} questions")
-    print(f"Blueprint qs   : {sum(len(s['questions']) for s in SAMPLE_BLUEPRINT['sections'])}")
-    print(f"Total marks    : {SAMPLE_BLUEPRINT['blueprint_metadata']['total_marks']}")
-    print("="*70)
+# if __name__ == "__main__":
+#     print("🚀 QUESTION SELECTOR AGENT — TEST RUN")
+#     print("="*70)
+#     print(f"PYQ Bank size  : {len(SAMPLE_PYQ_BANK)} questions")
+#     print(f"Blueprint qs   : {sum(len(s['questions']) for s in SAMPLE_BLUEPRINT['sections'])}")
+#     print(f"Total marks    : {SAMPLE_BLUEPRINT['blueprint_metadata']['total_marks']}")
+#     print("="*70)
 
-    try:
-        draft_paper = select_questions(
-            blueprint=SAMPLE_BLUEPRINT,
-            pyq_bank=SAMPLE_PYQ_BANK
-        )
+#     try:
+#         draft_paper = select_questions(
+#             blueprint=SAMPLE_BLUEPRINT,
+#             pyq_bank=SAMPLE_PYQ_BANK
+#         )
 
-        # Pretty-print results
-        print_draft_paper(draft_paper)
+#         # Pretty-print results
+#         print_draft_paper(draft_paper)
 
-        # Save to file
-        output_file = "drafted_question_paper.json"
-        with open(output_file, "w") as f:
-            json.dump(draft_paper, f, indent=2)
-        print(f"\n✅ Draft paper saved to: {output_file}")
+#         # Save to file
+#         output_file = "drafted_question_paper.json"
+#         with open(output_file, "w") as f:
+#             json.dump(draft_paper, f, indent=2)
+#         print(f"\n✅ Draft paper saved to: {output_file}")
 
-    except Exception as e:
-        print(f"\n❌ ERROR: {e}")
-        import traceback
-        traceback.print_exc()
+#     except Exception as e:
+#         print(f"\n❌ ERROR: {e}")
+#         import traceback
+#         traceback.print_exc()
