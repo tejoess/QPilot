@@ -51,6 +51,8 @@ export function TeacherInputAgentCard({ projectId }: TeacherInputAgentCardProps)
     } = useGenerationStore();
 
     const {
+        status: globalStatus,
+        setStatus,
         agentStatuses,
         setAgentStatus,
         emitMessage,
@@ -112,6 +114,7 @@ export function TeacherInputAgentCard({ projectId }: TeacherInputAgentCardProps)
                 if (stepIdx === steps.length + 1) {
                     updateStep(steps.length - 1, "completed");
                     setAgentStatus("generation", "completed");
+                    setStatus("completed"); // Master status for redirect
 
                     emitMessage("Generation Agent", "agent", "Generating question paper...");
 

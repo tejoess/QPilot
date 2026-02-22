@@ -1,73 +1,50 @@
 import { currentUser } from "@clerk/nextjs/server";
-import Image from "next/image";
+import { Hero } from "@/components/landing/Hero";
+import { Features } from "@/components/landing/Features";
+import { HowItWorks } from "@/components/landing/HowItWorks";
+import { Pricing } from "@/components/landing/Pricing";
+import { Navbar } from "@/components/landing/Navbar";
+import { Footer } from "@/components/landing/Footer";
 
 export default async function Home() {
   const user = await currentUser();
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            {user ? `Welcome, ${user.firstName}!` : "QPilot: AI-Powered Question Paper Generator"}
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            {user
-              ? "You are logged in. Your data is being synchronized with our database."
-              : "To get started, please sign in using the button in the header."}
-          </p>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
+    <div className="flex min-h-screen flex-col bg-background font-body antialiased">
+      <Navbar />
+      <main className="flex-1">
+        <Hero />
+
+        <Features />
+        <HowItWorks />
+        <Pricing />
+
+        {/* Blog Preview Placeholder */}
+        <section id="blog" className="py-24 bg-background">
+          <div className="container mx-auto px-6">
+            <div className="mb-16">
+              <h2 className="text-sm font-bold text-primary uppercase tracking-[0.3em] mb-4">Latest Insights</h2>
+              <h3 className="text-4xl md:text-5xl font-black">Resources & News</h3>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="group cursor-pointer">
+                  <div className="aspect-video bg-muted rounded-3xl mb-6 overflow-hidden relative">
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent" />
+                    {/* Placeholder for blog image */}
+                    <div className="w-full h-full bg-primary/5 flex items-center justify-center text-primary/20 font-black text-4xl italic uppercase">Blog {i}</div>
+                  </div>
+                  <span className="inline-block px-3 py-1 rounded-full bg-primary/10 text-primary text-[10px] font-black uppercase tracking-widest mb-4">Article</span>
+                  <h4 className="text-xl font-bold mb-4 group-hover:text-primary transition-colors">The Future of AI in Question Paper Design for 2026.</h4>
+                  <p className="text-muted-foreground text-sm line-clamp-2">Exploring how generative models are transforming the way educators approach curriculum alignment.</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
       </main>
+      <Footer />
     </div>
   );
 }

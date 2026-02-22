@@ -49,23 +49,6 @@ export default function RootLayout({
             themes={["light", "dark", "ocean", "royal"]}
           >
             <SyncUser />
-            <header className="flex justify-end items-center p-4 gap-4 h-16 border-b">
-              <SignedOut>
-                <SignInButton mode="modal">
-                  <button className="text-sm font-medium hover:text-primary transition-colors">
-                    Sign In
-                  </button>
-                </SignInButton>
-                <SignUpButton mode="modal">
-                  <button className="bg-primary text-primary-foreground rounded-full font-medium text-sm h-10 px-4 cursor-pointer hover:opacity-90 transition-opacity">
-                    Sign Up
-                  </button>
-                </SignUpButton>
-              </SignedOut>
-              <SignedIn>
-                <UserButton afterSignOutUrl="/" />
-              </SignedIn>
-            </header>
             <main>
               {children}
             </main>

@@ -21,6 +21,7 @@ import { cn } from "@/lib/utils";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Button } from "@/components/ui/button";
+import { UserButton } from "@clerk/nextjs";
 
 const NAV_ITEMS = [
     { title: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
@@ -106,6 +107,18 @@ export function QPilotSidebar() {
                     </SidebarGroupContent>
                 </SidebarGroup>
             </SidebarContent>
+            <div className={cn(
+                "mt-auto p-4 border-t border-border/30 flex items-center justify-between",
+                isCollapsed && "justify-center px-0"
+            )}>
+                <UserButton afterSignOutUrl="/" />
+                {!isCollapsed && (
+                    <div className="flex flex-col ml-3">
+                        <span className="text-[12px] font-bold">Account</span>
+                        <span className="text-[10px] text-muted-foreground">Manage profile</span>
+                    </div>
+                )}
+            </div>
         </Sidebar>
     );
 }
