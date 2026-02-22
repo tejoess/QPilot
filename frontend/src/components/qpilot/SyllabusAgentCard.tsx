@@ -53,6 +53,7 @@ export function SyllabusAgentCard({ projectId }: SyllabusAgentCardProps) {
         setAgentStatus,
         emitMessage,
         setActiveAgentIndex,
+        activeAgentIndex,
         triggerNextAgent
     } = useQPilotStore();
 
@@ -65,13 +66,11 @@ export function SyllabusAgentCard({ projectId }: SyllabusAgentCardProps) {
     const handleStart = useCallback(async () => {
         if (status === "running" || status === "completed") return;
 
-        if (activeTab === "pdf" && !fileName) {
-            setError("Please select a PDF file first.");
-            return;
-        }
-        if (activeTab === "text" && !textContent.trim()) {
-            setError("Please paste some syllabus content.");
-            return;
+        // Auto-fill a dummy file if we are in auto-mode and nothing is selected
+        let finalFileName = fileName;
+        if (!fileName && !textContent.trim()) {
+            finalFileName = "Engineering_AI_Syllabus.pdf";
+            setFileName(finalFileName);
         }
 
         setAgentStatus("syllabus", "running");
@@ -124,19 +123,18 @@ export function SyllabusAgentCard({ projectId }: SyllabusAgentCardProps) {
         }
     }, [status, activeTab, fileName, textContent, setAgentStatus, setError, setActiveAgentIndex, emitMessage, projectId, steps, updateStep, triggerNextAgent]);
 
+    // Auto-trigger on mount/active
+    useEffect(() => {
+        if (status === "idle" && activeAgentIndex === 0) {
+            handleStart();
+        }
+    }, [status, activeAgentIndex, handleStart]);
+
     useEffect(() => {
         if (textContent.length > 50 && !fileName) {
             setActiveTab("text");
         }
     }, [textContent, fileName]);
-
-    // Auto-trigger when data is available
-    useEffect(() => {
-        const hasData = activeTab === "pdf" ? fileName : textContent.length > 50;
-        if (hasData && status === "idle") {
-            handleStart();
-        }
-    }, [fileName, textContent, activeTab, status, handleStart]);
 
     // Clean up polling on unmount
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {

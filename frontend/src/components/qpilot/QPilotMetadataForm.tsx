@@ -18,8 +18,8 @@ import {
 } from "@/components/ui/select";
 import { FileText, GraduationCap, BookOpen, Clock } from "lucide-react";
 
-const GRADES = ["6", "7", "8", "9", "10", "11", "12"];
-const BOARDS = ["CBSE", "ICSE", "IGCSE", "State Board"];
+const GRADES = ["6", "7", "8", "9", "10", "11", "12", "Other"];
+const BOARDS = ["CBSE", "ICSE", "IGCSE", "State Board", "Other"];
 
 export function QPilotMetadataForm() {
     const { metadata, setMetadata } = useQPilotConfigStore();
@@ -51,7 +51,7 @@ export function QPilotMetadataForm() {
                             placeholder="e.g. Periodic Test - II"
                             value={metadata.title}
                             onChange={(e) => setMetadata({ title: e.target.value })}
-                            className="bg-card"
+                            className="bg-card font-medium"
                         />
                     </div>
 
@@ -66,7 +66,7 @@ export function QPilotMetadataForm() {
                             placeholder="e.g. Physics"
                             value={metadata.subject}
                             onChange={(e) => setMetadata({ subject: e.target.value })}
-                            className="bg-card"
+                            className="bg-card font-medium"
                         />
                     </div>
                 </div>
@@ -75,31 +75,51 @@ export function QPilotMetadataForm() {
                     {/* Grade */}
                     <div className="space-y-2">
                         <Label htmlFor="grade" className="text-xs font-bold text-muted-foreground uppercase">Grade / Class</Label>
-                        <Select value={metadata.grade} onValueChange={(v) => setMetadata({ grade: v })}>
-                            <SelectTrigger id="grade" className="bg-card">
-                                <SelectValue placeholder="Select Grade" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {GRADES.map((g) => (
-                                    <SelectItem key={g} value={g}>Grade {g}</SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
+                        <div className="space-y-2">
+                            <Select value={GRADES.includes(metadata.grade) ? metadata.grade : "Other"} onValueChange={(v) => setMetadata({ grade: v === "Other" ? "" : v })}>
+                                <SelectTrigger id="grade" className="bg-card font-medium">
+                                    <SelectValue placeholder="Select Grade" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {GRADES.map((g) => (
+                                        <SelectItem key={g} value={g}>{g === "Other" ? "Other / Custom" : `Grade ${g}`}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                            {(!GRADES.includes(metadata.grade) || metadata.grade === "Other") && (
+                                <Input
+                                    placeholder="Enter custom grade (e.g. TE Engineering)"
+                                    value={metadata.grade === "Other" ? "" : metadata.grade}
+                                    onChange={(e) => setMetadata({ grade: e.target.value })}
+                                    className="h-8 text-xs bg-muted/20 border-primary/20 animate-in fade-in slide-in-from-top-1 duration-300"
+                                />
+                            )}
+                        </div>
                     </div>
 
                     {/* Board */}
                     <div className="space-y-2">
                         <Label htmlFor="board" className="text-xs font-bold text-muted-foreground uppercase">Education Board</Label>
-                        <Select value={metadata.board} onValueChange={(v) => setMetadata({ board: v })}>
-                            <SelectTrigger id="board" className="bg-card">
-                                <SelectValue placeholder="Select Board" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {BOARDS.map((b) => (
-                                    <SelectItem key={b} value={b}>{b}</SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
+                        <div className="space-y-2">
+                            <Select value={BOARDS.includes(metadata.board) ? metadata.board : "Other"} onValueChange={(v) => setMetadata({ board: v === "Other" ? "" : v })}>
+                                <SelectTrigger id="board" className="bg-card font-medium">
+                                    <SelectValue placeholder="Select Board" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {BOARDS.map((b) => (
+                                        <SelectItem key={b} value={b}>{b === "Other" ? "Other / Custom" : b}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                            {(!BOARDS.includes(metadata.board) || metadata.board === "Other") && (
+                                <Input
+                                    placeholder="Enter board (e.g. SPPU, University)"
+                                    value={metadata.board === "Other" ? "" : metadata.board}
+                                    onChange={(e) => setMetadata({ board: e.target.value })}
+                                    className="h-8 text-xs bg-muted/20 border-primary/20 animate-in fade-in slide-in-from-top-1 duration-300"
+                                />
+                            )}
+                        </div>
                     </div>
 
                     {/* Marks */}

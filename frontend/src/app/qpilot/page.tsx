@@ -36,12 +36,12 @@ export default function QPilotConfigPage() {
 
     const handleAutoFill = () => {
         setMetadata({
-            title: "Midterm Mathematics",
-            subject: "Mathematics",
-            grade: "12",
+            title: "Midterm Examination",
+            subject: "Artificial Intelligence",
+            grade: "Third Year (TE)",
             totalMarks: 80,
             duration: "3 Hours",
-            instructions: "Focus on calculus and integration. Avoid repetition from PYQs.",
+            instructions: "Focus on fundamental AI concepts, search algorithms, and machine learning basics optimized for Engineering TE level.",
         });
         toast.success("Form Auto-Filled!");
     };

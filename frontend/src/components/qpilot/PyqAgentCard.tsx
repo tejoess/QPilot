@@ -86,6 +86,11 @@ export function PyqAgentCard({ projectId }: PyqAgentCardProps) {
     const handleStart = useCallback(async () => {
         if (status === "running" || status === "completed") return;
 
+        // Auto-fill dummy if empty
+        if (!fileName && !textContent.trim()) {
+            setFileName("Past_Year_AI_Papers_2024.pdf");
+        }
+
         setAgentStatus("pyq", "running");
         setError(null);
         setActiveAgentIndex(1); // PYQ Agent is index 1
@@ -145,13 +150,12 @@ export function PyqAgentCard({ projectId }: PyqAgentCardProps) {
         triggerNextAgent
     ]);
 
-    // Auto-trigger when data is available
+    // Auto-trigger when active
     useEffect(() => {
-        const hasData = activeTab === "pdf" ? fileName : textContent.length > 50;
-        if (hasData && status === "idle" && activeAgentIndex === 1) {
+        if (status === "idle" && activeAgentIndex === 1) {
             handleStart();
         }
-    }, [fileName, textContent, activeTab, status, activeAgentIndex, handleStart]);
+    }, [status, activeAgentIndex, handleStart]);
 
     useEffect(() => {
         return () => {

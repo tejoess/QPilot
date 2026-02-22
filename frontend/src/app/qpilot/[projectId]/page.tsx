@@ -27,7 +27,7 @@ export default function QPilotExecutionPage() {
     const metaId = searchParams.get("metaId");
     const router = useRouter();
 
-    const { status, reset, setCurrentMetadata, currentMetadata, emitMessage } = useQPilotStore();
+    const { status, reset, setCurrentMetadata, currentMetadata, emitMessage, setActiveAgentIndex } = useQPilotStore();
     const [requestData, setRequestData] = useState<PaperGenerationRequest | null>(null);
     const [isInitializing, setIsInitializing] = useState(true);
 
@@ -52,6 +52,9 @@ export default function QPilotExecutionPage() {
                             `Duration: ${data.duration}`
                         );
 
+                        // Auto-start Syllabus Agent Extraction
+                        setTimeout(() => setActiveAgentIndex(0), 1000);
+
                         console.log("Orchestrator check-in complete. Agents initialized with paper metadata.");
                     }
                 } catch (err) {
@@ -60,7 +63,7 @@ export default function QPilotExecutionPage() {
             };
             fetchMetadata();
         }
-    }, [metaId, currentMetadata, isInitializing, setCurrentMetadata, emitMessage]);
+    }, [metaId, currentMetadata, isInitializing, setCurrentMetadata, emitMessage, setActiveAgentIndex]);
 
     // 1. Initial Data Fetch
     useEffect(() => {
@@ -96,7 +99,7 @@ export default function QPilotExecutionPage() {
                 description: "Reviewing final document... Redirecting in 3s.",
             });
             const timer = setTimeout(() => {
-                router.push(`/output/${projectId}`);
+                router.push(`/qpilot/${projectId}/resultqp`);
             }, 3500);
             return () => clearTimeout(timer);
         }
