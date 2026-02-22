@@ -7,16 +7,23 @@ import re
 from backend.services.prompts import format_syllabus as SYLLABUS_PROMPT
 from backend.services.llm_service import openai_llm as llm
 from langchain_core.messages import HumanMessage
+from langchain_core.output_parsers import PydanticOutputParser
+from backend.services.schemas.llm_schemas import SyllabusOutput
 
 
 
 def get_syllabus_json(system_instruction: str, dummy_syllabus: str):
 
-    print("⏳ Sending request to Gemini via LangChain...")
+    print("⏳ Sending request to LLM via LangChain with Pydantic Output Parser...")
+
+    # Create output parser
+    parser = PydanticOutputParser(pydantic_object=SyllabusOutput)
+    format_instructions = parser.get_format_instructions()
 
     try:
-        # Format the prompt template with the actual syllabus content
+        # Add format instructions to prompt
         formatted_prompt = system_instruction.format(dummy_syllabus=dummy_syllabus)
+        formatted_prompt += f"\n\n{format_instructions}\n\nRETURN ONLY VALID JSON. NO MARKDOWN, NO EXPLANATIONS."
         
         response = llm.invoke([
             HumanMessage(content=formatted_prompt)
@@ -24,21 +31,30 @@ def get_syllabus_json(system_instruction: str, dummy_syllabus: str):
 
         raw_response = response.content
 
-        print("\n--- Raw LLM Response ---")
-        print(raw_response)
-        print("------------------------\n")
+        print("\n--- Raw LLM Response (first 500 chars) ---")
+        print(raw_response[:500])
+        print("------------------------------------------\n")
 
-        json_match = re.search(r'\{[\s\S]*\}', raw_response)
-
-        if json_match:
-            json_str = json_match.group(0)
-            parsed_data = json.loads(json_str)
+        # Try parsing with Pydantic parser first
+        try:
+            parsed_obj = parser.parse(raw_response)
+            parsed_data = parsed_obj.dict()
+            print("✅ Successfully parsed with Pydantic OutputParser")
             return parsed_data
-        else:
-            print("❌ No JSON object found in response.")
-            print("Full response was:")
-            print(raw_response)
-            return None
+        except Exception as parse_error:
+            print(f"⚠️ Pydantic parse failed: {parse_error}")
+            print("Falling back to regex extraction...")
+            
+            # Fallback: regex extraction
+            json_match = re.search(r'\{[\s\S]*\}', raw_response)
+            if json_match:
+                json_str = json_match.group(0)
+                parsed_data = json.loads(json_str)
+                print("✅ Parsed with regex fallback")
+                return parsed_data
+            else:
+                print("❌ No JSON object found in response.")
+                return None
 
     except Exception as e:
         print(f"❌ Error: {e}")

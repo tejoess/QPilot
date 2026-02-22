@@ -169,7 +169,52 @@ def run_ocr(reader: easyocr.Reader, img: np.ndarray) -> str:
 
 
 # ─────────────────────────────────────────────
-# MAIN
+# EXTRACT TEXT FUNCTION (for use in pipeline)
+# ─────────────────────────────────────────────
+def extract_text_with_ocr(pdf_path: str, languages: list = None, gpu: bool = False) -> str:
+    """
+    Extract text from PDF using OCR.
+    Returns all extracted text as a single string.
+    
+    Args:
+        pdf_path: Path to the PDF file
+        languages: List of languages for OCR (default: ['en'])
+        gpu: Whether to use GPU acceleration (default: False)
+    
+    Returns:
+        str: All extracted text from the PDF
+    """
+    if languages is None:
+        languages = ['en']
+    
+    if not os.path.exists(pdf_path):
+        raise FileNotFoundError(f"PDF file not found: {pdf_path}")
+    
+    print(f"[OCR] Initializing EasyOCR for languages: {languages} ...")
+    reader = easyocr.Reader(languages, gpu=gpu)
+    
+    print(f"[OCR] Converting PDF to images (zoom={ZOOM}x) ...")
+    pages = pdf_to_images(pdf_path, ZOOM)
+    
+    all_text = []
+    
+    for i, page_img in enumerate(pages, start=1):
+        print(f"[OCR] Processing page {i}/{len(pages)} ...")
+        
+        enhanced = enhance_image(page_img, i, MAX_WIDTH)
+        text = run_ocr(reader, enhanced)
+        
+        all_text.append(f"\n--- PAGE {i} ---\n{text}")
+        print(f"[OCR] Page {i}: Extracted {len(text)} characters")
+    
+    combined_text = "\n".join(all_text)
+    print(f"[OCR] ✅ Extraction complete! Total: {len(combined_text)} characters")
+    
+    return combined_text
+
+
+# ─────────────────────────────────────────────
+# MAIN (for standalone usage)
 # ─────────────────────────────────────────────
 def main():
     pdf_path = sys.argv[1] if len(sys.argv) > 1 else INPUT_PDF

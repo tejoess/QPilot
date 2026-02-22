@@ -1,5 +1,7 @@
 import asyncio
 import json
+import os
+from datetime import datetime
 from typing import TypedDict, Optional
 from langgraph.graph import StateGraph, END
 
@@ -56,6 +58,26 @@ async def send(session_id: str, message: str):
 
 
 # -------------------------
+# Helper: save JSON data
+# -------------------------
+def save_json_data(session_id: str, filename: str, data: dict):
+    """
+    Save JSON data to the data folder organized by session_id
+    """
+    # Create session folder
+    session_folder = os.path.join("backend", "services", "data", session_id)
+    os.makedirs(session_folder, exist_ok=True)
+    
+    # Save file
+    file_path = os.path.join(session_folder, filename)
+    with open(file_path, 'w', encoding='utf-8') as f:
+        json.dump(data, f, indent=2, ensure_ascii=False)
+    
+    print(f"💾 Saved: {file_path}")
+    return file_path
+
+
+# -------------------------
 # Nodes
 # -------------------------
 async def syllabus_fetch(state: PipelineState):
@@ -65,6 +87,15 @@ async def syllabus_fetch(state: PipelineState):
         r"C:\Users\Tejas\Desktop\Multi-Agent-Question-Paper-Generator\syllabus.pdf",
         "syllabus"
     )
+    
+    # Save raw syllabus text
+    session_folder = os.path.join("backend", "services", "data", state["session_id"])
+    os.makedirs(session_folder, exist_ok=True)
+    text_path = os.path.join(session_folder, "syllabus_raw.txt")
+    with open(text_path, 'w', encoding='utf-8') as f:
+        f.write(text)
+    print(f"💾 Saved: {text_path}")
+    
     return {"syllabus_text": text}
 
 
@@ -75,6 +106,10 @@ async def syllabus_format(state: PipelineState):
     # Ensure it's a dict, if None or parsing failed, use empty dict
     if not syllabus_json or not isinstance(syllabus_json, dict):
         syllabus_json = {"modules": [], "error": "Failed to parse syllabus"}
+    
+    # Save syllabus JSON
+    save_json_data(state["session_id"], "syllabus.json", syllabus_json)
+    
     return {"syllabus": syllabus_json}
 
 
@@ -85,6 +120,15 @@ async def pyqs_fetch(state: PipelineState):
     # Return text if it's string, empty if None
     if not pyqs_text:
         pyqs_text = ""
+    
+    # Save raw PYQs text
+    if pyqs_text:
+        session_folder = os.path.join("backend", "services", "data", state["session_id"])
+        text_path = os.path.join(session_folder, "pyqs_raw.txt")
+        with open(text_path, 'w', encoding='utf-8') as f:
+            f.write(pyqs_text)
+        print(f"💾 Saved: {text_path}")
+    
     return {"pyqs_text": pyqs_text}
 
 
@@ -94,10 +138,12 @@ async def pyqs_format_node(state: PipelineState):
     pyqs_result = format_pyqs(state.get("pyqs_text", ""), state.get("syllabus", {}))
     # format_pyqs returns JSON string, parse it
     try:
-        import json
         pyqs_dict = json.loads(pyqs_result) if isinstance(pyqs_result, str) else pyqs_result
     except:
         pyqs_dict = {"questions": [], "error": "Failed to parse PYQs"}
+    
+    # Save PYQs JSON
+    save_json_data(state["session_id"], "pyqs.json", pyqs_dict)
     
     return {"pyqs": pyqs_dict, "pyqs_analysis": pyqs_dict}
 
@@ -117,6 +163,9 @@ async def blueprint_build_node(state: PipelineState):
     if not isinstance(blueprint, dict):
         blueprint = {"sections": [], "error": "Failed to generate blueprint"}
     
+    # Save blueprint JSON
+    save_json_data(state["session_id"], "blueprint.json", blueprint)
+    
     return {"blueprint": blueprint}
 
 
@@ -135,6 +184,9 @@ async def blueprint_verify_node(state: PipelineState):
     if not isinstance(blueprint_verdict, dict):
         blueprint_verdict = {"status": "pending", "issues": []}
     
+    # Save blueprint verification JSON
+    save_json_data(state["session_id"], "blueprint_verification.json", blueprint_verdict)
+    
     return {"blueprint_verdict": blueprint_verdict}
 
 
@@ -150,6 +202,9 @@ async def question_select_node(state: PipelineState):
     # Ensure it's a dict
     if not isinstance(draft_paper, dict):
         draft_paper = {"sections": [], "error": "Failed to select questions"}
+    
+    # Save draft paper JSON
+    save_json_data(state["session_id"], "draft_paper.json", draft_paper)
     
     return {"draft_paper": draft_paper}
 
@@ -170,18 +225,50 @@ async def paper_verify_node(state: PipelineState):
     if not isinstance(paper_verdict, dict):
         paper_verdict = {"verdict": "pending", "rating": 0}
     
+    # Save paper verification JSON
+    save_json_data(state["session_id"], "paper_verification.json", paper_verdict)
+    
     return {"paper_verdict": paper_verdict}
 
 
 async def final_generate_node(state: PipelineState):
     await send(state["session_id"], "Step 9: generate final")
     
-    # TODO: Implement final paper generation
-    # For now, return a placeholder path
-    final_path = "generated/final_question_paper.pdf"
+    session_id = state["session_id"]
+    session_folder = os.path.join("backend", "services", "data", session_id)
     
+    # Save final paper JSON
+    draft_paper = state.get("draft_paper", {})
+    final_paper_json_path = save_json_data(session_id, "final_paper.json", draft_paper)
+    
+    # Create a summary/metadata file
+    summary = {
+        "session_id": session_id,
+        "timestamp": datetime.now().isoformat(),
+        "status": "completed",
+        "total_marks": sum(q.get("marks", 0) for s in draft_paper.get("sections", []) for q in s.get("questions", [])),
+        "total_questions": sum(len(s.get("questions", [])) for s in draft_paper.get("sections", [])),
+        "verdict": state.get("paper_verdict", {}).get("verdict", "unknown"),
+        "rating": state.get("paper_verdict", {}).get("rating", 0),
+        "files_generated": {
+            "syllabus": "syllabus.json",
+            "pyqs": "pyqs.json",
+            "blueprint": "blueprint.json",
+            "blueprint_verification": "blueprint_verification.json",
+            "draft_paper": "draft_paper.json",
+            "paper_verification": "paper_verification.json",
+            "final_paper": "final_paper.json"
+        }
+    }
+    save_json_data(session_id, "session_summary.json", summary)
+    
+    # TODO: Generate PDF from final_paper.json
+    final_path = os.path.join(session_folder, "final_question_paper.pdf")
+    
+    await send(state["session_id"], f"✅ All files saved to: {session_folder}")
     await send(state["session_id"], f"✅ Paper generated at: {final_path}")
-    print(f"Final paper generated at: {final_path}") 
+    print(f"\n✅ Final paper path: {final_path}")
+    print(f"✅ All data saved to: {session_folder}")
     
     return {"final_path": final_path}
 
@@ -240,24 +327,24 @@ async def run_question_paper_pipeline(session_id: str = "default"):
             "total_marks": 80,
             "total_questions": 10,
             "module_weightage_range": {
-                "min": 10,
-                "max": 30
+                "min": 0.10,  # 10% as decimal
+                "max": 0.30   # 30% as decimal
             },
-            "allowed_marks_per_question": [2, 5, 10, 15],
+            "allowed_marks_per_question": [2, 5, 6, 10, 15],
             "sections": [
                 {
                     "section_name": "Section A",
                     "section_description": "Short Answer Questions",
                     "question_count": 5,
-                    "marks_per_question": 2
+                    "marks_per_question": 6  # 5 × 6 = 30 marks
                 },
                 {
                     "section_name": "Section B", 
                     "section_description": "Long Answer Questions",
                     "question_count": 5,
-                    "marks_per_question": 10
+                    "marks_per_question": 10  # 5 × 10 = 50 marks
                 }
-            ]
+            ]  # Total: 30 + 50 = 80 marks ✓
         },
         "pyqs_analysis": None,
         "blueprint": None,

@@ -1,17 +1,19 @@
 # app/services/pyq_service.py
-# app/services/pyq_service.py
 
 import json
 import os
 from typing import Dict, Any
 from backend.services.llm_service import gemini_llm as llm
 from langchain_core.messages import HumanMessage
+from langchain_core.output_parsers import PydanticOutputParser
+from backend.services.schemas.llm_schemas import PYQOutput
 
 
 def format_pyqs(pyq_text: str = "", syllabus_json: Dict[str, Any] = None) -> str:
     """
     Takes raw PYQ text + syllabus JSON and extracts questions in a single pass (no chunking).
     Topics/Subtopics are forced strictly from syllabus labels.
+    Uses Pydantic Output Parser for strict JSON enforcement.
     """
 
     print("\n🛠️  [GRAPH NODE] Formatting PYQ JSON (Syllabus-Constrained Mode)...")
@@ -21,6 +23,10 @@ def format_pyqs(pyq_text: str = "", syllabus_json: Dict[str, Any] = None) -> str
 
     if not syllabus_json:
         return json.dumps({"error": "Syllabus JSON not provided."})
+
+    # Create output parser
+    parser = PydanticOutputParser(pydantic_object=PYQOutput)
+    format_instructions = parser.get_format_instructions()
 
     syllabus_text = json.dumps(syllabus_json, indent=2)
 
@@ -57,19 +63,6 @@ STRICT RULES:
    - Remove numbering artifacts.
    - Normalize spacing and broken words.
 
-Return JSON in EXACT structure:
-
-{{
-    "questions": [
-        {{
-            "question": "Full question text here",
-            "topic": "Exact Topic From Syllabus",
-            "subtopic": "Exact Subtopic From Syllabus",
-            "marks": 10
-        }}
-    ]
-}}
-
 SYLLABUS:
 ---
 {syllabus_text}
@@ -80,15 +73,31 @@ PYQ TEXT:
 {pyq_text}
 ---
 
-Return ONLY valid JSON.
+{format_instructions}
+
+Return ONLY valid JSON matching the schema above.
 """
 
     try:
         response = llm.invoke([HumanMessage(content=prompt)])
         content = response.content
-        print(content)
 
-        data = json.loads(content)
+        print(f"\n📥 LLM Response (first 300 chars): {content[:300]}")
+
+        # Try parsing with Pydantic parser
+        try:
+            parsed_obj = parser.parse(content)
+            data = parsed_obj.dict()
+            print(f"✅ Successfully parsed with Pydantic OutputParser")
+        except Exception as parse_error:
+            print(f"⚠️ Pydantic parse failed: {parse_error}")
+            print("Falling back to manual JSON parse...")
+            # Fallback: manual parsing
+            import re
+            json_match = re.search(r'\{[\s\S]*\}', content)
+            if json_match:
+                content = json_match.group(0)
+            data = json.loads(content)
 
         if "questions" not in data:
             return json.dumps({"error": "Invalid JSON structure from LLM."})
@@ -105,7 +114,7 @@ Return ONLY valid JSON.
 
         final_output = {
             "exam_info": {
-                "note": "Generated using syllabus-constrained labeling."
+                "note": "Generated using syllabus-constrained labeling with Pydantic validation."
             },
             "questions": unique_questions
         }
@@ -113,10 +122,12 @@ Return ONLY valid JSON.
         print(f"✅  [PYQ FORMAT] Completed. Total Unique Questions: {len(unique_questions)}")
         return json.dumps(final_output, indent=4)
 
-    except json.JSONDecodeError:
+    except json.JSONDecodeError as e:
+        print(f"❌ JSON decode error: {e}")
         return json.dumps({"error": "LLM returned invalid JSON."})
 
     except Exception as e:
+        print(f"❌ Unexpected error: {e}")
         return json.dumps({"error": str(e)})
 
 

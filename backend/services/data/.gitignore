@@ -1,0 +1,6 @@
+# Ignore all session folders
+*/
+
+# But keep the README
+!README.md
+!.gitignore
