@@ -9,3 +9,7 @@ websocket
 langgraph
 pymupdf4llm
 docling
+
+npm install @clerk/nextjs
+npm i drizzle-orm @neondatabase/serverless dotenv
+npm i -D drizzle-kit tsx

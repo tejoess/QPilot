@@ -26,12 +26,25 @@ export default function QPilotConfigPage() {
         metadata,
         isSubmitting,
         setSubmitting,
+        setMetadata,
         reset
     } = useQPilotConfigStore();
 
     useEffect(() => {
         return () => reset(); // Cleanup on unmount
     }, [reset]);
+
+    const handleAutoFill = () => {
+        setMetadata({
+            title: "Midterm Mathematics",
+            subject: "Mathematics",
+            grade: "12",
+            totalMarks: 80,
+            duration: "3 Hours",
+            instructions: "Focus on calculus and integration. Avoid repetition from PYQs.",
+        });
+        toast.success("Form Auto-Filled!");
+    };
 
     const handleStartGenerate = async () => {
         // 1. Validations
@@ -42,35 +55,46 @@ export default function QPilotConfigPage() {
 
         // 2. Execution
         setSubmitting(true);
+        console.log("QP Metadata:", metadata);
         const id = toast.loading("Initializing QPilot Engines...");
 
         try {
             /**
-             * Integration point: Trigger generation.
-             * Route: POST /generate-paper
-             * Payload: { subject, grade, board }
+             * Phase 1 & 2 Integration:
+             * 1. Collect form values
+             * 2. Call backend API route /api/qp-metadata
+             * 3. Insert into Neon DB
              */
-            const response = await generatePaper({
-                subject: metadata.subject,
-                grade: metadata.grade,
-                board: metadata.board,
+            const response = await fetch('/api/qp-metadata', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    exam_title: metadata.title,
+                    subject: metadata.subject,
+                    grade: metadata.grade,
+                    total_marks: metadata.totalMarks || 80,
+                    duration: metadata.duration || "3 Hours",
+                    instructions: metadata.instructions || ""
+                })
             });
 
-            if (response.status === "success") {
-                toast.success("Ready for Launch!", { id });
+            const insertedData = await response.json();
 
-                // As per request: redirect to proj-demo-1
-                // In a real app, we'd use an ID from the backend if available.
+            if (response.ok) {
+                toast.success("Ready for Launch!", { id });
+                /**
+                 * Phase 3: Redirect to proj-demo-1 with metaId
+                 */
                 setTimeout(() => {
-                    router.push("/qpilot/proj-demo-1");
+                    router.push(`/qpilot/proj-demo-1?metaId=${insertedData.id}`);
                 }, 1000);
             } else {
-                toast.error("Backend Error", { id, description: "The server failed to initialize the session." });
+                toast.error("Database Error", { id, description: "The server failed to save the metadata." });
                 setSubmitting(false);
             }
         } catch (err) {
             const error = err as { message?: string };
-            toast.error("Connection Failed", { id, description: error?.message || "Ensure backend is running on port 8000." });
+            toast.error("Connection Failed", { id, description: error?.message || "Ensure backend is running." });
             setSubmitting(false);
         }
     };
@@ -88,13 +112,27 @@ export default function QPilotConfigPage() {
                     <main className="max-w-4xl mx-auto px-6 py-10 space-y-10">
 
                         {/* Header Section */}
-                        <div className="space-y-2">
-                            <div className="flex items-center gap-2 text-primary font-bold text-xs uppercase tracking-[0.2em]">
-                                <Rocket className="h-3 w-3" />
-                                QPilot Interface
-                            </div>
+                        <div className="space-y-4">
                             <div className="flex items-center justify-between">
-                                <h1 className="text-3xl font-bold tracking-tight text-foreground">Prepare New Exam</h1>
+                                <div className="space-y-2">
+                                    <div className="flex items-center gap-2 text-primary font-bold text-xs uppercase tracking-[0.2em]">
+                                        <Rocket className="h-3 w-3" />
+                                        QPilot Interface
+                                    </div>
+                                    <h1 className="text-3xl font-bold tracking-tight text-foreground">Prepare New Exam</h1>
+                                </div>
+
+                                <Button
+                                    variant="outline"
+                                    onClick={handleAutoFill}
+                                    disabled={isSubmitting}
+                                    className="border-dashed border-primary/40 bg-primary/5 hover:bg-primary/10 text-primary font-bold text-xs"
+                                >
+                                    AutoFill Demo
+                                </Button>
+                            </div>
+
+                            <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-2 bg-green-500/10 text-green-600 dark:text-green-400 px-3 py-1 rounded-full text-xs font-bold border border-green-500/20">
                                     <ShieldCheck className="h-3.5 w-3.5" />
                                     System Optimized
