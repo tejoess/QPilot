@@ -19,38 +19,65 @@ export const metadata: Metadata = {
   description: "AI-powered question paper generator",
 };
 
+import {
+  ClerkProvider,
+  SignInButton,
+  SignUpButton,
+  SignedIn,
+  SignedOut,
+  UserButton,
+} from '@clerk/nextjs'
+
+import SyncUser from "@/components/SyncUser";
+
 export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-      >
-        {/*
-         * ThemeProvider from next-themes handles the dark/light class on <html>.
-         * attribute="class" ensures it works with Tailwind's `dark:` variant.
-         * disableTransitionOnChange prevents FOUC on hydration.
-         */}
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="light"
-          enableSystem={false}
-          disableTransitionOnChange
-          themes={["light", "dark", "ocean", "royal"]}
+    <ClerkProvider>
+      <html lang="en" suppressHydrationWarning>
+        <body
+          className={`${geistSans.variable} ${geistMono.variable} antialiased`}
         >
-          {children}
-          {/* Sonner toast container — positioned bottom-right */}
-          <Toaster
-            position="bottom-right"
-            expand={false}
-            richColors
-            closeButton
-          />
-        </ThemeProvider>
-      </body>
-    </html>
+          <ThemeProvider
+            attribute="class"
+            defaultTheme="light"
+            enableSystem={false}
+            disableTransitionOnChange
+            themes={["light", "dark", "ocean", "royal"]}
+          >
+            <SyncUser />
+            <header className="flex justify-end items-center p-4 gap-4 h-16 border-b">
+              <SignedOut>
+                <SignInButton mode="modal">
+                  <button className="text-sm font-medium hover:text-primary transition-colors">
+                    Sign In
+                  </button>
+                </SignInButton>
+                <SignUpButton mode="modal">
+                  <button className="bg-primary text-primary-foreground rounded-full font-medium text-sm h-10 px-4 cursor-pointer hover:opacity-90 transition-opacity">
+                    Sign Up
+                  </button>
+                </SignUpButton>
+              </SignedOut>
+              <SignedIn>
+                <UserButton afterSignOutUrl="/" />
+              </SignedIn>
+            </header>
+            <main>
+              {children}
+            </main>
+            <Toaster
+              position="bottom-right"
+              expand={false}
+              richColors
+              closeButton
+            />
+          </ThemeProvider>
+        </body>
+      </html>
+    </ClerkProvider>
   );
 }
