@@ -1,0 +1,68 @@
+{
+  "questions": [
+    {
+      "qid": 1,
+      "question": "What is vectorization in the context of backtesting trading strategies?"
+    },
+    {
+      "qid": 2,
+      "question": "Explain various Digital Driven processes used in Technology."
+    },
+    {
+      "qid": 3,
+      "question": "What are two commonly used representations for deploying fraud analytics models?"
+    },
+    {
+      "qid": 4,
+      "question": "Discuss on Markov Regime Switching Model."
+    },
+    {
+      "qid": 5,
+      "question": "Why is it important for a prediction-based trading strategy to accurately forecast large market movements?"
+    },
+    {
+      "qid": 6,
+      "question": "Explain GIFT City in detail."
+    },
+    {
+      "qid": 7,
+      "question": "Explain the steps involved in the K-means clustering algorithm and how it works in partitioning data."
+    },
+    {
+      "qid": 8,
+      "question": "What is the Wishart distribution and how is it related to covariance matrices?"
+    },
+    {
+      "qid": 9,
+      "question": "Explain Sharpe Ratio and show with example how Sharpe Ratio can be used to evaluate income statement growth."
+    },
+    {
+      "qid": 10,
+      "question": "Describe key components of Capital Asset Pricing Model in detail."
+    },
+    {
+      "qid": 11,
+      "question": "Compare between Stop Loss (SL), Trailing Stop Loss (TSL), and Take Profit (TP) orders in trading and explain each with example."
+    },
+    {
+      "qid": 12,
+      "question": "Explain in detail visualizing covariance and precision matrices."
+    },
+    {
+      "qid": 13,
+      "question": "What is the relationship between prior and posterior distributions in Bayesian analysis?"
+    },
+    {
+      "qid": 14,
+      "question": "Explain concept of infallibility in financial and banking operation."
+    },
+    {
+      "qid": 15,
+      "question": "What is an undirected graph and why is it used?"
+    },
+    {
+      "qid": 16,
+      "question": "Explain Traffic Light Indicator in detail. How does the traffic light indicator approach help in the representation of fraud analytics model outcomes?"
+    }
+  ]
+}
