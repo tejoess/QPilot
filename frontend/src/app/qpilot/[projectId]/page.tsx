@@ -92,7 +92,7 @@ export default function QPilotExecutionPage() {
 
                         {/* 2. LEFT PANEL (Agents Area) - ~400px fixed width */}
                         <div className="w-[400px] border-r border-border/50 bg-card/10 overflow-hidden flex flex-col">
-                            <div className="px-6 py-4 border-b border-border/50 bg-background/50">
+                            <div className="px-6 border-b border-border/50 bg-background/50 h-[82px] flex flex-col justify-center">
                                 <h2 className="text-sm font-bold uppercase tracking-[0.2em] text-primary">Multi-Agent Orchestration</h2>
                                 <p className="text-[10px] text-muted-foreground uppercase font-medium">Real-time pipeline monitoring</p>
                             </div>

@@ -25,7 +25,7 @@ export function AgentChatPanel() {
 
     return (
         <div className="flex flex-col h-full bg-slate-50/30 dark:bg-slate-950/20">
-            <div className="px-6 py-4 bg-background border-b border-border/50 flex items-center justify-between sticky top-0 z-10">
+            <div className="px-6 bg-background border-b border-border/50 flex items-center justify-between sticky top-0 z-10 h-[82px]">
                 <div className="flex items-center gap-3">
                     <div className="p-2 rounded-lg bg-slate-900 border border-slate-800 text-slate-100 shadow-lg">
                         <Bot className="h-5 w-5" />
