@@ -9,7 +9,7 @@
  */
 
 import { useEffect, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import { QPilotSidebar } from "@/components/qpilot/QPilotSidebar";
 import { AgentPanel } from "@/components/qpilot/AgentPanel";
@@ -23,11 +23,44 @@ import type { PaperGenerationRequest } from "@/types/api";
 
 export default function QPilotExecutionPage() {
     const { projectId } = useParams<{ projectId: string }>();
+    const searchParams = useSearchParams();
+    const metaId = searchParams.get("metaId");
     const router = useRouter();
 
-    const { status, reset } = useQPilotStore();
+    const { status, reset, setCurrentMetadata, currentMetadata, emitMessage } = useQPilotStore();
     const [requestData, setRequestData] = useState<PaperGenerationRequest | null>(null);
     const [isInitializing, setIsInitializing] = useState(true);
+
+    // Phase 4 & 5: Metadata Fetch & Orchestrator Greeting
+    useEffect(() => {
+        if (metaId && !currentMetadata && !isInitializing) {
+            const fetchMetadata = async () => {
+                try {
+                    const res = await fetch(`/api/qp-metadata/${metaId}`);
+                    const data = await res.json();
+
+                    if (data && !data.error) {
+                        setCurrentMetadata(data);
+
+                        // Push structured greeting message
+                        emitMessage("Orchestrator", "orchestrator",
+                            `Hello agents, we are creating this paper:\n\n` +
+                            `Exam: ${data.examTitle}\n` +
+                            `Subject: ${data.subject}\n` +
+                            `Grade: ${data.grade}\n` +
+                            `Total Marks: ${data.totalMarks}\n` +
+                            `Duration: ${data.duration}`
+                        );
+
+                        console.log("Orchestrator check-in complete. Agents initialized with paper metadata.");
+                    }
+                } catch (err) {
+                    console.error("Metadata fetch error:", err);
+                }
+            };
+            fetchMetadata();
+        }
+    }, [metaId, currentMetadata, isInitializing, setCurrentMetadata, emitMessage]);
 
     // 1. Initial Data Fetch
     useEffect(() => {
