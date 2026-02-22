@@ -3,7 +3,7 @@
 import json
 import os
 from typing import Dict, Any
-from backend.services.llm_service import gemini_llm as llm
+from backend.services.llm_service import openai_llm as llm
 from langchain_core.messages import HumanMessage
 from langchain_core.output_parsers import PydanticOutputParser
 from backend.services.schemas.llm_schemas import PYQOutput
@@ -102,14 +102,21 @@ Return ONLY valid JSON matching the schema above.
         if "questions" not in data:
             return json.dumps({"error": "Invalid JSON structure from LLM."})
 
-        # Deduplicate questions
+        # Deduplicate questions and add unique IDs
         seen = set()
         unique_questions = []
+        question_id_counter = 1
 
         for q in data["questions"]:
             q_text = str(q.get("question", "")).strip().lower()
             if q_text and q_text not in seen:
                 seen.add(q_text)
+                # Add unique ID and normalize field names for compatibility
+                q["id"] = f"pyq_{question_id_counter:03d}"
+                # Rename 'question' to 'text' for compatibility with question_service.py
+                if "question" in q and "text" not in q:
+                    q["text"] = q["question"]
+                question_id_counter += 1
                 unique_questions.append(q)
 
         final_output = {
