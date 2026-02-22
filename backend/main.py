@@ -1,4 +1,5 @@
 # backend/main.py
+import uuid
 from fastapi import FastAPI , WebSocket
 from backend.schemas.request import PaperGenerationRequest
 from backend.schemas.response import PaperGenerationResponse
@@ -18,10 +19,11 @@ async def websocket_logs(websocket: WebSocket, session_id: str):
 
 
 @backend.post("/generate-paper", response_model=PaperGenerationResponse)
-def generate_question_paper(payload: PaperGenerationRequest):
-    session_id = "session_1"
-    file_path = run_question_paper_pipeline(session_id)
-
+async def generate_question_paper(request: PaperGenerationRequest):
+    session_id = str(uuid.uuid4())
+    
+    file_path = await run_question_paper_pipeline(session_id)
+    
     return PaperGenerationResponse(
         status="success",
         file_path=file_path

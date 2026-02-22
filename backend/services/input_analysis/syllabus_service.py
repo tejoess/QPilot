@@ -4,8 +4,8 @@
 import os
 import json
 import re
-from app.services.prompts import format_syllabus as SYLLABUS_PROMPT
-from app.services.llm_service import gemini_llm as llm
+from backend.services.prompts import format_syllabus as SYLLABUS_PROMPT
+from backend.services.llm_service import openai_llm as llm
 from langchain_core.messages import HumanMessage
 
 
@@ -115,8 +115,6 @@ The assessment consists of two class tests of 20 marks each. The first class tes
 
 """
 
-# Test call - uncomment to test directly
-# get_syllabus_json(SYLLABUS_PROMPT, dummy_syllabus)
-
-def format_syllabus():
-    print("Formatting syllabus")
+# # Test call - uncomment to test directly
+# result = get_syllabus_json(SYLLABUS_PROMPT, dummy_syllabus)
+# print("Syllabus JSON result:", result)  

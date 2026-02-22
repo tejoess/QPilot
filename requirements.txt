@@ -7,3 +7,5 @@ langchain_google_genai
 pydantic 
 websocket
 langgraph
+pymupdf4llm
+docling
