@@ -64,6 +64,7 @@ interface QPilotState {
         generation: AgentStatus;
     };
     chatMessages: ChatMessage[];
+    currentMetadata: any | null;
 
     // Actions
     setStatus: (status: QPilotState["status"]) => void;
@@ -71,6 +72,7 @@ interface QPilotState {
     setActiveAgentIndex: (index: number) => void;
     setVerticalProgress: (progress: number) => void;
     addQuestion: (sectionTitle: string, question: Omit<Question, "id">) => void;
+    setCurrentMetadata: (metadata: any) => void;
 
     // Orchestrator Actions
     emitMessage: (sender: string, role: ChatMessage["role"], content: string) => void;
@@ -114,6 +116,7 @@ export const useQPilotStore = create<QPilotState>((set, get) => ({
         generation: "idle",
     },
     chatMessages: [],
+    currentMetadata: null,
 
     setStatus: (status) => set({ status }),
 
@@ -151,6 +154,8 @@ export const useQPilotStore = create<QPilotState>((set, get) => ({
         return { paperContent: content };
     }),
 
+    setCurrentMetadata: (metadata) => set({ currentMetadata: metadata }),
+
     // Orchestrator Actions
     emitMessage: (sender, role, content) => set((state) => ({
         chatMessages: [
@@ -171,7 +176,7 @@ export const useQPilotStore = create<QPilotState>((set, get) => ({
             generation: 4
         };
 
-        const index = indexMap[agent];
+        const index = indexMap[agent as string];
         const newAgents = [...state.agents];
         if (newAgents[index]) {
             newAgents[index] = { ...newAgents[index], status };
@@ -234,5 +239,6 @@ export const useQPilotStore = create<QPilotState>((set, get) => ({
             generation: "idle",
         },
         chatMessages: [],
+        currentMetadata: null,
     }),
 }));
