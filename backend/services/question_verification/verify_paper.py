@@ -237,18 +237,39 @@ Return ONLY valid JSON (no markdown):
 
 If no issues found for a category, leave the list empty. Be concise (max 15 words per issue/suggestion)."""
 
-    msg = HumanMessage(content=prompt)
-    response = llm.invoke([msg])
-    text = response.content.strip()
+    max_retries = 2
+    for attempt in range(max_retries):
+        try:
+            msg = HumanMessage(content=prompt)
+            response = llm.invoke([msg])
+            text = response.content.strip()
 
-    # Clean markdown if present
-    if text.startswith("```"):
-        text = text.split("```")[1]
-        if text.startswith("json"):
-            text = text[4:]
-        text = text.strip()
+            # Clean markdown if present
+            if text.startswith("```"):
+                text = text.split("```")[1]
+                if text.startswith("json"):
+                    text = text[4:]
+                text = text.strip()
 
-    return json.loads(text)
+            # Try parsing JSON
+            return json.loads(text)
+            
+        except Exception as e:
+            error_type = type(e).__name__
+            print(f"  ⚠️ LLM judge attempt {attempt + 1}/{max_retries} failed: {error_type}")
+            
+            # Check if it's a connection error
+            if "Connection" in error_type or "Timeout" in error_type or "APIConnectionError" in error_type:
+                if attempt < max_retries - 1:
+                    import time
+                    wait_time = (attempt + 1) * 2
+                    print(f"  🔄 Waiting {wait_time}s before retry...")
+                    time.sleep(wait_time)
+                    continue
+            
+            # If not connection error or last attempt, raise to outer handler
+            if attempt == max_retries - 1:
+                raise
 
 
 # ============================================================================

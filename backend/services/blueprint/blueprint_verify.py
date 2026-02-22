@@ -413,17 +413,29 @@ Now evaluate the blueprint:"""
             print(f"✅ Successfully generated critique on attempt {attempt + 1}")
             return critique
             
-        except (json.JSONDecodeError, ValueError) as e:
-            print(f"\n❌ Attempt {attempt + 1}/{max_retries} failed: {type(e).__name__}")
-            print(f"Error: {e}")
+        except Exception as e:
+            error_type = type(e).__name__
+            print(f"\n❌ Attempt {attempt + 1}/{max_retries} failed: {error_type}")
+            print(f"Error: {str(e)[:200]}")
             
-            if attempt < max_retries - 1:
+            # Check if it's a connection/network error
+            if "Connection" in error_type or "Timeout" in error_type or "APIConnectionError" in error_type:
+                print(f"⚠️ Network/Connection error detected")
+                if attempt < max_retries - 1:
+                    import time
+                    wait_time = (attempt + 1) * 2  # Exponential backoff: 2s, 4s, 6s
+                    print(f"🔄 Waiting {wait_time}s before retry...")
+                    time.sleep(wait_time)
+                    continue
+            
+            # For other errors, try adjusted prompt
+            if attempt < max_retries - 1 and 'response_text' in locals():
                 print(f"🔄 Retrying with adjusted prompt...")
                 prompt += "\n\nCRITICAL: Return ONLY valid JSON. No explanations. Keep feedback SHORT. Ensure JSON is complete."
             else:
-                print(f"\n❌ ERROR: Failed to parse LLM response after {max_retries} attempts")
-                print(f"\nLLM Response (first 500 chars):\n{response_text[:500]}")
-                print(f"\nLLM Response (last 300 chars):\n...{response_text[-300:]}")
+                print(f"\n❌ ERROR: Failed after {max_retries} attempts")
+                if 'response_text' in locals():
+                    print(f"\nLLM Response (first 500 chars):\n{response_text[:500]}")
                 
                 # Return fallback critique instead of crashing
                 print("\n🔧 Returning fallback critique...")

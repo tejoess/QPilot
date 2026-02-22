@@ -4,36 +4,21 @@
 
 # Syllabus Extraction Prompt
 
-format_syllabus = """
-You are an expert syllabus analyzer. Extract the syllabus structure from the following text and return a single, structured JSON object.
+format_syllabus = """You are a strict JSON generator. Extract syllabus data and return it in the EXACT schema format provided.
 
-Here is the required JSON format:
-{{
-    "course": "Course Name",
-    "total_units": <Total number of units>,
-    "units": [
-        {{
-            "unit_number": <Unit Number (e.g., 1)>,
-            "unit_name": "Unit Name",
-            "weightage": <Weightage (as a number, e.g., 20)>,
-            "topics": [
-                {{
-                    "topic": "Topic Name",
-                    "subtopics": ["Subtopic 1", "Subtopic 2"],
-                    "bloom_level": "e.g., Remember, Understand, Apply",
-                    
-                }}
-            ]
-        }}
-    ],
-    "course_outcomes": ["Course Outcome 1", "Course Outcome 2"],
-    "course_objectives": ["Course Objective 1", "Course Objective 2"]
-}}
+DO NOT use natural language field names like "course", "units", "topics".
+DO NOT add extra fields like "total_units", "course_objectives".
+ONLY output fields that match the schema exactly.
 
-Syllabus Text:
----
-{dummy_syllabus}
----
+MANDATORY field name requirements:
+- Root level: "course_code", "course_name", "modules" (NOT "course", NOT "units")
+- Module level: "module_number", "module_name", "weightage", "topics"
+- Topic level: "name", "subtopics"
+- Subtopic level: "name", "description"
 
-Return ONLY the single, complete JSON object. Do not add any other text or markdown formatting.
-"""
+Weightage MUST be decimal (0.20 = 20%, NOT integer 20).
+
+INPUT SYLLABUS:
+{syllabus}
+
+OUTPUT: Follow the schema definition below EXACTLY. Use ONLY the field names from the schema."""

@@ -67,7 +67,11 @@ def find_match(pyq_bank: List[Dict], used_pyq_ids: set, **criteria) -> Optional[
     bloom_level = criteria.get("bloom_level")
 
     for pyq in pyq_bank:
-        if pyq["id"] in used_pyq_ids:
+        # Safety check: skip if PYQ doesn't have an id
+        pyq_id = pyq.get("id")
+        if not pyq_id:
+            continue
+        if pyq_id in used_pyq_ids:
             continue
         if level == 1 and match_level_1(pyq, topic, subtopic, marks, bloom_level):
             return pyq
@@ -232,11 +236,14 @@ def select_questions(
                     marks=marks, bloom_level=bloom_level
                 )
                 if match:
-                    print(f"     ✅ Level 1 match (exact) → PYQ #{match['id']} used as-is")
-                    selected_text = match["text"]
+                    match_id = match.get("id", "unknown")
+                    match_text = match.get("text", match.get("question", ""))
+                    print(f"     ✅ Level 1 match (exact) → PYQ #{match_id} used as-is")
+                    selected_text = match_text
                     selection_method = "pyq_exact"
-                    source_pyq_id = match["id"]
-                    used_pyq_ids.add(match["id"])
+                    source_pyq_id = match_id
+                    if match_id != "unknown":
+                        used_pyq_ids.add(match_id)
                     stats["pyq_exact_match"] += 1
 
                 else:
@@ -247,16 +254,19 @@ def select_questions(
                         bloom_level=bloom_level
                     )
                     if match:
-                        print(f"     🔄 Level 2 match (drop marks) → Rephrasing PYQ #{match['id']} for {marks}M")
+                        match_id = match.get("id", "unknown")
+                        match_text = match.get("text", match.get("question", ""))
+                        print(f"     🔄 Level 2 match (drop marks) → Rephrasing PYQ #{match_id} for {marks}M")
                         selected_text = rephrase_pyq(
-                            pyq_text=match["text"],
+                            pyq_text=match_text,
                             target_marks=marks,
                             topic=topic,
                             bloom_level=bloom_level
                         )
                         selection_method = "pyq_rephrased_marks"
-                        source_pyq_id = match["id"]
-                        used_pyq_ids.add(match["id"])
+                        source_pyq_id = match_id
+                        if match_id != "unknown":
+                            used_pyq_ids.add(match_id)
                         stats["pyq_rephrased_marks"] += 1
 
                     else:
@@ -266,16 +276,19 @@ def select_questions(
                             level=3, topic=topic, subtopic=subtopic
                         )
                         if match:
-                            print(f"     🔄 Level 3 match (subtopic only) → Rephrasing PYQ #{match['id']} for {marks}M/{bloom_level}")
+                            match_id = match.get("id", "unknown")
+                            match_text = match.get("text", match.get("question", ""))
+                            print(f"     🔄 Level 3 match (subtopic only) → Rephrasing PYQ #{match_id} for {marks}M/{bloom_level}")
                             selected_text = rephrase_pyq(
-                                pyq_text=match["text"],
+                                pyq_text=match_text,
                                 target_marks=marks,
                                 topic=topic,
                                 bloom_level=bloom_level
                             )
                             selection_method = "pyq_rephrased_bloom"
-                            source_pyq_id = match["id"]
-                            used_pyq_ids.add(match["id"])
+                            source_pyq_id = match_id
+                            if match_id != "unknown":
+                                used_pyq_ids.add(match_id)
                             stats["pyq_rephrased_bloom"] += 1
 
                         else:

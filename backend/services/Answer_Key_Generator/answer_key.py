@@ -7,7 +7,6 @@ from reportlab.lib.units import cm
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable, KeepTogether
 from reportlab.lib.enums import TA_CENTER, TA_LEFT
 
-OPENROUTER_API_KEY = "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"
 MODEL = "openai/gpt-4o-mini"
 
 
