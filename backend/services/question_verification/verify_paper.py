@@ -89,11 +89,20 @@ def check_module_weightage(paper: Dict, paper_pattern: Dict) -> Tuple[bool, str]
 
     min_w = paper_pattern.get("module_weightage_range", {}).get("min", 0)
     max_w = paper_pattern.get("module_weightage_range", {}).get("max", 1)
+    
+    # Convert to percentage if values are between 0-1 (decimal format)
+    if min_w <= 1 and max_w <= 1:
+        min_w_display = min_w * 100
+        max_w_display = max_w * 100
+    else:
+        min_w_display = min_w
+        max_w_display = max_w
+    
     issues = []
     for mod, marks in module_marks.items():
         pct = marks / total_marks
         if not (min_w <= pct <= max_w):
-            issues.append(f"{mod}: {pct*100:.1f}% (allowed {min_w*100:.0f}%–{max_w*100:.0f}%)")
+            issues.append(f"{mod}: {pct*100:.1f}% (allowed {min_w_display:.0f}%–{max_w_display:.0f}%)")
     ok = len(issues) == 0
     return ok, f"Module weightage issues: {'; '.join(issues)}" if issues else "Module weightages valid"
 
@@ -189,7 +198,7 @@ QUESTION PAPER (compact view):
 {json.dumps(paper_summary, indent=2)}
 
 SYLLABUS MODULES:
-{json.dumps({k: v.get("name","") for k, v in syllabus.get("modules", {}).items()}, indent=2)}
+{json.dumps(syllabus.get("modules", []) if isinstance(syllabus.get("modules"), list) else list(syllabus.get("modules", {}).values()), indent=2)}
 
 TEACHER PREFERENCES:
 {json.dumps(teacher_input, indent=2)}
