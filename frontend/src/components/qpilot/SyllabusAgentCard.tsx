@@ -5,6 +5,7 @@
  * ─────────────────────────────────────────────────────────────────────────────
  * Compact card for the Syllabus Fetcher Agent.
  * Handles PDF upload, text paste, and subprocess visualization.
+ * NOW WITH REAL-TIME WEBSOCKET UPDATES! 🚀
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
@@ -25,11 +26,12 @@ import {
     Loader2,
     CheckCircle2,
     AlertCircle,
-    FileText
+    FileText,
+    Wifi
 } from "lucide-react";
 import { useSyllabusStore } from "@/store/syllabusStore";
 import { useQPilotStore } from "@/store/qpilotStore";
-import { extractSyllabus } from "@/lib/projectApi";
+import { useWorkflowOrchestrator } from "@/hooks/useWorkflowOrchestrator";
 import { cn } from "@/lib/utils";
 
 interface SyllabusAgentCardProps {
@@ -57,20 +59,56 @@ export function SyllabusAgentCard({ projectId }: SyllabusAgentCardProps) {
         triggerNextAgent
     } = useQPilotStore();
 
+    // 🚀 NEW: WebSocket Orchestrator
+    const orchestrator = useWorkflowOrchestrator();
+
     const status = agentStatuses.syllabus;
 
     const [activeTab, setActiveTab] = useState<"pdf" | "text">("pdf");
+    const [uploadedFile, setUploadedFile] = useState<File | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
-    const pollingRef = useRef<NodeJS.Timeout | null>(null);
+
+    // 🚀 NEW: Sync WebSocket progress to local steps
+    useEffect(() => {
+        if (orchestrator.syllabusStatus === "running") {
+            const progress = orchestrator.currentProgress;
+            // Map progress to steps
+            if (progress >= 0 && progress < 25) {
+                updateStep(0, "running");
+            } else if (progress >= 25 && progress < 50) {
+                updateStep(0, "completed");
+                updateStep(1, "running");
+            } else if (progress >= 50 && progress < 75) {
+                updateStep(1, "completed");
+                updateStep(2, "running");
+            } else if (progress >= 75) {
+                updateStep(2, "completed");
+                if (progress === 100) {
+                    updateStep(3, "completed");
+                }
+            }
+        }
+    }, [orchestrator.currentProgress, orchestrator.syllabusStatus, updateStep]);
+
+    // 🚀 NEW: Handle WebSocket logs
+    useEffect(() => {
+        orchestrator.logs.forEach(log => {
+            if (log.level === "info") {
+                emitMessage("Syllabus Agent", "agent", log.message);
+            }
+        });
+    }, [orchestrator.logs, emitMessage]);
 
     const handleStart = useCallback(async () => {
         if (status === "running" || status === "completed") return;
 
-        // Auto-fill a dummy file if we are in auto-mode and nothing is selected
-        let finalFileName = fileName;
-        if (!fileName && !textContent.trim()) {
-            finalFileName = "Engineering_AI_Syllabus.pdf";
-            setFileName(finalFileName);
+        if (activeTab === "pdf" && !fileName) {
+            setError("Please select a PDF file first.");
+            return;
+        }
+        if (activeTab === "text" && !textContent.trim()) {
+            setError("Please paste some syllabus content.");
+            return;
         }
 
         setAgentStatus("syllabus", "running");
@@ -78,57 +116,32 @@ export function SyllabusAgentCard({ projectId }: SyllabusAgentCardProps) {
         setActiveAgentIndex(0);
 
         // Orchestrator Logs
-        emitMessage("Orchestrator", "orchestrator", "Initializing Syllabus Agent pipeline...");
+        emitMessage("Orchestrator", "orchestrator", "Initializing Syllabus Agent with WebSocket...");
         emitMessage("Syllabus Agent", "agent", `Starting extraction from ${activeTab === 'pdf' ? 'PDF' : 'manuscript'}...`);
 
         try {
-            // Trigger API
-            await extractSyllabus({
-                projectId,
-                sourceType: activeTab,
-                content: activeTab === "text" ? textContent : undefined,
+            // 🚀 NEW: Use WebSocket Orchestrator
+            // Queue PYQ agent to auto-trigger after syllabus completes
+            orchestrator.queuePyqsAfterSyllabus();
+
+            await orchestrator.analyzeSyllabus({
+                file: activeTab === "pdf" ? uploadedFile : undefined,
+                text: activeTab === "text" ? textContent : undefined,
             });
 
-            // Start Polling
-            let stepCounter = 0;
-            pollingRef.current = setInterval(async () => {
-                stepCounter++;
-
-                if (stepCounter <= steps.length) {
-                    if (stepCounter > 1) {
-                        updateStep(stepCounter - 2, "completed");
-                    }
-                    if (stepCounter < steps.length + 1) {
-                        updateStep(stepCounter - 1, "running");
-                        emitMessage("Syllabus Agent", "agent", `${steps[stepCounter - 1].label} in progress...`);
-                    }
-                }
-
-                if (stepCounter === steps.length + 1) {
-                    updateStep(steps.length - 1, "completed");
-                    setAgentStatus("syllabus", "completed");
-                    emitMessage("Syllabus Agent", "agent", "Syllabus extraction finalized. Knowledge base updated.");
-                    emitMessage("Orchestrator", "orchestrator", "Syllabus complete. Transitioning to PYQ Agent...");
-                    triggerNextAgent();
-
-                    if (pollingRef.current) clearInterval(pollingRef.current);
-                }
-            }, 2000);
+            // Success handled by WebSocket completion message
+            setAgentStatus("syllabus", "completed");
+            emitMessage("Syllabus Agent", "agent", "✅ Syllabus extraction finalized. Knowledge base updated.");
+            emitMessage("Orchestrator", "orchestrator", "Syllabus complete. Transitioning to PYQ Agent...");
+            triggerNextAgent();
 
         } catch (err) {
             const error = err as { message?: string };
             setError(error?.message || "Extraction failed.");
             setAgentStatus("syllabus", "failed");
-            emitMessage("Syllabus Agent", "agent", "Critical error during extraction. Retrying recommended.");
+            emitMessage("Syllabus Agent", "agent", "❌ Critical error during extraction. Retrying recommended.");
         }
     }, [status, activeTab, fileName, textContent, setAgentStatus, setError, setActiveAgentIndex, emitMessage, projectId, steps, updateStep, triggerNextAgent]);
-
-    // Auto-trigger on mount/active
-    useEffect(() => {
-        if (status === "idle" && activeAgentIndex === 0) {
-            handleStart();
-        }
-    }, [status, activeAgentIndex, handleStart]);
 
     useEffect(() => {
         if (textContent.length > 50 && !fileName) {
@@ -136,7 +149,14 @@ export function SyllabusAgentCard({ projectId }: SyllabusAgentCardProps) {
         }
     }, [textContent, fileName]);
 
-    // Clean up polling on unmount
+    // Auto-trigger when data is available
+    useEffect(() => {
+        const hasData = activeTab === "pdf" ? fileName : textContent.length > 50;
+        if (hasData && status === "idle") {
+            handleStart();
+        }
+    }, [fileName, textContent, activeTab, status, handleStart]);
+
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (file) {
@@ -145,15 +165,10 @@ export function SyllabusAgentCard({ projectId }: SyllabusAgentCardProps) {
                 return;
             }
             setFileName(file.name);
+            setUploadedFile(file);
             setError(null);
         }
     };
-
-    useEffect(() => {
-        return () => {
-            if (pollingRef.current) clearInterval(pollingRef.current);
-        };
-    }, []);
 
     return (
         <Card className="w-full border-border/60 shadow-md">
@@ -164,6 +179,10 @@ export function SyllabusAgentCard({ projectId }: SyllabusAgentCardProps) {
                             <FileText className="h-4 w-4" />
                         </div>
                         Syllabus Fetcher Agent
+                        {/* 🚀 NEW: WebSocket Status */}
+                        {orchestrator.isConnected && (
+                            <Wifi className="h-3 w-3 text-green-500 animate-pulse" />
+                        )}
                     </CardTitle>
                     {status === "completed" && (
                         <Badge className="bg-green-500/10 text-green-600 border-green-200 text-[10px] h-5">
@@ -255,6 +274,22 @@ export function SyllabusAgentCard({ projectId }: SyllabusAgentCardProps) {
                                 );
                             })}
                         </div>
+
+                        {/* 🚀 NEW: Inline WebSocket Logs */}
+                        {orchestrator.logs.length > 0 && status === "running" && (
+                            <div className="mt-3 p-2 bg-muted/30 rounded border border-border/40 space-y-1 max-h-[80px] overflow-y-auto">
+                                {orchestrator.logs.slice(-3).map((log, idx) => (
+                                    <div key={idx} className={cn(
+                                        "text-[9px] font-mono",
+                                        log.level === "info" ? "text-cyan-600" : "",
+                                        log.level === "warning" ? "text-yellow-600" : "",
+                                        log.level === "error" ? "text-red-600" : ""
+                                    )}>
+                                        {log.message}
+                                    </div>
+                                ))}
+                            </div>
+                        )}
                     </div>
                 )}
 

@@ -27,13 +27,14 @@ import {
     CheckCircle2,
     AlertCircle,
     Zap,
-    Info
+    Info,
+    Wifi
 } from "lucide-react";
 import { useGenerationStore } from "@/store/generationStore";
 import { usePatternStore } from "@/store/patternStore";
 import { useBloomStore } from "@/store/bloomStore";
 import { useQPilotStore } from "@/store/qpilotStore";
-import { triggerFinalGeneration } from "@/lib/projectApi";
+import { useWorkflowOrchestrator } from "@/hooks/useWorkflowOrchestrator";
 import { cn } from "@/lib/utils";
 
 interface TeacherInputAgentCardProps {
@@ -60,28 +61,58 @@ export function TeacherInputAgentCard({ projectId }: TeacherInputAgentCardProps)
         updateAgent
     } = useQPilotStore();
 
+    // 🚀 NEW: WebSocket Orchestrator
+    const orchestrator = useWorkflowOrchestrator();
+
     const status = agentStatuses.generation;
 
-    const { getTotalAllocated, totalMarks: targetMarks } = usePatternStore();
+    const { getTotalAllocated, getTotalQuestions, totalMarks: targetMarks, sections } = usePatternStore();
+    const { bloomLevels } = useBloomStore();
     const { getTotalAssigned } = useBloomStore();
 
-    const pollingRef = useRef<NodeJS.Timeout | null>(null);
-
     const totalAllocatedMarks = getTotalAllocated();
+    const totalQuestions = getTotalQuestions(); // 📌 FIX: Get actual question count from sections
     const totalBloomQuestions = getTotalAssigned();
 
     // Validations
     const isPatternValid = totalAllocatedMarks === targetMarks;
     const isBloomValid = totalBloomQuestions > 0;
 
+    // 🚀 NEW: Sync WebSocket progress to local steps
     useEffect(() => {
-        return () => {
-            if (pollingRef.current) clearInterval(pollingRef.current);
-        };
-    }, []);
+        if (orchestrator.paperStatus === "running") {
+            const progress = orchestrator.currentProgress;
+            if (progress >= 0 && progress < 33) {
+                updateStep(0, "running");
+            } else if (progress >= 33 && progress < 66) {
+                updateStep(0, "completed");
+                updateStep(1, "running");
+            } else if (progress >= 66) {
+                updateStep(1, "completed");
+                updateStep(2, "running");
+                if (progress === 100) {
+                    updateStep(2, "completed");
+                }
+            }
+        }
+    }, [orchestrator.currentProgress, orchestrator.paperStatus, updateStep]);
+
+    // 🚀 NEW: Handle WebSocket logs
+    useEffect(() => {
+        orchestrator.logs.slice(-3).forEach(log => {
+            if (log.level === "info") {
+                emitMessage("Generation Agent", "agent", log.message);
+            }
+        });
+    }, [orchestrator.logs, emitMessage]);
 
     const handleGenerate = async () => {
         if (status === "running" || status === "completed") return;
+
+        if (!orchestrator.syllabusSessionId || !orchestrator.pyqsSessionId) {
+            setError("Please complete Syllabus and PYQ analysis first.");
+            return;
+        }
 
         if (!isPatternValid || !isBloomValid) {
             setError("Please complete all required agent steps first.");
@@ -114,7 +145,6 @@ export function TeacherInputAgentCard({ projectId }: TeacherInputAgentCardProps)
                 if (stepIdx === steps.length + 1) {
                     updateStep(steps.length - 1, "completed");
                     setAgentStatus("generation", "completed");
-                    setStatus("completed"); // Master status for redirect
 
                     emitMessage("Generation Agent", "agent", "Generating question paper...");
 
@@ -126,7 +156,7 @@ export function TeacherInputAgentCard({ projectId }: TeacherInputAgentCardProps)
             const error = err as { message?: string };
             setError(error?.message || "Generation trigger failed.");
             setAgentStatus("generation", "failed");
-            emitMessage("Teacher Input Agent", "agent", "Pipeline synthesis failed. System state preserved.");
+            emitMessage("Teacher Input Agent", "agent", "❌ Pipeline synthesis failed. System state preserved.");
         }
     };
 
@@ -140,6 +170,10 @@ export function TeacherInputAgentCard({ projectId }: TeacherInputAgentCardProps)
                                 <MessageSquareQuote className="h-4 w-4" />
                             </div>
                             Teacher Input Agent
+                            {/* 🚀 NEW: WebSocket Status */}
+                            {orchestrator.isConnected && (
+                                <Wifi className="h-3 w-3 text-green-500 animate-pulse" />
+                            )}
                         </CardTitle>
                         <CardDescription className="text-[10px] uppercase font-bold tracking-tight text-muted-foreground/60">
                             Custom Instructions & Requirements
@@ -176,6 +210,50 @@ export function TeacherInputAgentCard({ projectId }: TeacherInputAgentCardProps)
                         <div className="p-2.5 bg-destructive/5 rounded-lg border border-destructive/20 flex items-start gap-2 animate-in shake-in">
                             <AlertCircle className="h-4 w-4 text-destructive shrink-0 mt-0.5" />
                             <p className="text-[10px] font-bold text-destructive leading-tight">{error}</p>
+                        </div>
+                    )}
+
+                    {/* 🚀 NEW: Running Steps Visualization */}
+                    {status === "running" && (
+                        <div className="space-y-2.5 p-3 bg-muted/20 rounded-lg border border-border/40 animate-in fade-in">
+                            {steps.map((step, idx) => {
+                                const isActive = step.status === "running";
+                                const isDone = step.status === "completed";
+
+                                return (
+                                    <div key={idx} className="flex items-center gap-3 px-1">
+                                        <div className={cn(
+                                            "h-1.5 w-1.5 rounded-full transition-all duration-300",
+                                            isActive ? "bg-blue-500 animate-pulse ring-4 ring-blue-500/20" : "bg-muted-foreground/30",
+                                            isDone ? "bg-green-500" : ""
+                                        )} />
+                                        <span className={cn(
+                                            "text-[10px] font-bold uppercase tracking-widest transition-colors",
+                                            isActive ? "text-blue-600" : "text-muted-foreground/60",
+                                            isDone ? "text-green-600/70" : ""
+                                        )}>
+                                            {step.label}
+                                        </span>
+                                        {isActive && <Loader2 className="h-3 w-3 animate-spin text-blue-500 ml-auto" />}
+                                    </div>
+                                );
+                            })}
+
+                            {/* 🚀 NEW: Inline WebSocket Logs */}
+                            {orchestrator.logs.length > 0 && (
+                                <div className="mt-3 p-2 bg-muted/30 rounded border border-border/40 space-y-1 max-h-[80px] overflow-y-auto">
+                                    {orchestrator.logs.slice(-3).map((log, idx) => (
+                                        <div key={idx} className={cn(
+                                            "text-[9px] font-mono",
+                                            log.level === "info" ? "text-cyan-600" : "",
+                                            log.level === "warning" ? "text-yellow-600" : "",
+                                            log.level === "error" ? "text-red-600" : ""
+                                        )}>
+                                            {log.message}
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
                         </div>
                     )}
 

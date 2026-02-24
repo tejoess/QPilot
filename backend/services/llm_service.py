@@ -18,7 +18,7 @@ openrouter_llm = ChatOpenAI(
     openai_api_key=OPENROUTER_API_KEY,
     openai_api_base="https://openrouter.ai/api/v1",
     temperature=0.1,
-    max_tokens=4096,
+    max_tokens=2048,  # Reduced from 4096 for faster responses
 )
 
 
@@ -27,14 +27,14 @@ openai_llm = ChatOpenAI(
     model="gpt-4o-mini",
     openai_api_key=OPENAI_API_KEY,
     temperature=0.1,
-    max_tokens=4096,
+    max_tokens=2048,  # Reduced from 4096 for faster responses
 )
 
 
 # --- Gemini LLM ---
 gemini_llm = ChatGoogleGenerativeAI(
-    model="gemini-2.5-flash",
+    model="gemini-2.0-flash-exp",  # Faster experimental model
     google_api_key=GEMINI_API_KEY,
     temperature=0.1,
-    max_output_tokens=16384,
+    max_output_tokens=8192,  # Reduced from 16384
 )

@@ -33,11 +33,12 @@ import {
     Play,
     Loader2,
     CheckCircle2,
-    AlertCircle
+    AlertCircle,
+    Wifi
 } from "lucide-react";
 import { usePyqStore } from "@/store/pyqStore";
 import { useQPilotStore } from "@/store/qpilotStore";
-import { processPyqs } from "@/lib/projectApi";
+import { useWorkflowOrchestrator } from "@/hooks/useWorkflowOrchestrator";
 import { cn } from "@/lib/utils";
 
 interface PyqAgentCardProps {
@@ -71,11 +72,46 @@ export function PyqAgentCard({ projectId }: PyqAgentCardProps) {
         triggerNextAgent
     } = useQPilotStore();
 
+    // 🚀 NEW: WebSocket Orchestrator
+    const orchestrator = useWorkflowOrchestrator();
+
     const status = agentStatuses.pyq;
 
     const [activeTab, setActiveTab] = useState<"pdf" | "text">("pdf");
+    const [uploadedFile, setUploadedFile] = useState<File | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
-    const pollingRef = useRef<NodeJS.Timeout | null>(null);
+
+    // 🚀 NEW: Sync WebSocket progress to local steps
+    useEffect(() => {
+        if (orchestrator.pyqsStatus === "running") {
+            const progress = orchestrator.currentProgress;
+            // Map progress to steps (4 steps for PYQ)
+            if (progress >= 0 && progress < 25) {
+                updateStep(0, "running");
+            } else if (progress >= 25 && progress < 50) {
+                updateStep(0, "completed");
+                updateStep(1, "running");
+            } else if (progress >= 50 && progress < 75) {
+                updateStep(1, "completed");
+                updateStep(2, "running");
+            } else if (progress >= 75) {
+                updateStep(2, "completed");
+                updateStep(3, "running");
+                if (progress === 100) {
+                    updateStep(3, "completed");
+                }
+            }
+        }
+    }, [orchestrator.currentProgress, orchestrator.pyqsStatus, updateStep]);
+
+    // 🚀 NEW: Handle WebSocket logs
+    useEffect(() => {
+        orchestrator.logs.slice(-3).forEach(log => {
+            if (log.level === "info" && log.message.toLowerCase().includes("pyq")) {
+                emitMessage("PYQ Agent", "agent", log.message);
+            }
+        });
+    }, [orchestrator.logs, emitMessage]);
 
     useEffect(() => {
         if (textContent.length > 50 && !fileName) {
@@ -86,82 +122,65 @@ export function PyqAgentCard({ projectId }: PyqAgentCardProps) {
     const handleStart = useCallback(async () => {
         if (status === "running" || status === "completed") return;
 
-        // Auto-fill dummy if empty
-        if (!fileName && !textContent.trim()) {
-            setFileName("Past_Year_AI_Papers_2024.pdf");
-        }
-
         setAgentStatus("pyq", "running");
         setError(null);
         setActiveAgentIndex(1); // PYQ Agent is index 1
 
-        emitMessage("Orchestrator", "orchestrator", "Initializing PYQ retrieval sequence...");
+        emitMessage("Orchestrator", "orchestrator", "Initializing PYQ retrieval with WebSocket...");
         emitMessage("PYQ Agent", "agent", `Processing historical data from ${year} (${board})...`);
 
         try {
-            await processPyqs({
-                projectId,
-                sourceType: activeTab,
-                content: activeTab === "text" ? textContent : undefined,
-                year,
-                board
+            // 🚀 NEW: Use WebSocket Orchestrator
+            await orchestrator.analyzePyqs({
+                file: activeTab === "pdf" ? uploadedFile : undefined,
+                text: activeTab === "text" ? textContent : undefined,
+                syllabusSessionId: orchestrator.syllabusSessionId || "", // Use syllabus session
             });
 
-            let stepIdx = 0;
-            pollingRef.current = setInterval(() => {
-                stepIdx++;
-
-                if (stepIdx <= steps.length) {
-                    if (stepIdx > 1) updateStep(stepIdx - 2, "completed");
-                    updateStep(stepIdx - 1, "running");
-                    emitMessage("PYQ Agent", "agent", `${steps[stepIdx - 1].label} in progress...`);
-                }
-
-                if (stepIdx === steps.length + 1) {
-                    updateStep(steps.length - 1, "completed");
-                    setAgentStatus("pyq", "completed");
-                    emitMessage("PYQ Agent", "agent", "Historical analysis complete. Patterns identified.");
-                    emitMessage("Orchestrator", "orchestrator", "PYQ processing complete. Calling Blooxanomy Agent...");
-                    triggerNextAgent();
-
-                    if (pollingRef.current) clearInterval(pollingRef.current);
-                }
-            }, 2000);
+            // Success handled by WebSocket completion message
+            setAgentStatus("pyq", "completed");
+            emitMessage("PYQ Agent", "agent", "✅ Historical analysis complete. Patterns identified.");
+            emitMessage("Orchestrator", "orchestrator", "PYQs complete. Calling Blooxanomy Agent...");
+            triggerNextAgent();
 
         } catch (err) {
             const error = err as { message?: string };
             setError(error?.message || "PYQ processing failed.");
             setAgentStatus("pyq", "failed");
-            emitMessage("PYQ Agent", "agent", "Encountered a hurdle during data processing. Awaiting recovery.");
+            emitMessage("PYQ Agent", "agent", "❌ Encountered error during processing.");
         }
     }, [
         status,
+        activeTab,
+        uploadedFile,
+        textContent,
+        year,
+        board,
         setAgentStatus,
         setError,
         setActiveAgentIndex,
         emitMessage,
-        year,
-        board,
-        projectId,
-        activeTab,
-        textContent,
-        steps,
-        updateStep,
+        orchestrator,
         triggerNextAgent
     ]);
 
     // Auto-trigger when active
     useEffect(() => {
-        if (status === "idle" && activeAgentIndex === 1) {
+        const hasData = activeTab === "pdf" ? fileName : textContent.length > 50;
+        if (hasData && status === "idle" && activeAgentIndex === 1) {
             handleStart();
         }
-    }, [status, activeAgentIndex, handleStart]);
+    }, [fileName, textContent, activeTab, status, activeAgentIndex, handleStart]);
 
+    // 🚀 NEW: Auto-trigger when orchestrator queues PYQs
     useEffect(() => {
-        return () => {
-            if (pollingRef.current) clearInterval(pollingRef.current);
-        };
-    }, []);
+        const hasData = activeTab === "pdf" ? uploadedFile : textContent.length > 50;
+        // When orchestrator sets PYQs to "running" (via queue), trigger the actual API call
+        if (orchestrator.pyqsStatus === "running" && status === "idle" && hasData) {
+            console.log("🎯 Orchestrator triggered PYQs - starting API call");
+            handleStart();
+        }
+    }, [orchestrator.pyqsStatus, status, activeTab, uploadedFile, textContent, handleStart]);
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -171,6 +190,7 @@ export function PyqAgentCard({ projectId }: PyqAgentCardProps) {
                 return;
             }
             setFileName(file.name);
+            setUploadedFile(file);
             setError(null);
         }
     };
@@ -184,6 +204,10 @@ export function PyqAgentCard({ projectId }: PyqAgentCardProps) {
                             <History className="h-4 w-4" />
                         </div>
                         Previous Year Questions Agent
+                        {/* 🚀 NEW: WebSocket Status */}
+                        {orchestrator.isConnected && (
+                            <Wifi className="h-3 w-3 text-green-500 animate-pulse" />
+                        )}
                     </CardTitle>
                     {status === "completed" && (
                         <Badge className="bg-green-500/10 text-green-600 border-green-200 text-[10px] h-5">
@@ -293,6 +317,22 @@ export function PyqAgentCard({ projectId }: PyqAgentCardProps) {
                                 );
                             })}
                         </div>
+
+                        {/* 🚀 NEW: Inline WebSocket Logs */}
+                        {orchestrator.logs.length > 0 && status === "running" && (
+                            <div className="mt-3 p-2 bg-muted/30 rounded border border-border/40 space-y-1 max-h-[80px] overflow-y-auto">
+                                {orchestrator.logs.slice(-3).map((log, idx) => (
+                                    <div key={idx} className={cn(
+                                        "text-[9px] font-mono",
+                                        log.level === "info" ? "text-cyan-600" : "",
+                                        log.level === "warning" ? "text-yellow-600" : "",
+                                        log.level === "error" ? "text-red-600" : ""
+                                    )}>
+                                        {log.message}
+                                    </div>
+                                ))}
+                            </div>
+                        )}
                     </div>
                 )}
 

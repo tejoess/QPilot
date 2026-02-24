@@ -362,3 +362,236 @@ export async function triggerFinalGeneration(data: FinalGenerationRequest): Prom
     await delay(1000);
     return { status: "success", file_path: "/path/to/generated/paper.pdf" };
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ✨ NEW: Backend Integration APIs (Real Implementation)
+// ─────────────────────────────────────────────────────────────────────────────
+
+const BACKEND_URL = "http://127.0.0.1:8000";
+
+/**
+ * API 1: Analyze Syllabus
+ * Accepts file OR text, returns session_id and parsed syllabus
+ */
+export interface AnalyzeSyllabusRequest {
+    file?: File;
+    text?: string;
+    sessionId?: string; // Optional: for WebSocket tracking
+}
+
+export interface AnalyzeSyllabusResponse {
+    status: "success" | "error";
+    session_id: string;
+    syllabus: {
+        course_code: string;
+        course_name: string;
+        modules: Array<{
+            module_number: string;
+            module_name: string;
+            weightage: number;
+            topics: string[];
+        }>;
+    };
+    message: string;
+}
+
+export async function analyzeSyllabus(request: AnalyzeSyllabusRequest): Promise<AnalyzeSyllabusResponse> {
+    const formData = new FormData();
+    
+    if (request.file) {
+        formData.append("file", request.file);
+    }
+    if (request.text) {
+        formData.append("text", request.text);
+    }
+    if (request.sessionId) {
+        formData.append("session_id", request.sessionId);
+    }
+
+    const response = await fetch(`${BACKEND_URL}/analyze-syllabus`, {
+        method: "POST",
+        body: formData,
+    });
+
+    if (!response.ok) {
+        const error = await response.json().catch(() => ({ detail: "Unknown error" }));
+        throw new Error(error.detail || `HTTP ${response.status}`);
+    }
+
+    return response.json();
+}
+
+/**
+ * API 2: Analyze PYQs (Previous Year Questions)
+ * Requires syllabus_session_id from step 1
+ */
+export interface AnalyzePyqsRequest {
+    syllabusSessionId: string;
+    file?: File;
+    text?: string;
+    sessionId?: string; // Optional: for WebSocket tracking
+}
+
+export interface AnalyzePyqsResponse {
+    status: "success" | "error";
+    session_id: string;
+    pyqs: {
+        questions: Array<{
+            question_id: string;
+            question_text: string;
+            marks: number;
+            difficulty: string;
+            bloom_level: string;
+            topic: string;
+        }>;
+    };
+    total_questions: number;
+    message: string;
+}
+
+export async function analyzePyqs(request: AnalyzePyqsRequest): Promise<AnalyzePyqsResponse> {
+    const formData = new FormData();
+    
+    formData.append("syllabus_session_id", request.syllabusSessionId);
+    
+    if (request.file) {
+        formData.append("file", request.file);
+    }
+    if (request.text) {
+        formData.append("text", request.text);
+    }
+    if (request.sessionId) {
+        formData.append("session_id", request.sessionId);
+    }
+
+    const response = await fetch(`${BACKEND_URL}/analyze-pyqs`, {
+        method: "POST",
+        body: formData,
+    });
+
+    if (!response.ok) {
+        const error = await response.json().catch(() => ({ detail: "Unknown error" }));
+        throw new Error(error.detail || `HTTP ${response.status}`);
+    }
+
+    return response.json();
+}
+
+/**
+ * API 3: Generate Question Paper
+ * Requires both syllabus_session_id and pyqs_session_id
+ */
+export interface GenerateQuestionPaperRequest {
+    syllabusSessionId: string;
+    pyqsSessionId: string;
+    totalMarks?: number;
+    totalQuestions?: number;
+    // Bloom Taxonomy (percentages, must sum to 100)
+    bloomLevels?: {
+        remember?: number;
+        understand?: number;
+        apply?: number;
+        analyze?: number;
+        evaluate?: number;
+        create?: number;
+    };
+    // Paper pattern (JSON structure)
+    paperPattern?: {
+        sections: Array<{
+            name: string;
+            type: string;
+            numQuestions: number;
+            marksPerQuestion: number;
+        }>;
+    };
+    // Teacher input
+    teacherInput?: string;
+    // WebSocket tracking
+    sessionId?: string;
+}
+
+export interface GenerateQuestionPaperResponse {
+    status: "success" | "error";
+    session_id: string;
+    paper: {
+        sections: Array<{
+            section_name: string;
+            questions: Array<{
+                question_no: string;
+                question_text: string;
+                marks: number;
+                difficulty: string;
+                bloom_level: string;
+            }>;
+        }>;
+    };
+    verification: {
+        verdict: string;
+        rating: number;
+    };
+    pdf_path: string;
+    message: string;
+}
+
+export async function generateQuestionPaper(
+    request: GenerateQuestionPaperRequest
+): Promise<GenerateQuestionPaperResponse> {
+    const formData = new FormData();
+    
+    formData.append("syllabus_session_id", request.syllabusSessionId);
+    formData.append("pyqs_session_id", request.pyqsSessionId);
+    
+    if (request.totalMarks !== undefined) {
+        formData.append("total_marks", request.totalMarks.toString());
+    }
+    if (request.totalQuestions !== undefined) {
+        formData.append("total_questions", request.totalQuestions.toString());
+    }
+
+    // Bloom taxonomy levels
+    if (request.bloomLevels) {
+        const { remember, understand, apply, analyze, evaluate, create } = request.bloomLevels;
+        if (remember !== undefined) formData.append("bloom_remember", remember.toString());
+        if (understand !== undefined) formData.append("bloom_understand", understand.toString());
+        if (apply !== undefined) formData.append("bloom_apply", apply.toString());
+        if (analyze !== undefined) formData.append("bloom_analyze", analyze.toString());
+        if (evaluate !== undefined) formData.append("bloom_evaluate", evaluate.toString());
+        if (create !== undefined) formData.append("bloom_create", create.toString());
+    }
+
+    // Paper pattern (transform keys to match backend expectations)
+    if (request.paperPattern) {
+        const transformedPattern = {
+            sections: request.paperPattern.sections.map(section => ({
+                section_name: section.name,
+                section_description: section.type,
+                question_count: section.numQuestions,
+                marks_per_question: section.marksPerQuestion
+            }))
+        };
+        console.log("📐 Transformed paper pattern:", transformedPattern);
+        formData.append("paper_pattern", JSON.stringify(transformedPattern));
+    }
+
+    // Teacher input
+    if (request.teacherInput) {
+        formData.append("teacher_input", request.teacherInput);
+    }
+
+    // Session ID for WebSocket tracking
+    if (request.sessionId) {
+        formData.append("session_id", request.sessionId);
+    }
+
+    const response = await fetch(`${BACKEND_URL}/generate-paper`, {
+        method: "POST",
+        body: formData,
+    });
+
+    if (!response.ok) {
+        const error = await response.json().catch(() => ({ detail: "Unknown error" }));
+        throw new Error(error.detail || `HTTP ${response.status}`);
+    }
+
+    return response.json();
+}
