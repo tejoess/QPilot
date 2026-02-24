@@ -227,8 +227,10 @@ async def blueprint_build_node(state: PipelineState):
     bloom_levels = state.get("bloom_taxanomy_levels", {"remember": 20, "understand": 30, "apply": 30, "analyze": 20})
     qp_pattern = state.get("qp_pattern", {"total_marks": 80, "sections": []})
     
-    await manager.send_progress(session_id, "blueprint_build", "running", 40, "Generating blueprint with LLM")
+    await manager.send_progress(session_id, "blueprint_build", "running", 40, "Generating blueprint with AI...")
+    await manager.send_log(session_id, "info", "🤖 AI is analyzing syllabus and generating blueprint structure")
     blueprint = generate_blueprint(syllabus, pyqs, bloom_levels, teacher_inputs, qp_pattern)
+    await manager.send_log(session_id, "info", "✅ Blueprint generation complete")
     
     # Ensure it's a dict
     if not isinstance(blueprint, dict):
@@ -261,8 +263,10 @@ async def blueprint_verify_node(state: PipelineState):
     teacher_inputs = state.get("teacher_inputs", {})
     qp_pattern = state.get("qp_pattern", {})
     
-    await manager.send_progress(session_id, "blueprint_verify", "running", 60, "Running LLM critique")
+    await manager.send_progress(session_id, "blueprint_verify", "running", 60, "AI is critiquing blueprint...")
+    await manager.send_log(session_id, "info", "🔍 AI analyzing blueprint quality and requirements match")
     blueprint_verdict = critique_blueprint(blueprint, syllabus, pyqs_analysis, bloom_levels, teacher_inputs, qp_pattern)
+    await manager.send_log(session_id, "info", "✅ Blueprint critique complete")
     
     # Ensure it's a dict
     if not isinstance(blueprint_verdict, dict):
@@ -296,9 +300,10 @@ async def question_select_node(state: PipelineState):
     pyq_list = pyqs.get("questions", []) if isinstance(pyqs, dict) else []
     
     await manager.send_log(session_id, "info", f"Available PYQ pool: {len(pyq_list)} questions")
-    await manager.send_progress(session_id, "question_select", "running", 40, "Matching questions to blueprint")
-    
+    await manager.send_progress(session_id, "question_select", "running", 40, "AI matching questions to blueprint...")
+    await manager.send_log(session_id, "info", "🎯 AI selecting best-fit questions from PYQ pool")
     draft_paper = select_questions(blueprint, pyq_list)
+    await manager.send_log(session_id, "info", "✅ Question selection complete")
     
     # Ensure it's a dict
     if not isinstance(draft_paper, dict):
@@ -332,8 +337,10 @@ async def paper_verify_node(state: PipelineState):
     qp_pattern = state.get("qp_pattern", {})
     teacher_inputs = state.get("teacher_inputs", {})
     
-    await manager.send_progress(session_id, "paper_verify", "running", 50, "Running comprehensive LLM verification")
+    await manager.send_progress(session_id, "paper_verify", "running", 50, "AI running comprehensive verification...")
+    await manager.send_log(session_id, "info", "📋 AI verifying paper quality, marks, and requirements")
     paper_verdict = verify_question_paper(draft_paper, syllabus, pyqs_analysis, blueprint, bloom_levels, qp_pattern, teacher_inputs)
+    await manager.send_log(session_id, "info", "✅ Paper verification complete")
     
     # Ensure it's a dict
     if not isinstance(paper_verdict, dict):

@@ -2,6 +2,7 @@
 import uuid
 import os
 from fastapi import FastAPI, WebSocket, File, UploadFile, Form, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from typing import Optional
 from backend.websocket.manager import manager
@@ -13,6 +14,15 @@ from backend.services.pipeline import (
 
 
 backend = FastAPI()
+
+# ✅ Enable CORS for frontend access
+backend.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 @backend.websocket("/ws/{session_id}")
@@ -28,12 +38,14 @@ async def websocket_logs(websocket: WebSocket, session_id: str):
 @backend.post("/analyze-syllabus")
 async def analyze_syllabus(
     file: Optional[UploadFile] = File(None),
-    text: Optional[str] = Form(None)
+    text: Optional[str] = Form(None),
+    session_id: Optional[str] = Form(None)
 ):
     """
     Accepts either:
     - file: PDF upload (multipart/form-data)
     - text: Plain text syllabus content
+    - session_id: (Optional) Custom session ID for WebSocket tracking
     
     Returns: session_id and parsed syllabus data
     """
@@ -45,7 +57,13 @@ async def analyze_syllabus(
     if not file and not text_content:
         raise HTTPException(status_code=400, detail="Either 'file' or 'text' must be provided")
     
-    session_id = str(uuid.uuid4())
+    # Use provided session_id or generate new one
+    if not session_id or not session_id.strip():
+        session_id = str(uuid.uuid4())
+    else:
+        session_id = session_id.strip()
+    
+    print(f"📝 Using session_id: {session_id}")
     
     try:
         # If file uploaded, save it temporarily
@@ -92,13 +110,15 @@ async def analyze_syllabus(
 async def analyze_pyqs(
     syllabus_session_id: str = Form(...),
     file: Optional[UploadFile] = File(None),
-    text: Optional[str] = Form(None)
+    text: Optional[str] = Form(None),
+    session_id: Optional[str] = Form(None)
 ):
     """
     Accepts:
     - syllabus_session_id: Session ID from analyze-syllabus API
     - file: PDF upload (multipart/form-data) OR
     - text: Plain text PYQ content
+    - session_id: (Optional) Custom session ID for WebSocket tracking
     
     Returns: session_id and parsed PYQs data
     """
@@ -115,7 +135,13 @@ async def analyze_pyqs(
     if not os.path.exists(syllabus_folder):
         raise HTTPException(status_code=404, detail=f"Syllabus session {syllabus_session_id} not found")
     
-    pyqs_session_id = str(uuid.uuid4())
+    # Use provided session_id or generate new one
+    if not session_id or not session_id.strip():
+        pyqs_session_id = str(uuid.uuid4())
+    else:
+        pyqs_session_id = session_id.strip()
+    
+    print(f"📝 Using PYQs session_id: {pyqs_session_id}")
     
     try:
         # If file uploaded, save it temporarily
@@ -168,7 +194,9 @@ async def generate_paper(
     # Paper Pattern (JSON string of sections)
     paper_pattern: Optional[str] = Form(None),
     # Teacher Input (custom instructions/focus areas)
-    teacher_input: Optional[str] = Form(None)
+    teacher_input: Optional[str] = Form(None),
+    # WebSocket tracking
+    session_id: Optional[str] = Form(None)
 ):
     """
     Accepts:
@@ -179,6 +207,7 @@ async def generate_paper(
     - bloom_*: Bloom's Taxonomy level percentages (optional, must sum to 100)
     - paper_pattern: JSON string defining sections (optional)
     - teacher_input: Custom instructions from teacher (optional)
+    - session_id: (Optional) Custom session ID for WebSocket tracking
     
     Returns: Generated question paper
     """
@@ -225,6 +254,7 @@ async def generate_paper(
         try:
             pattern_data = json_lib.loads(paper_pattern)
             sections = pattern_data.get("sections", [])
+            print(f"📐 Received sections: {json_lib.dumps(sections, indent=2)}")
         except json_lib.JSONDecodeError:
             raise HTTPException(status_code=400, detail="Invalid JSON format for paper_pattern")
     
@@ -234,7 +264,13 @@ async def generate_paper(
         "preferences": teacher_input or "Standard difficulty"
     }
     
-    paper_session_id = str(uuid.uuid4())
+    # Use provided session_id or generate new one
+    if not session_id or not session_id.strip():
+        paper_session_id = str(uuid.uuid4())
+    else:
+        paper_session_id = session_id.strip()
+    
+    print(f"📄 Using paper generation session_id: {paper_session_id}")
     
     try:
         # Run paper generation workflow
@@ -249,14 +285,22 @@ async def generate_paper(
             teacher_inputs=teacher_instructions
         )
         
+        # Extract paper from result (use draft_paper, not final_paper)
+        paper_data = result.get("draft_paper", {})
+        verification_data = result.get("paper_verdict", {})
+        pdf_path = result.get("final_path", "")
+        
         return JSONResponse(content={
             "status": "success",
             "session_id": paper_session_id,
-            "paper": result["final_paper"],
-            "verification": result["paper_verdict"],
-            "pdf_path": result["final_path"],
+            "paper": paper_data,
+            "verification": verification_data,
+            "pdf_path": pdf_path,
             "message": "Question paper generated successfully"
         })
         
     except Exception as e:
+        import traceback
+        print(f"❌ Error in paper generation: {str(e)}")
+        print(traceback.format_exc())
         raise HTTPException(status_code=500, detail=f"Paper generation failed: {str(e)}")

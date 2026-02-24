@@ -44,6 +44,7 @@ interface PatternState {
     reset: () => void;
     startPatternProcess: () => void;
     getTotalAllocated: () => number;
+    getTotalQuestions: () => number;
 }
 
 const INITIAL_STEPS: SubprocessStep[] = [
@@ -103,6 +104,10 @@ export const usePatternStore = create<PatternState>((set, get) => ({
 
     getTotalAllocated: () => {
         return get().sections.reduce((acc, s) => acc + s.totalMarks, 0);
+    },
+
+    getTotalQuestions: () => {
+        return get().sections.reduce((acc, s) => acc + s.numQuestions, 0);
     },
 
     reset: () => set({
