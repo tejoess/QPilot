@@ -4,8 +4,8 @@
 import os
 import json
 import re
-from app.services.prompts import format_syllabus as SYLLABUS_PROMPT
-from app.services.llm_service import gemini_llm as llm
+from backend.services.prompts import format_syllabus as SYLLABUS_PROMPT
+from backend.services.llm_service import gemini_llm as llm
 from langchain_core.messages import HumanMessage
 
 

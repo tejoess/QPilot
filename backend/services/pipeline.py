@@ -3,7 +3,7 @@ import asyncio
 from backend.websocket.manager import manager
 from backend.services.prompts import format_syllabus as SYLLABUS_PROMPT
 from backend.services.input_analysis.syllabus_service import get_syllabus_json, format_syllabus
-from backend.services.input_analysis.pyq_service import get_pyqs, format_pyqs
+from backend.services.input_analysis.pyq_service import format_pyqs
 from backend.services.blueprint.blueprint_service import build_blueprint, verify_blueprint
 from backend.services.question_selection.question_service import (
     select_questions,
@@ -25,9 +25,6 @@ def run_question_paper_pipeline(session_id: str = "default"):
         await send("Step 2: syllabus format")
         get_syllabus_json(SYLLABUS_PROMPT, dummy_syllabus)
         
-        await send("Step 3: pyqs fetch")
-        get_pyqs()
-
         await send("Step 4: pyqs format")
         format_pyqs()
 

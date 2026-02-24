@@ -38,3 +38,7 @@ gemini_llm = ChatGoogleGenerativeAI(
     temperature=0.1,
     max_output_tokens=16384,
 )
+
+def generate_response(prompt: str) -> str:
+    response = gemini_llm.invoke(prompt)
+    return response.content
