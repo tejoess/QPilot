@@ -7,19 +7,9 @@ from langgraph.graph import StateGraph, END
 
 from backend.websocket.manager import manager
 from backend.services.prompts import format_syllabus as SYLLABUS_PROMPT
-from backend.services.input_analysis.syllabus_service import (
-    get_syllabus_json,
-)
-from backend.services.input_analysis.pyq_service import (
-    
-    format_pyqs,
-)
-from backend.services.blueprint.blueprint_service import (
-    generate_blueprint,
-)
-from backend.services.blueprint.blueprint_verify import (
- critique_blueprint
-)
+from backend.services.input_analysis.syllabus_service import get_syllabus_json, format_syllabus
+from backend.services.input_analysis.pyq_service import format_pyqs
+from backend.services.blueprint.blueprint_service import build_blueprint, verify_blueprint
 from backend.services.question_selection.question_service import (
     select_questions,
 )
@@ -648,6 +638,7 @@ async def generate_paper_workflow(
         section_a_marks = 6
         section_b_marks = (total_marks - (section_a_count * section_a_marks)) // section_b_count
         
+<<<<<<< HEAD
         sections = [
             {
                 "section_name": "Section A",
@@ -708,3 +699,29 @@ async def generate_paper_workflow(
     
     result = await app.ainvoke(initial_state)
     return result
+=======
+        await send("Step 2: syllabus format")
+        get_syllabus_json(SYLLABUS_PROMPT, dummy_syllabus)
+        
+        await send("Step 4: pyqs format")
+        format_pyqs()
+
+        await send("Step 5: blueprint build")
+        build_blueprint()
+
+        await send("Step 6: blueprint verify")
+        verify_blueprint()
+
+        await send("Step 7: select questions")
+        select_questions()
+
+        await send("Step 8: verify paper")
+        verify_question_paper()
+
+        await send("Step 9: generate final")
+        generate_final_paper()
+
+    asyncio.run(run())
+
+    return "generated/final_question_paper.pdf"
+>>>>>>> graph_generator

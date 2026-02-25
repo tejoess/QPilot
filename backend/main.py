@@ -1,10 +1,8 @@
 # backend/main.py
-import uuid
-import os
-from fastapi import FastAPI, WebSocket, File, UploadFile, Form, HTTPException
+from fastapi import FastAPI , WebSocket
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
-from typing import Optional
+from backend.schemas.request import PaperGenerationRequest
+from backend.schemas.response import PaperGenerationResponse
 from backend.websocket.manager import manager
 from backend.services.pipeline import (
     analyze_syllabus_workflow,
@@ -12,18 +10,26 @@ from backend.services.pipeline import (
     generate_paper_workflow
 )
 
-
 backend = FastAPI()
 
+<<<<<<< HEAD
 # ✅ Enable CORS for frontend access
 backend.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+=======
+backend.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Allow any origin (for file:// local testing)
+>>>>>>> graph_generator
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+<<<<<<< HEAD
 
+=======
+>>>>>>> graph_generator
 
 @backend.websocket("/ws/{session_id}")
 async def websocket_logs(websocket: WebSocket, session_id: str):
@@ -31,6 +37,7 @@ async def websocket_logs(websocket: WebSocket, session_id: str):
     while True:
         await websocket.receive_text()
 
+<<<<<<< HEAD
 
 # ==========================================
 # API 1: Analyze Syllabus
@@ -304,3 +311,44 @@ async def generate_paper(
         print(f"❌ Error in paper generation: {str(e)}")
         print(traceback.format_exc())
         raise HTTPException(status_code=500, detail=f"Paper generation failed: {str(e)}")
+=======
+@backend.post("/generate-paper", response_model=PaperGenerationResponse)
+def generate_question_paper(payload: PaperGenerationRequest):
+    from backend.services.pipeline import run_question_paper_pipeline
+    session_id = "session_1"
+    file_path = run_question_paper_pipeline(session_id)
+
+    return PaperGenerationResponse(
+        status="success",
+        file_path=file_path
+    )
+
+from fastapi import UploadFile, File, HTTPException
+import json
+from backend.QP_Verifier.question_paper_verifier import evaluate_question_paper
+
+@backend.post("/verify-paper")
+async def verify_paper(
+    question_paper: UploadFile = File(...),
+    syllabus: UploadFile = File(...),
+    teacher_instructions: UploadFile = File(...),
+    bloom_level: UploadFile = File(...)
+):
+    try:
+        qp_data = json.loads(await question_paper.read())
+        syllabus_data = json.loads(await syllabus.read())
+        teacher_data = json.loads(await teacher_instructions.read())
+        bloom_data = json.loads(await bloom_level.read())
+        
+        input_json = {
+            "syllabus": syllabus_data,
+            "teacher_input": teacher_data,
+            "blooms_target_distribution": bloom_data,
+            "question_paper": qp_data
+        }
+        
+        result = evaluate_question_paper(input_json)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+>>>>>>> graph_generator

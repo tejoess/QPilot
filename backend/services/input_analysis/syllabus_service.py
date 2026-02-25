@@ -5,7 +5,11 @@ import os
 import json
 import re
 from backend.services.prompts import format_syllabus as SYLLABUS_PROMPT
+<<<<<<< HEAD
 from backend.services.llm_service import openai_llm as llm
+=======
+from backend.services.llm_service import gemini_llm as llm
+>>>>>>> graph_generator
 from langchain_core.messages import HumanMessage
 from langchain_core.output_parsers import PydanticOutputParser
 from backend.services.schemas.llm_schemas import SyllabusOutput
