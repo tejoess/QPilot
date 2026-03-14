@@ -1,0 +1,20 @@
+{
+    "questions": [
+        {
+            "id": "1",
+            "question_number": "1",
+            "text": "Explain Newton's first law in detail.",
+            "marks": 5,
+            "blooms_level": "Understand",
+            "topic": "Unit 1"
+        },
+        {
+            "id": "2",
+            "question_number": "2",
+            "text": "Calculate the force of a 10kg object moving at 5m/s^2.",
+            "marks": 10,
+            "blooms_level": "Apply",
+            "topic": "Unit 2"
+        }
+    ]
+}

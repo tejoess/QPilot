@@ -1,11 +1,8 @@
 # backend/main.py
-import uuid
-import os
-from fastapi import FastAPI, WebSocket, File, UploadFile, Form, HTTPException
+from fastapi import FastAPI , WebSocket
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
-from starlette.websockets import WebSocketDisconnect
-from typing import Optional
+from backend.schemas.request import PaperGenerationRequest
+from backend.schemas.response import PaperGenerationResponse
 from backend.websocket.manager import manager
 from backend.services.pipeline import (
     analyze_syllabus_workflow,
@@ -13,18 +10,15 @@ from backend.services.pipeline import (
     generate_paper_workflow
 )
 
-
 backend = FastAPI()
 
-# ✅ Enable CORS for frontend access
 backend.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+    allow_origins=["*"],  # Allow any origin (for file:// local testing)
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
 
 @backend.websocket("/ws/{session_id}")
 async def websocket_logs(websocket: WebSocket, session_id: str):
@@ -35,273 +29,42 @@ async def websocket_logs(websocket: WebSocket, session_id: str):
     except WebSocketDisconnect:
         manager.disconnect(session_id)
 
+@backend.post("/generate-paper", response_model=PaperGenerationResponse)
+def generate_question_paper(payload: PaperGenerationRequest):
+    from backend.services.pipeline import run_question_paper_pipeline
+    session_id = "session_1"
+    file_path = run_question_paper_pipeline(session_id)
 
-# ==========================================
-# API 1: Analyze Syllabus
-# ==========================================
-@backend.post("/analyze-syllabus")
-async def analyze_syllabus(
-    file: Optional[UploadFile] = File(None),
-    text: Optional[str] = Form(None),
-    session_id: Optional[str] = Form(None)
+    return PaperGenerationResponse(
+        status="success",
+        file_path=file_path
+    )
+
+from fastapi import UploadFile, File, HTTPException
+import json
+from backend.QP_Verifier.question_paper_verifier import evaluate_question_paper
+
+@backend.post("/verify-paper")
+async def verify_paper(
+    question_paper: UploadFile = File(...),
+    syllabus: UploadFile = File(...),
+    teacher_instructions: UploadFile = File(...),
+    bloom_level: UploadFile = File(...)
 ):
-    """
-    Accepts either:
-    - file: PDF upload (multipart/form-data)
-    - text: Plain text syllabus content
-    - session_id: (Optional) Custom session ID for WebSocket tracking
-    
-    Returns: session_id and parsed syllabus data
-    """
-    # Clean up empty strings to None
-    text_content = None
-    if text and text.strip():
-        text_content = text.strip()
-    
-    if not file and not text_content:
-        raise HTTPException(status_code=400, detail="Either 'file' or 'text' must be provided")
-    
-    # Use provided session_id or generate new one
-    if not session_id or not session_id.strip():
-        session_id = str(uuid.uuid4())
-    else:
-        session_id = session_id.strip()
-    
-    print(f"📝 Using session_id: {session_id}")
-    
     try:
-        # If file uploaded, save it temporarily
-        pdf_path = None
-        if file:
-            # Save uploaded file
-            upload_dir = os.path.join("backend", "services", "data", session_id, "uploads")
-            os.makedirs(upload_dir, exist_ok=True)
-            pdf_path = os.path.join(upload_dir, "syllabus.pdf")
-            
-            with open(pdf_path, "wb") as f:
-                content = await file.read()
-                f.write(content)
-            print(f"📁 Saved file to: {pdf_path}")
+        qp_data = json.loads(await question_paper.read())
+        syllabus_data = json.loads(await syllabus.read())
+        teacher_data = json.loads(await teacher_instructions.read())
+        bloom_data = json.loads(await bloom_level.read())
         
-        print(f"🔍 DEBUG: pdf_path={pdf_path}, text_content={'<text>' if text_content else None}")
+        input_json = {
+            "syllabus": syllabus_data,
+            "teacher_input": teacher_data,
+            "blooms_target_distribution": bloom_data,
+            "question_paper": qp_data
+        }
         
-        # Run syllabus analysis workflow
-        result = await analyze_syllabus_workflow(
-            session_id=session_id,
-            pdf_path=pdf_path,
-            text_content=text_content
-        )
-        
-        return JSONResponse(content={
-            "status": "success",
-            "session_id": session_id,
-            "syllabus": result["syllabus"],
-            "message": "Syllabus analyzed successfully"
-        })
-        
+        result = evaluate_question_paper(input_json)
+        return result
     except Exception as e:
-        import traceback
-        print("❌ ERROR:" + "="*50)
-        print(traceback.format_exc())
-        print("="*60)
-        raise HTTPException(status_code=500, detail=f"Syllabus analysis failed: {str(e)}")
-
-
-# ==========================================
-# API 2: Analyze PYQs
-# ==========================================
-@backend.post("/analyze-pyqs")
-async def analyze_pyqs(
-    syllabus_session_id: str = Form(...),
-    file: Optional[UploadFile] = File(None),
-    text: Optional[str] = Form(None),
-    session_id: Optional[str] = Form(None)
-):
-    """
-    Accepts:
-    - syllabus_session_id: Session ID from analyze-syllabus API
-    - file: PDF upload (multipart/form-data) OR
-    - text: Plain text PYQ content
-    - session_id: (Optional) Custom session ID for WebSocket tracking
-    
-    Returns: session_id and parsed PYQs data
-    """
-    # Clean up empty strings to None
-    text_content = None
-    if text and text.strip():
-        text_content = text.strip()
-    
-    if not file and not text_content:
-        raise HTTPException(status_code=400, detail="Either 'file' or 'text' must be provided")
-    
-    # Verify syllabus session exists
-    syllabus_folder = os.path.join("backend", "services", "data", syllabus_session_id)
-    if not os.path.exists(syllabus_folder):
-        raise HTTPException(status_code=404, detail=f"Syllabus session {syllabus_session_id} not found")
-    
-    # Use provided session_id or generate new one
-    if not session_id or not session_id.strip():
-        pyqs_session_id = str(uuid.uuid4())
-    else:
-        pyqs_session_id = session_id.strip()
-    
-    print(f"📝 Using PYQs session_id: {pyqs_session_id}")
-    
-    try:
-        os.makedirs(os.path.join("backend", "services", "data", pyqs_session_id), exist_ok=True)
-
-        # If file uploaded, save it temporarily
-        pdf_path = None
-        if file:
-            upload_dir = os.path.join("backend", "services", "data", pyqs_session_id, "uploads")
-            os.makedirs(upload_dir, exist_ok=True)
-            pdf_path = os.path.join(upload_dir, "pyqs.pdf")
-            
-            with open(pdf_path, "wb") as f:
-                content = await file.read()
-                f.write(content)
-        
-        # Run PYQ analysis workflow
-        result = await analyze_pyqs_workflow(
-            session_id=pyqs_session_id,
-            syllabus_session_id=syllabus_session_id,
-            pdf_path=pdf_path,
-            text_content=text_content
-        )
-        
-        return JSONResponse(content={
-            "status": "success",
-            "session_id": pyqs_session_id,
-            "pyqs": result["pyqs"],
-            "total_questions": len(result["pyqs"].get("questions", [])),
-            "message": "PYQs analyzed successfully"
-        })
-        
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"PYQ analysis failed: {str(e)}")
-
-
-# ==========================================
-# API 3: Generate Paper
-# ==========================================
-@backend.post("/generate-paper")
-async def generate_paper(
-    syllabus_session_id: str = Form(...),
-    pyqs_session_id: str = Form(...),
-    total_marks: Optional[int] = Form(None),
-    total_questions: Optional[int] = Form(None),
-    # Bloom Taxonomy Levels (percentages)
-    bloom_remember: Optional[int] = Form(None),
-    bloom_understand: Optional[int] = Form(None),
-    bloom_apply: Optional[int] = Form(None),
-    bloom_analyze: Optional[int] = Form(None),
-    bloom_evaluate: Optional[int] = Form(None),
-    bloom_create: Optional[int] = Form(None),
-    # Paper Pattern (JSON string of sections)
-    paper_pattern: Optional[str] = Form(None),
-    # Teacher Input (custom instructions/focus areas)
-    teacher_input: Optional[str] = Form(None),
-    # WebSocket tracking
-    session_id: Optional[str] = Form(None)
-):
-    """
-    Accepts:
-    - syllabus_session_id: Session ID from analyze-syllabus API
-    - pyqs_session_id: Session ID from analyze-pyqs API
-    - total_marks: Total marks for the paper (default: 80)
-    - total_questions: Total number of questions (default: 10)
-    - bloom_*: Bloom's Taxonomy level percentages (optional, must sum to 100)
-    - paper_pattern: JSON string defining sections (optional)
-    - teacher_input: Custom instructions from teacher (optional)
-    - session_id: (Optional) Custom session ID for WebSocket tracking
-    
-    Returns: Generated question paper
-    """
-    import json as json_lib
-    
-    # Verify both sessions exist
-    syllabus_folder = os.path.join("backend", "services", "data", syllabus_session_id)
-    pyqs_folder = os.path.join("backend", "services", "data", pyqs_session_id)
-    
-    if not os.path.exists(syllabus_folder):
-        raise HTTPException(status_code=404, detail=f"Syllabus session {syllabus_session_id} not found")
-    if not os.path.exists(pyqs_folder):
-        raise HTTPException(status_code=404, detail=f"PYQs session {pyqs_session_id} not found")
-    
-    # Parse Bloom Taxonomy levels
-    raw_bloom = {
-        "remember": bloom_remember or 0,
-        "understand": bloom_understand or 0,
-        "apply": bloom_apply or 0,
-        "analyze": bloom_analyze or 0,
-        "evaluate": bloom_evaluate or 0,
-        "create": bloom_create or 0,
-    }
-    total_bloom = sum(raw_bloom.values())
-    if total_bloom > 0:
-        # Auto-normalize to 100 so partial inputs still work
-        bloom_levels = {k: round(v / total_bloom * 100) for k, v in raw_bloom.items()}
-        # Fix any rounding drift on the largest key
-        drift = 100 - sum(bloom_levels.values())
-        if drift:
-            largest = max(bloom_levels, key=bloom_levels.get)  # type: ignore[arg-type]
-            bloom_levels[largest] += drift
-    else:
-        bloom_levels = {"remember": 20, "understand": 30, "apply": 30, "analyze": 20, "evaluate": 0, "create": 0}
-    
-    # Parse paper pattern
-    sections = None
-    if paper_pattern:
-        try:
-            pattern_data = json_lib.loads(paper_pattern)
-            sections = pattern_data.get("sections", [])
-            print(f"📐 Received sections: {json_lib.dumps(sections, indent=2)}")
-        except json_lib.JSONDecodeError:
-            raise HTTPException(status_code=400, detail="Invalid JSON format for paper_pattern")
-    
-    # Parse teacher input
-    teacher_instructions = {
-        "focus_areas": [],
-        "preferences": teacher_input or "Standard difficulty"
-    }
-    
-    # Use provided session_id or generate new one
-    if not session_id or not session_id.strip():
-        paper_session_id = str(uuid.uuid4())
-    else:
-        paper_session_id = session_id.strip()
-    
-    print(f"📄 Using paper generation session_id: {paper_session_id}")
-    
-    try:
-        # Run paper generation workflow
-        result = await generate_paper_workflow(
-            session_id=paper_session_id,
-            syllabus_session_id=syllabus_session_id,
-            pyqs_session_id=pyqs_session_id,
-            total_marks=total_marks or 0,
-            total_questions=total_questions or 0,
-            bloom_levels=bloom_levels,
-            paper_sections=sections,
-            teacher_inputs=teacher_instructions
-        )
-        
-        # Extract paper from result (use draft_paper, not final_paper)
-        paper_data = result.get("draft_paper", {})
-        verification_data = result.get("paper_verdict", {})
-        pdf_path = result.get("final_path", "")
-        
-        return JSONResponse(content={
-            "status": "success",
-            "session_id": paper_session_id,
-            "paper": paper_data,
-            "verification": verification_data,
-            "pdf_path": pdf_path,
-            "message": "Question paper generated successfully"
-        })
-        
-    except Exception as e:
-        import traceback
-        print(f"❌ Error in paper generation: {str(e)}")
-        print(traceback.format_exc())
-        raise HTTPException(status_code=500, detail=f"Paper generation failed: {str(e)}")
+        raise HTTPException(status_code=400, detail=str(e))
