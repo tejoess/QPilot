@@ -175,6 +175,6 @@ The assessment consists of two class tests of 20 marks each. The first class tes
 
 """
 
-# # Test call - uncomment to test directly
-#result = get_syllabus_json(SYLLABUS_PROMPT, dummy_syllabus)
-#print("Syllabus JSON result:", result)  
+# # # Test call - uncomment to test directly
+# result = get_syllabus_json(SYLLABUS_PROMPT, dummy_syllabus)
+# print("Syllabus JSON result:", result)  

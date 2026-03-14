@@ -182,7 +182,13 @@ export const useQPilotStore = create<QPilotState>((set, get) => ({
             newAgents[index] = { ...newAgents[index], status };
         }
 
-        return { agentStatuses: statuses, agents: newAgents };
+        // Propagate generation finish to the top-level status so redirects fire
+        const topStatus =
+            agent === "generation" && (status === "completed" || status === "failed")
+                ? status
+                : state.status;
+
+        return { agentStatuses: statuses, agents: newAgents, status: topStatus };
     }),
 
     triggerNextAgent: () => {

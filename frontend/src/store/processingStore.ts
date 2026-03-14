@@ -7,6 +7,7 @@
  */
 
 import { create } from "zustand";
+import type { DraftPaper } from "@/types/api";
 
 export type StepStatus = "pending" | "running" | "completed" | "failed";
 
@@ -24,13 +25,14 @@ interface ProcessingState {
     steps: PipelineStep[];
     error: string | null;
     resultFilePath: string | null;
+    paperData: DraftPaper | null;
 
     // Actions
     startProcessing: () => void;
     updateStep: (id: string, status: StepStatus) => void;
     addLog: (log: string) => void;
     setProgress: (progress: number) => void;
-    setResult: (path: string) => void;
+    setResult: (path: string, paper?: DraftPaper) => void;
     setError: (msg: string) => void;
     reset: () => void;
 }
@@ -54,6 +56,7 @@ export const useProcessingStore = create<ProcessingState>((set) => ({
     steps: INITIAL_STEPS,
     error: null,
     resultFilePath: null,
+    paperData: null,
 
     startProcessing: () => set({
         status: "generating",
@@ -61,7 +64,8 @@ export const useProcessingStore = create<ProcessingState>((set) => ({
         logs: [],
         steps: INITIAL_STEPS.map(s => ({ ...s, status: s.id === "1" ? "running" : "pending" })),
         error: null,
-        resultFilePath: null
+        resultFilePath: null,
+        paperData: null
     }),
 
     updateStep: (id, status) => set((state) => {
@@ -82,7 +86,7 @@ export const useProcessingStore = create<ProcessingState>((set) => ({
 
     setProgress: (progress) => set({ progress }),
 
-    setResult: (path) => set({ status: "completed", resultFilePath: path, progress: 100 }),
+    setResult: (path, paper) => set({ status: "completed", resultFilePath: path, paperData: paper ?? null, progress: 100 }),
 
     setError: (msg) => set({ status: "failed", error: msg }),
 
@@ -92,6 +96,7 @@ export const useProcessingStore = create<ProcessingState>((set) => ({
         logs: [],
         steps: INITIAL_STEPS,
         error: null,
-        resultFilePath: null
+        resultFilePath: null,
+        paperData: null
     }),
 }));

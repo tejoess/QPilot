@@ -28,30 +28,37 @@ def normalize(text: str) -> str:
     return text.lower().strip()
 
 
-def match_level_1(pyq: Dict, topic: str, subtopic: str, marks: int, bloom_level: str) -> bool:
-    """Exact match: topic + subtopic + marks + bloom_level"""
-    return (
+def match_level_1(pyq: Dict, topic: str, marks: int, bloom_level: str) -> bool:
+    """Exact match: topic + marks + bloom_level (ignore subtopic)"""
+    # Match blueprint topic against PYQ subtopic (common case) or topic
+    topic_match = (
+        normalize(pyq.get("subtopic", "")) == normalize(topic) or
         normalize(pyq.get("topic", "")) == normalize(topic)
-        and normalize(pyq.get("subtopic", "")) == normalize(subtopic)
+    )
+    return (
+        topic_match
         and pyq.get("marks") == marks
         and normalize(pyq.get("bloom_level", "")) == normalize(bloom_level)
     )
 
 
-def match_level_2(pyq: Dict, topic: str, subtopic: str, bloom_level: str) -> bool:
-    """Drop marks: topic + subtopic + bloom_level"""
-    return (
+def match_level_2(pyq: Dict, topic: str, bloom_level: str) -> bool:
+    """Drop marks: topic + bloom_level only (ignore subtopic)"""
+    topic_match = (
+        normalize(pyq.get("subtopic", "")) == normalize(topic) or
         normalize(pyq.get("topic", "")) == normalize(topic)
-        and normalize(pyq.get("subtopic", "")) == normalize(subtopic)
+    )
+    return (
+        topic_match
         and normalize(pyq.get("bloom_level", "")) == normalize(bloom_level)
     )
 
 
-def match_level_3(pyq: Dict, topic: str, subtopic: str) -> bool:
-    """Drop marks + bloom: topic + subtopic only"""
+def match_level_3(pyq: Dict, topic: str) -> bool:
+    """Drop marks + bloom: topic only (ignore subtopic)"""
     return (
+        normalize(pyq.get("subtopic", "")) == normalize(topic) or
         normalize(pyq.get("topic", "")) == normalize(topic)
-        and normalize(pyq.get("subtopic", "")) == normalize(subtopic)
     )
 
 
@@ -62,7 +69,6 @@ def find_match(pyq_bank: List[Dict], used_pyq_ids: set, **criteria) -> Optional[
     """
     level = criteria.get("level", 1)
     topic = criteria["topic"]
-    subtopic = criteria["subtopic"]
     marks = criteria.get("marks")
     bloom_level = criteria.get("bloom_level")
 
@@ -73,11 +79,11 @@ def find_match(pyq_bank: List[Dict], used_pyq_ids: set, **criteria) -> Optional[
             continue
         if pyq_id in used_pyq_ids:
             continue
-        if level == 1 and match_level_1(pyq, topic, subtopic, marks, bloom_level):
+        if level == 1 and match_level_1(pyq, topic, marks, bloom_level):
             return pyq
-        elif level == 2 and match_level_2(pyq, topic, subtopic, bloom_level):
+        elif level == 2 and match_level_2(pyq, topic, bloom_level):
             return pyq
-        elif level == 3 and match_level_3(pyq, topic, subtopic):
+        elif level == 3 and match_level_3(pyq, topic):
             return pyq
     return None
 
@@ -229,11 +235,10 @@ def select_questions(
             # CASE B: Blueprint says IS a PYQ → Apply matching hierarchy
             # ----------------------------------------------------------------
             else:
-                # Level 1: topic + subtopic + marks + bloom_level (exact)
+                # Level 1: topic + marks + bloom_level (exact)
                 match = find_match(
                     pyq_bank, used_pyq_ids,
-                    level=1, topic=topic, subtopic=subtopic,
-                    marks=marks, bloom_level=bloom_level
+                    level=1, topic=topic, marks=marks, bloom_level=bloom_level
                 )
                 if match:
                     match_id = match.get("id", "unknown")
@@ -246,60 +251,51 @@ def select_questions(
                         used_pyq_ids.add(match_id)
                     stats["pyq_exact_match"] += 1
 
-                else:
-                    # Level 2: topic + subtopic + bloom_level (drop marks)
+                # Level 2: topic + bloom_level (drop marks)
+                if not match:
                     match = find_match(
                         pyq_bank, used_pyq_ids,
-                        level=2, topic=topic, subtopic=subtopic,
-                        bloom_level=bloom_level
+                        level=2, topic=topic, bloom_level=bloom_level
                     )
                     if match:
                         match_id = match.get("id", "unknown")
+                        orig_marks = match.get("marks", marks)
                         match_text = match.get("text", match.get("question", ""))
-                        print(f"     🔄 Level 2 match (drop marks) → Rephrasing PYQ #{match_id} for {marks}M")
-                        selected_text = rephrase_pyq(
-                            pyq_text=match_text,
-                            target_marks=marks,
-                            topic=topic,
-                            bloom_level=bloom_level
-                        )
+                        print(f"     🔄 Level 2 match (drop marks: {orig_marks}M→{marks}M) → Rephrasing PYQ #{match_id}")
+                        selected_text = rephrase_pyq(match_text, marks, topic, bloom_level)
                         selection_method = "pyq_rephrased_marks"
                         source_pyq_id = match_id
                         if match_id != "unknown":
                             used_pyq_ids.add(match_id)
                         stats["pyq_rephrased_marks"] += 1
 
-                    else:
-                        # Level 3: topic + subtopic only (drop marks + bloom)
-                        match = find_match(
-                            pyq_bank, used_pyq_ids,
-                            level=3, topic=topic, subtopic=subtopic
-                        )
-                        if match:
-                            match_id = match.get("id", "unknown")
-                            match_text = match.get("text", match.get("question", ""))
-                            print(f"     🔄 Level 3 match (subtopic only) → Rephrasing PYQ #{match_id} for {marks}M/{bloom_level}")
-                            selected_text = rephrase_pyq(
-                                pyq_text=match_text,
-                                target_marks=marks,
-                                topic=topic,
-                                bloom_level=bloom_level
-                            )
-                            selection_method = "pyq_rephrased_bloom"
-                            source_pyq_id = match_id
-                            if match_id != "unknown":
-                                used_pyq_ids.add(match_id)
-                            stats["pyq_rephrased_bloom"] += 1
+                # Level 3: topic only (drop marks + bloom)
+                if not match:
+                    match = find_match(
+                        pyq_bank, used_pyq_ids,
+                        level=3, topic=topic
+                    )
+                    if match:
+                        match_id = match.get("id", "unknown")
+                        orig_bloom = match.get("bloom_level", bloom_level)
+                        match_text = match.get("text", match.get("question", ""))
+                        print(f"     🔄 Level 3 match (bloom: {orig_bloom}→{bloom_level}) → Rephrasing PYQ #{match_id}")
+                        selected_text = rephrase_pyq(match_text, marks, topic, bloom_level)
+                        selection_method = "pyq_rephrased_bloom"
+                        source_pyq_id = match_id
+                        if match_id != "unknown":
+                            used_pyq_ids.add(match_id)
+                        stats["pyq_rephrased_bloom"] += 1
 
-                        else:
-                            # Fallback: Generate new (no PYQ found despite is_pyq=True)
-                            print(f"     ⚡ No PYQ match found → Generating new question")
-                            selected_text = generate_new_question(
-                                topic=topic, subtopic=subtopic, module=module,
-                                marks=marks, bloom_level=bloom_level, question_number=q_num
-                            )
-                            selection_method = "generated_fallback"
-                            stats["generated_new"] += 1
+                # Fallback: Generate new question if no PYQ match
+                if not match:
+                    print(f"     ⚡ No PYQ match found → Generating new question")
+                    selected_text = generate_new_question(
+                        topic=topic, subtopic=subtopic, module=module,
+                        marks=marks, bloom_level=bloom_level, question_number=q_num
+                    )
+                    selection_method = "generated_fallback"
+                    stats["generated_new"] += 1
 
             # Build draft question entry
             draft_q = {
@@ -401,256 +397,417 @@ def print_draft_paper(draft_paper: Dict):
 SAMPLE_PYQ_BANK = [
     {
         "id": "pyq_001",
-        "text": "Define the concept of normalization and explain why it is important in database design.",
-        "topic": "Normalization",
-        "subtopic": "Normal Forms",
-        "module": "Module 3",
-        "marks": 5,
-        "bloom_level": "Remember",
-        "year": 2022
+        "question": "Design AND gate using Perceptron.",
+        "topic": "Fundamentals of Neural Network",
+        "subtopic": "Multilayer Perceptrons (MLPs)",
+        "marks": 2,
+        "bloom_level": "Apply"
     },
     {
         "id": "pyq_002",
-        "text": "Explain the difference between 2NF and 3NF with suitable examples.",
-        "topic": "Normalization",
-        "subtopic": "Normal Forms",
-        "module": "Module 3",
+        "question": "Suppose we have input-output pairs. Our goal is to find parameters that predict the output from the input according to. Calculate the sum-of-squared error function. Derive the gradient descent update rule.",
+        "topic": "Training, Optimization and Regularization of Deep Neural Network",
+        "subtopic": "Loss functions: Squared Error loss",
         "marks": 10,
-        "bloom_level": "Understand",
-        "year": 2023
+        "bloom_level": "Apply"
     },
     {
         "id": "pyq_003",
-        "text": "Normalize the given relation to BCNF: R(A, B, C, D) with FDs: A→B, B→C, C→D.",
-        "topic": "Normalization",
-        "subtopic": "Normal Forms",
-        "module": "Module 3",
-        "marks": 15,
-        "bloom_level": "Apply",
-        "year": 2021
+        "question": "Explain dropout. How does it solve the problem of overfitting?",
+        "topic": "Training, Optimization and Regularization of Deep Neural Network",
+        "subtopic": "Regularization Methods: Dropout",
+        "marks": 5,
+        "bloom_level": "Understand"
     },
     {
         "id": "pyq_004",
-        "text": "What are functional dependencies? State Armstrong's axioms.",
-        "topic": "Functional Dependencies",
-        "subtopic": "FD Rules",
-        "module": "Module 3",
+        "question": "Explain denoising autoencoder model.",
+        "topic": "Autoencoders: Unsupervised Learning",
+        "subtopic": "Denoising Autoencoders",
         "marks": 5,
-        "bloom_level": "Remember",
-        "year": 2023
+        "bloom_level": "Understand"
     },
     {
         "id": "pyq_005",
-        "text": "Explain the ACID properties of transactions with examples.",
-        "topic": "Transactions",
-        "subtopic": "ACID Properties",
-        "module": "Module 4",
-        "marks": 5,
-        "bloom_level": "Understand",
-        "year": 2022
+        "question": "Describe sequence learning problem.",
+        "topic": "Recurrent Neural Networks (RNN)",
+        "subtopic": "Sequence Learning Problem",
+        "marks": 2,
+        "bloom_level": "Understand"
     },
     {
         "id": "pyq_006",
-        "text": "Describe the different states of a transaction and draw the transaction state diagram.",
-        "topic": "Transactions",
-        "subtopic": "Transaction States",
-        "module": "Module 4",
-        "marks": 10,
-        "bloom_level": "Understand",
-        "year": 2023
+        "question": "Explain Gated Recurrent Unit (GRU) in detail.",
+        "topic": "Recurrent Neural Networks (RNN)",
+        "subtopic": "Long Short Term Memory(LSTM): Gated Recurrent Unit (GRU)",
+        "marks": 5,
+        "bloom_level": "Understand"
     },
     {
         "id": "pyq_007",
-        "text": "Explain two-phase locking protocol and prove that it ensures serializability.",
-        "topic": "Concurrency Control",
-        "subtopic": "Locking",
-        "module": "Module 4",
-        "marks": 15,
-        "bloom_level": "Analyze",
-        "year": 2021
+        "question": "What is an activation function? Describe any four activation functions.",
+        "topic": "Fundamentals of Neural Network",
+        "subtopic": "Activation functions",
+        "marks": 5,
+        "bloom_level": "Understand"
     },
     {
         "id": "pyq_008",
-        "text": "What is an ER diagram? Explain its components with examples.",
-        "topic": "ER Modeling",
-        "subtopic": "ER Diagrams",
-        "module": "Module 1",
-        "marks": 5,
-        "bloom_level": "Remember",
-        "year": 2022
+        "question": "Explain CNN architecture in detail. Calculate parameters for a layer with input, ten filters, stride 1, and pad 2.",
+        "topic": "Convolutional Neural Networks (CNN)",
+        "subtopic": "CNN architecture",
+        "marks": 10,
+        "bloom_level": "Apply"
     },
     {
         "id": "pyq_009",
-        "text": "Draw an ER diagram for a library management system.",
-        "topic": "ER Modeling",
-        "subtopic": "ER Diagrams",
-        "module": "Module 1",
-        "marks": 15,
-        "bloom_level": "Apply",
-        "year": 2023
+        "question": "Explain early stopping, batch normalization, and data augmentation.",
+        "topic": "Training, Optimization and Regularization of Deep Neural Network",
+        "subtopic": "Regularization Methods: Early stopping, Batch normalization",
+        "marks": 5,
+        "bloom_level": "Understand"
     },
     {
         "id": "pyq_010",
-        "text": "Explain the different types of joins in SQL with examples.",
-        "topic": "SQL",
-        "subtopic": "Joins",
-        "module": "Module 2",
-        "marks": 10,
-        "bloom_level": "Understand",
-        "year": 2022
+        "question": "Explain RNN architecture in detail.",
+        "topic": "Recurrent Neural Networks (RNN)",
+        "subtopic": "Recurrent Neural Network",
+        "marks": 5,
+        "bloom_level": "Understand"
     },
     {
         "id": "pyq_011",
-        "text": "Write SQL queries to: (a) Find all employees earning more than 50000, (b) List departments with more than 5 employees.",
-        "topic": "SQL",
-        "subtopic": "Queries",
-        "module": "Module 2",
-        "marks": 10,
-        "bloom_level": "Apply",
-        "year": 2023
+        "question": "Explain the working of Generative Adversarial Network (GAN).",
+        "topic": "Recent Trends and Applications",
+        "subtopic": "Generative Adversarial Network (GAN): Architecture",
+        "marks": 5,
+        "bloom_level": "Understand"
     },
     {
         "id": "pyq_012",
-        "text": "Explain relational algebra operations: Selection, Projection, and Join with examples.",
-        "topic": "Relational Algebra",
-        "subtopic": "Joins",
-        "module": "Module 2",
-        "marks": 15,
-        "bloom_level": "Understand",
-        "year": 2021
+        "question": "Explain Stochastic Gradient Descent and momentum-based gradient descent optimization techniques.",
+        "topic": "Training, Optimization and Regularization of Deep Neural Network",
+        "subtopic": "Optimization Learning with backpropagation",
+        "marks": 5,
+        "bloom_level": "Understand"
+    },
+    {
+        "id": "pyq_013",
+        "question": "Explain LSTM architecture.",
+        "topic": "Recurrent Neural Networks (RNN)",
+        "subtopic": "Long Short Term Memory(LSTM): Selective Read, Selective write, Selective Forget",
+        "marks": 5,
+        "bloom_level": "Understand"
+    },
+    {
+        "id": "pyq_014",
+        "question": "Describe LeNet architecture.",
+        "topic": "Convolutional Neural Networks (CNN)",
+        "subtopic": "Modern Deep Learning Architectures: LeNET: Architecture",
+        "marks": 5,
+        "bloom_level": "Understand"
+    },
+    {
+        "id": "pyq_015",
+        "question": "Explain vanishing and exploding gradient in RNNs.",
+        "topic": "Recurrent Neural Networks (RNN)",
+        "subtopic": "Limitation of 'vanilla RNN' Vanishing and Exploding Gradients",
+        "marks": 5,
+        "bloom_level": "Understand"
+    },
+    {
+        "id": "pyq_016",
+        "question": "Comment on the Representation Power of MLPs.",
+        "topic": "Fundamentals of Neural Network",
+        "subtopic": "Representation Power of MLPs",
+        "marks": 5,
+        "bloom_level": "Understand"
+    },
+    {
+        "id": "pyq_017",
+        "question": "Explain Gradient Descent in Deep Learning.",
+        "topic": "Training, Optimization and Regularization of Deep Neural Network",
+        "subtopic": "Learning Parameters: Gradient Descent (GD)",
+        "marks": 5,
+        "bloom_level": "Understand"
+    },
+    {
+        "id": "pyq_018",
+        "question": "Explain the dropout method and its advantages.",
+        "topic": "Training, Optimization and Regularization of Deep Neural Network",
+        "subtopic": "Regularization Methods: Dropout",
+        "marks": 5,
+        "bloom_level": "Understand"
+    },
+    {
+        "id": "pyq_019",
+        "question": "What are Denoising Autoencoders?",
+        "topic": "Autoencoders: Unsupervised Learning",
+        "subtopic": "Denoising Autoencoders",
+        "marks": 2,
+        "bloom_level": "Remember"
+    },
+    {
+        "id": "pyq_020",
+        "question": "Explain Pooling operation in CNN.",
+        "topic": "Convolutional Neural Networks (CNN)",
+        "subtopic": "Pooling Layer",
+        "marks": 5,
+        "bloom_level": "Understand"
+    },
+    {
+        "id": "pyq_021",
+        "question": "What are the Three Classes of Deep Learning? Explain each.",
+        "topic": "Fundamentals of Neural Network",
+        "subtopic": "Deep Networks: Three Classes of Deep Learning",
+        "marks": 10,
+        "bloom_level": "Understand"
+    },
+    {
+        "id": "pyq_022",
+        "question": "Explain and analyze the architectural components of AlexNet CNN.",
+        "topic": "Convolutional Neural Networks (CNN)",
+        "subtopic": "Modern Deep Learning Architectures: AlexNET: Architecture",
+        "marks": 10,
+        "bloom_level": "Analyze"
+    },
+    {
+        "id": "pyq_023",
+        "question": "What are the different types of Gradient Descent methods? Explain any three.",
+        "topic": "Training, Optimization and Regularization of Deep Neural Network",
+        "subtopic": "Learning Parameters: Gradient Descent (GD)",
+        "marks": 10,
+        "bloom_level": "Understand"
+    },
+    {
+        "id": "pyq_024",
+        "question": "Differentiate between the architecture of LSTM and GRU networks.",
+        "topic": "Recurrent Neural Networks (RNN)",
+        "subtopic": "Long Short Term Memory(LSTM): Selective Read, Selective write, Selective Forget, Gated Recurrent Unit (GRU)",
+        "marks": 5,
+        "bloom_level": "Analyze"
+    },
+    {
+        "id": "pyq_025",
+        "question": "Explain the key components of an RNN.",
+        "topic": "Recurrent Neural Networks (RNN)",
+        "subtopic": "Recurrent Neural Network",
+        "marks": 5,
+        "bloom_level": "Understand"
+    },
+    {
+        "id": "pyq_026",
+        "question": "Calculate the total number of parameters in a CNN layer: Input 32 channels, 64 filters, stride 1, no padding.",
+        "topic": "Convolutional Neural Networks (CNN)",
+        "subtopic": "CNN architecture",
+        "marks": 10,
+        "bloom_level": "Apply"
+    },
+    {
+        "id": "pyq_027",
+        "question": "Comment on the significance of Loss functions and explain different types.",
+        "topic": "Training, Optimization and Regularization of Deep Neural Network",
+        "subtopic": "Loss functions",
+        "marks": 10,
+        "bloom_level": "Understand"
+    },
+    {
+        "id": "pyq_028",
+        "question": "Explain any three types of Autoencoders.",
+        "topic": "Autoencoders: Unsupervised Learning",
+        "subtopic": "Application of Autoencoders",
+        "marks": 10,
+        "bloom_level": "Understand"
+    },
+    {
+        "id": "pyq_029",
+        "question": "What is the significance of Activation Functions? Explain types used in NN.",
+        "topic": "Fundamentals of Neural Network",
+        "subtopic": "Activation functions",
+        "marks": 10,
+        "bloom_level": "Understand"
+    },
+    {
+        "id": "pyq_030",
+        "question": "Explain GAN architecture and its applications.",
+        "topic": "Recent Trends and Applications",
+        "subtopic": "Generative Adversarial Network (GAN): Architecture, Applications",
+        "marks": 10,
+        "bloom_level": "Understand"
+    },
+    {
+        "id": "pyq_031",
+        "question": "Explain basic architecture of feedforward neural network.",
+        "topic": "Fundamentals of Neural Network",
+        "subtopic": "Feedforward Neural Networks",
+        "marks": 5,
+        "bloom_level": "Understand"
+    },
+    {
+        "id": "pyq_032",
+        "question": "Explain regularization in neural network.",
+        "topic": "Training, Optimization and Regularization of Deep Neural Network",
+        "subtopic": "Regularization Overview of Overfitting",
+        "marks": 5,
+        "bloom_level": "Understand"
+    },
+    {
+        "id": "pyq_033",
+        "question": "Explain types of neural network.",
+        "topic": "Fundamentals of Neural Network",
+        "subtopic": "Types of Neural Networks",
+        "marks": 5,
+        "bloom_level": "Understand"
+    },
+    {
+        "id": "pyq_034",
+        "question": "Explain the concept of overfitting and under fitting.",
+        "topic": "Training, Optimization and Regularization of Deep Neural Network",
+        "subtopic": "Overview of Overfitting",
+        "marks": 5,
+        "bloom_level": "Understand"
+    },
+    {
+        "id": "pyq_035",
+        "question": "Explain basic working of CNN.",
+        "topic": "Convolutional Neural Networks (CNN)",
+        "subtopic": "CNN architecture",
+        "marks": 5,
+        "bloom_level": "Understand"
+    },
+    {
+        "id": "pyq_036",
+        "question": "Explain the gradient descent algorithm and discuss types in detail.",
+        "topic": "Training, Optimization and Regularization of Deep Neural Network",
+        "subtopic": "Learning Parameters: Gradient Descent (GD)",
+        "marks": 10,
+        "bloom_level": "Understand"
+    },
+    {
+        "id": "pyq_037",
+        "question": "Explain the working and types of autoencoders in detail.",
+        "topic": "Autoencoders: Unsupervised Learning",
+        "subtopic": "Application of Autoencoders",
+        "marks": 10,
+        "bloom_level": "Understand"
     }
 ]
 
 
 SAMPLE_BLUEPRINT = {
-    "blueprint_metadata": {
-        "total_marks": 80,
-        "total_questions": 8,
-        "bloom_distribution": {
-            "Remember": 0.125,
-            "Understand": 0.25,
-            "Apply": 0.35,
-            "Analyze": 0.20,
-            "Evaluate": 0.05,
-            "Create": 0.025
-        },
-        "module_distribution": {
-            "Module 1": 0.25,
-            "Module 2": 0.25,
-            "Module 3": 0.25,
-            "Module 4": 0.25
-        },
-        "pyq_usage": {
-            "actual_pyq_count": 5,
-            "new_question_count": 3,
-            "pyq_percentage": 0.625
-        }
+  "blueprint_metadata": {
+    "total_marks": 80,
+    "total_questions": 8,
+    "bloom_distribution": {
+      "Remember": 0.15,
+      "Understand": 0.25,
+      "Apply": 0.3,
+      "Analyze": 0.2,
+      "Evaluate": 0.07,
+      "Create": 0.03
     },
-    "sections": [
+    "module_distribution": {
+      "Module 1": 0.25,
+      "Module 2": 0.3,
+      "Module 3": 0.2,
+      "Module 4": 0.1,
+      "Module 5": 0.1,
+      "Module 6": 0.0
+    },
+    "pyq_usage": {
+      "actual_pyq_count": 5,
+      "new_question_count": 3,
+      "pyq_percentage": 62.5
+    }
+  },
+  "sections": [
+    {
+      "section_name": "Section A",
+      "section_description": "Short Answer Questions",
+      "questions": [
         {
-            "section_name": "Section A",
-            "section_description": "Short Answer Questions",
-            "questions": [
-                {
-                    # Case: is_pyq=True, exact match exists (pyq_008)
-                    "question_number": "1",
-                    "module": "Module 1",
-                    "topic": "ER Modeling",
-                    "subtopic": "ER Diagrams",
-                    "marks": 5,
-                    "bloom_level": "Remember",
-                    "is_pyq": True,
-                    "rationale": "High PYQ availability"
-                },
-                {
-                    # Case: is_pyq=True, marks mismatch → Level 2 match → rephrase (pyq_005 matches topic+subtopic+bloom but 5M)
-                    "question_number": "2",
-                    "module": "Module 4",
-                    "topic": "Transactions",
-                    "subtopic": "ACID Properties",
-                    "marks": 10,
-                    "bloom_level": "Understand",
-                    "is_pyq": True,
-                    "rationale": "PYQ available, adjust marks"
-                },
-                {
-                    # Case: is_pyq=True, no exact or L2 match but L3 (subtopic) match exists → rephrase
-                    "question_number": "3",
-                    "module": "Module 3",
-                    "topic": "Functional Dependencies",
-                    "subtopic": "FD Rules",
-                    "marks": 5,
-                    "bloom_level": "Apply",   # pyq_004 is Remember → L3 match
-                    "is_pyq": True,
-                    "rationale": "Subtopic match found"
-                },
-                {
-                    # Case: is_pyq=False → Generate directly
-                    "question_number": "4",
-                    "module": "Module 2",
-                    "topic": "SQL",
-                    "subtopic": "DDL",
-                    "marks": 5,
-                    "bloom_level": "Remember",
-                    "is_pyq": False,
-                    "rationale": "No PYQ available for DDL"
-                }
-            ]
+          "question_number": "1a",
+          "module": "Module 1",
+          "topic": "History of Deep Learning",
+          "marks": 5,
+          "bloom_level": "Remember",
+          "is_pyq": True,
+          "rationale": "High PYQ availability"
         },
         {
-            "section_name": "Section B",
-            "section_description": "Long Answer Questions",
-            "questions": [
-                {
-                    # Case: is_pyq=True, exact match (pyq_009)
-                    "question_number": "5",
-                    "module": "Module 1",
-                    "topic": "ER Modeling",
-                    "subtopic": "ER Diagrams",
-                    "marks": 15,
-                    "bloom_level": "Apply",
-                    "is_pyq": True,
-                    "rationale": "High PYQ availability"
-                },
-                {
-                    # Case: is_pyq=True, exact match (pyq_012)
-                    "question_number": "6",
-                    "module": "Module 2",
-                    "topic": "Relational Algebra",
-                    "subtopic": "Joins",
-                    "marks": 15,
-                    "bloom_level": "Understand",
-                    "is_pyq": True,
-                    "rationale": "Good PYQ available"
-                },
-                {
-                    # Case: is_pyq=True, exact match (pyq_003)
-                    "question_number": "7",
-                    "module": "Module 3",
-                    "topic": "Normalization",
-                    "subtopic": "Normal Forms",
-                    "marks": 15,
-                    "bloom_level": "Apply",
-                    "is_pyq": True,
-                    "rationale": "PYQ with numerical problem"
-                },
-                {
-                    # Case: is_pyq=False → Generate a new analysis question
-                    "question_number": "8",
-                    "module": "Module 4",
-                    "topic": "Concurrency Control",
-                    "subtopic": "Deadlock",
-                    "marks": 15,
-                    "bloom_level": "Analyze",
-                    "is_pyq": False,
-                    "rationale": "No good PYQ for deadlock analysis"
-                }
-            ]
+          "question_number": "1b",
+          "module": "Module 2",
+          "topic": "Fundamentals of Neural Network",
+          "marks": 5,
+          "bloom_level": "Understand",
+          "is_pyq": True,
+          "rationale": "High PYQ availability"
+        },
+        {
+          "question_number": "1c",
+          "module": "Module 3",
+          "topic": "Denoising Autoencoders",
+          "marks": 5,
+          "bloom_level": "Remember",
+          "is_pyq": True,
+          "rationale": "New question generated"
+        },
+        {
+          "question_number": "1d",
+          "module": "Module 4",
+          "topic": "CNN architecture",
+          "marks": 5,
+          "bloom_level": "Understand",
+          "is_pyq": False,
+          "rationale": "New question generated"
         }
-    ],
-    "strategy_notes": "Balanced coverage with PYQ preference for Modules 1-3, fresh questions for edge cases."
+      ]
+    },
+    {
+      "section_name": "Section B",
+      "section_description": "Long Answer Questions",
+      "questions": [
+        {
+          "question_number": "2a",
+          "module": "Module 2",
+          "topic": "Regularization Methods",
+          "marks": 15,
+          "bloom_level": "Apply",
+          "is_pyq": True,
+          "rationale": "High PYQ availability"
+        },
+        {
+          "question_number": "2b",
+          "module": "Module 3",
+          "topic": "Applications of Autoencoders",
+          "marks": 15,
+          "bloom_level": "Analyze",
+          "is_pyq": False,
+          "rationale": "New question generated"
+        },
+        {
+          "question_number": "2c",
+          "module": "Module 5",
+          "topic": "Long Short Term Memory (LSTM)",
+          "marks": 20,
+          "bloom_level": "Evaluate",
+          "is_pyq": True,
+          "rationale": "High PYQ availability"
+        },
+        {
+          "question_number": "2d",
+          "module": "Module 2",
+          "topic": "Choosing output function and loss function",
+          "marks": 15,
+          "bloom_level": "Apply",
+          "is_pyq": True,
+          "rationale": "High PYQ availability"
+        }
+      ]
+    }
+  ],
+  "strategy_notes": "Balanced focus on Modules 2 and 3, with PYQs prioritized."
 }
-
 
 # ============================================================================
 # TEST EXECUTION

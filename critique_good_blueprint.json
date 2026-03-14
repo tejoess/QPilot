@@ -1,0 +1,166 @@
+{
+  "overall_rating": {
+    "total_score": 45,
+    "max_possible": 80,
+    "percentage": 56.25,
+    "grade": "C",
+    "verdict": "NEEDS_REVISION",
+    "summary": "The total marks in the blueprint are 85, which is incorrect as the expected total is 80. Additionally, there are several issues with PYQ utilization and alignment with teacher preferences."
+  },
+  "metric_scores": {
+    "constraint_compliance": {
+      "score": 0,
+      "status": "poor",
+      "details": "Score: 0/10"
+    },
+    "syllabus_coverage": {
+      "score": 10,
+      "status": "excellent",
+      "details": "Score: 10/10"
+    },
+    "bloom_balance": {
+      "score": 4,
+      "status": "poor",
+      "details": "Score: 4/10"
+    },
+    "pyq_utilization": {
+      "score": 6,
+      "status": "acceptable",
+      "details": "Topic with PYQ count > 5 marked is_pyq: false."
+    },
+    "difficulty_progression": {
+      "score": 7,
+      "status": "good",
+      "details": "Marks mismatch Bloom level."
+    },
+    "topic_distribution": {
+      "score": 8,
+      "status": "good",
+      "details": "Score: 8/10"
+    },
+    "teacher_alignment": {
+      "score": 6,
+      "status": "acceptable",
+      "details": "Focus modules emphasized in marks share."
+    }
+  },
+  "critical_issues": [
+    {
+      "severity": "high",
+      "category": "pyq_utilization",
+      "issue": "Topic with PYQ count > 5 marked is_pyq: false.",
+      "impact": "Affects 1c",
+      "fix": "Change is_pyq to true for question 1c."
+    },
+    {
+      "severity": "high",
+      "category": "pyq_utilization",
+      "issue": "Topic with PYQ count < 2 marked is_pyq: true.",
+      "impact": "Affects 2b",
+      "fix": "Change is_pyq to false for question 2b."
+    }
+  ],
+  "warnings": [
+    {
+      "category": "difficulty_progression",
+      "warning": "Marks mismatch Bloom level.",
+      "suggestion": "Adjust the marks for question 2c to align with the Analyze level."
+    },
+    {
+      "category": "teacher_alignment",
+      "warning": "Focus modules emphasized in marks share.",
+      "suggestion": "Increase the number of questions from Module 3 to balance the marks share."
+    }
+  ],
+  "strengths": [],
+  "recommendations": {
+    "immediate_fixes": [
+      "Change is_pyq to true for question 1c.",
+      "Change is_pyq to false for question 2b."
+    ],
+    "suggested_improvements": [
+      "Adjust the marks for question 2c to align with the Analyze level.",
+      "Increase the number of questions from Module 3 to balance the marks share."
+    ],
+    "alternative_approaches": []
+  },
+  "detailed_analysis": {
+    "bloom_distribution_analysis": {
+      "required": {},
+      "actual": {},
+      "deviations": {}
+    },
+    "module_distribution_analysis": {
+      "required": {},
+      "actual": {},
+      "deviations": {}
+    },
+    "pyq_usage_analysis": {
+      "total_pyqs_available": 0,
+      "pyqs_used": 5,
+      "utilization_rate": 0
+    },
+    "topic_coverage_analysis": {
+      "missing_topics": [],
+      "repeated_topics": []
+    }
+  },
+  "pass_fail_decision": {
+    "decision": "NEEDS_REVISION",
+    "can_proceed": false,
+    "requires_iteration": true,
+    "iteration_priority": "medium"
+  },
+  "computed": {
+    "total_marks": 85,
+    "total_questions": 8,
+    "marks_correct": false,
+    "count_correct": true,
+    "module_distribution": {
+      "Module 1": 0.0588,
+      "Module 2": 0.4118,
+      "Module 3": 0.2353,
+      "Module 4": 0.0588,
+      "Module 5": 0.2353
+    },
+    "bloom_actual": {
+      "Remember": 0.25,
+      "Understand": 0.25,
+      "Apply": 0.25,
+      "Analyze": 0.125,
+      "Evaluate": 0.125
+    },
+    "bloom_deviations": {
+      "Understand": 0.0,
+      "Create": -3.0,
+      "Analyze": -7.5,
+      "Remember": 10.0,
+      "Evaluate": 5.5,
+      "Apply": -5.0
+    },
+    "max_bloom_deviation_pct": 10.0,
+    "pyq_count": 5,
+    "constraint_violations": [
+      "Total marks: got 85, expected 80",
+      "Module 1: 5.9% outside [20%, 30%]",
+      "Module 2: 41.2% outside [20%, 30%]",
+      "Module 4: 5.9% outside [20%, 30%]"
+    ],
+    "module_weight_violations": [
+      "Module 1: 5.9% outside [20%, 30%]",
+      "Module 2: 41.2% outside [20%, 30%]",
+      "Module 4: 5.9% outside [20%, 30%]"
+    ],
+    "illegal_mark_values": []
+  },
+  "raw_scores": {
+    "constraint_compliance": 0,
+    "module_balance": 4,
+    "bloom_balance": 4,
+    "pyq_utilization": 6,
+    "difficulty_progression": 7,
+    "topic_diversity": 8,
+    "syllabus_coverage": 10,
+    "teacher_alignment": 6
+  }
+}

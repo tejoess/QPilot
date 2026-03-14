@@ -1,26 +1,28 @@
 {
-  "paper_id": "229626ae-d42",
+  "paper_id": "0d7aa58b-b48",
   "blueprint_metadata": {
     "total_marks": 80,
     "total_questions": 8,
     "bloom_distribution": {
-      "Remember": 0.125,
+      "Remember": 0.15,
       "Understand": 0.25,
-      "Apply": 0.35,
+      "Apply": 0.3,
       "Analyze": 0.2,
-      "Evaluate": 0.05,
-      "Create": 0.025
+      "Evaluate": 0.07,
+      "Create": 0.03
     },
     "module_distribution": {
       "Module 1": 0.25,
-      "Module 2": 0.25,
-      "Module 3": 0.25,
-      "Module 4": 0.25
+      "Module 2": 0.3,
+      "Module 3": 0.2,
+      "Module 4": 0.1,
+      "Module 5": 0.1,
+      "Module 6": 0.0
     },
     "pyq_usage": {
       "actual_pyq_count": 5,
       "new_question_count": 3,
-      "pyq_percentage": 0.625
+      "pyq_percentage": 62.5
     }
   },
   "sections": [
@@ -29,53 +31,53 @@
       "section_description": "Short Answer Questions",
       "questions": [
         {
-          "id": "aebd2abd",
-          "question_number": "1",
+          "id": "9e42961b",
+          "question_number": "1a",
           "module": "Module 1",
-          "topic": "ER Modeling",
-          "subtopic": "ER Diagrams",
+          "topic": "History of Deep Learning",
+          "subtopic": "",
           "marks": 5,
           "bloom_level": "Remember",
-          "question_text": "What is an ER diagram? Explain its components with examples.",
-          "selection_method": "pyq_exact",
-          "source_pyq_id": "pyq_008",
-          "is_pyq_sourced": true
+          "question_text": "List and briefly describe three key milestones in the history of deep learning.",
+          "selection_method": "generated_fallback",
+          "source_pyq_id": null,
+          "is_pyq_sourced": false
         },
         {
-          "id": "388e534e",
-          "question_number": "2",
-          "module": "Module 4",
-          "topic": "Transactions",
-          "subtopic": "ACID Properties",
-          "marks": 10,
-          "bloom_level": "Understand",
-          "question_text": "Describe each of the ACID properties (Atomicity, Consistency, Isolation, and Durability) of database transactions. For each property, provide a practical example and explain its significance in ensuring data integrity and reliability within a transactional system.",
-          "selection_method": "pyq_rephrased_marks",
-          "source_pyq_id": "pyq_005",
-          "is_pyq_sourced": true
-        },
-        {
-          "id": "51a6eb09",
-          "question_number": "3",
-          "module": "Module 3",
-          "topic": "Functional Dependencies",
-          "subtopic": "FD Rules",
-          "marks": 5,
-          "bloom_level": "Apply",
-          "question_text": "Given a relation R with attributes {A, B, C, D, E} and a set of functional dependencies F = {A -> B, BC -> D, D -> E}. Explain the significance of functional dependency closure and, using Armstrong's axioms, determine the closure of the attribute set {A, C} (i.e., {A, C}+), explicitly showing the application of each axiom in your derivation.",
-          "selection_method": "pyq_rephrased_bloom",
-          "source_pyq_id": "pyq_004",
-          "is_pyq_sourced": true
-        },
-        {
-          "id": "71e31ba3",
-          "question_number": "4",
+          "id": "8ceb815f",
+          "question_number": "1b",
           "module": "Module 2",
-          "topic": "SQL",
-          "subtopic": "DDL",
+          "topic": "Fundamentals of Neural Network",
+          "subtopic": "",
+          "marks": 5,
+          "bloom_level": "Understand",
+          "question_text": "What is an activation function? Describe any four activation functions.",
+          "selection_method": "pyq_exact",
+          "source_pyq_id": "pyq_007",
+          "is_pyq_sourced": true
+        },
+        {
+          "id": "e6addef0",
+          "question_number": "1c",
+          "module": "Module 3",
+          "topic": "Denoising Autoencoders",
+          "subtopic": "",
           "marks": 5,
           "bloom_level": "Remember",
-          "question_text": "List the five main DDL (Data Definition Language) commands in SQL and briefly state the primary function of each.",
+          "question_text": "Explain the concept of Denoising Autoencoders and their purpose in machine learning.",
+          "selection_method": "pyq_rephrased_marks",
+          "source_pyq_id": "pyq_019",
+          "is_pyq_sourced": true
+        },
+        {
+          "id": "1fbafbb9",
+          "question_number": "1d",
+          "module": "Module 4",
+          "topic": "CNN architecture",
+          "subtopic": "",
+          "marks": 5,
+          "bloom_level": "Understand",
+          "question_text": "Explain the key components of a Convolutional Neural Network (CNN) architecture and describe the role of each component in the process of image classification.",
           "selection_method": "generated_direct",
           "source_pyq_id": null,
           "is_pyq_sourced": false
@@ -87,54 +89,54 @@
       "section_description": "Long Answer Questions",
       "questions": [
         {
-          "id": "6cb72263",
-          "question_number": "5",
-          "module": "Module 1",
-          "topic": "ER Modeling",
-          "subtopic": "ER Diagrams",
-          "marks": 15,
-          "bloom_level": "Apply",
-          "question_text": "Draw an ER diagram for a library management system.",
-          "selection_method": "pyq_exact",
-          "source_pyq_id": "pyq_009",
-          "is_pyq_sourced": true
-        },
-        {
-          "id": "b9e2d332",
-          "question_number": "6",
+          "id": "b8269816",
+          "question_number": "2a",
           "module": "Module 2",
-          "topic": "Relational Algebra",
-          "subtopic": "Joins",
-          "marks": 15,
-          "bloom_level": "Understand",
-          "question_text": "Explain relational algebra operations: Selection, Projection, and Join with examples.",
-          "selection_method": "pyq_exact",
-          "source_pyq_id": "pyq_012",
-          "is_pyq_sourced": true
-        },
-        {
-          "id": "ed797b3e",
-          "question_number": "7",
-          "module": "Module 3",
-          "topic": "Normalization",
-          "subtopic": "Normal Forms",
+          "topic": "Regularization Methods",
+          "subtopic": "",
           "marks": 15,
           "bloom_level": "Apply",
-          "question_text": "Normalize the given relation to BCNF: R(A, B, C, D) with FDs: A\u2192B, B\u2192C, C\u2192D.",
-          "selection_method": "pyq_exact",
-          "source_pyq_id": "pyq_003",
-          "is_pyq_sourced": true
+          "question_text": "Consider a linear regression model that predicts the price of houses based on their size (in square feet) and the number of bedrooms. You have the following dataset:\n\n| Size (sq ft) | Bedrooms | Price ($) |\n|---------------|----------|-----------|\n| 1500          | 3        | 300,000   |\n| 1600          | 3        | 320,000   |\n| 1700          | 4        | 350,000   |\n| 1800          | 4        | 370,000   |\n| 1900          | 5        | 400,000   |\n\nYou decide to apply Lasso regularization to improve the model's performance and reduce overfitting. \n\n1. Compute the Lasso regression coefficients using a regularization parameter (\u03bb) of 0.1. Assume that the intercept is not regularized and that the model is fit using the least squares method with Lasso penalty.\n2. Explain how the choice of \u03bb affects the coefficients and the overall model performance.\n\nShow your calculations and provide a brief discussion on the impact of Lasso regularization in this context.",
+          "selection_method": "generated_fallback",
+          "source_pyq_id": null,
+          "is_pyq_sourced": false
         },
         {
-          "id": "5fbd7514",
-          "question_number": "8",
-          "module": "Module 4",
-          "topic": "Concurrency Control",
-          "subtopic": "Deadlock",
+          "id": "b8289471",
+          "question_number": "2b",
+          "module": "Module 3",
+          "topic": "Applications of Autoencoders",
+          "subtopic": "",
           "marks": 15,
           "bloom_level": "Analyze",
-          "question_text": "Deadlock handling strategies are broadly categorized into Prevention, Avoidance, and Detection & Recovery. Differentiate between these three approaches by examining their core principles, the conditions they address, and their respective operational overheads. Furthermore, analyze the critical trade-offs involved in selecting one strategy over the others for a given system design, considering factors such as resource utilization, system throughput, and implementation complexity.",
+          "question_text": "Compare and contrast the use of convolutional autoencoders and variational autoencoders in image compression tasks. In your answer, analyze the strengths and weaknesses of each approach, and discuss how their underlying architectures influence their performance in terms of reconstruction quality and computational efficiency. Provide specific examples or scenarios where one might be preferred over the other.",
           "selection_method": "generated_direct",
+          "source_pyq_id": null,
+          "is_pyq_sourced": false
+        },
+        {
+          "id": "753e6f61",
+          "question_number": "2c",
+          "module": "Module 5",
+          "topic": "Long Short Term Memory (LSTM)",
+          "subtopic": "",
+          "marks": 20,
+          "bloom_level": "Evaluate",
+          "question_text": "Critically evaluate the effectiveness of Long Short Term Memory (LSTM) networks compared to traditional recurrent neural networks (RNNs) in handling sequence prediction tasks. In your response, justify your arguments with specific examples from recent applications in natural language processing or time series forecasting. Additionally, assess the potential limitations of LSTMs and discuss scenarios where alternative models might be more appropriate.",
+          "selection_method": "generated_fallback",
+          "source_pyq_id": null,
+          "is_pyq_sourced": false
+        },
+        {
+          "id": "0910f115",
+          "question_number": "2d",
+          "module": "Module 2",
+          "topic": "Choosing output function and loss function",
+          "subtopic": "",
+          "marks": 15,
+          "bloom_level": "Apply",
+          "question_text": "A machine learning engineer is tasked with developing a binary classification model to predict whether a customer will purchase a product based on their browsing behavior. The output of the model is a probability score between 0 and 1, indicating the likelihood of purchase. \n\n1. Identify an appropriate output function for this binary classification problem and justify your choice. (5 marks)\n\n2. The engineer decides to use binary cross-entropy as the loss function. Given the following data for a batch of 4 customers, compute the binary cross-entropy loss:\n\n- True labels (y): [1, 0, 1, 0]\n- Predicted probabilities (p): [0.9, 0.2, 0.8, 0.1]\n\nShow your calculations clearly. (10 marks)",
+          "selection_method": "generated_fallback",
           "source_pyq_id": null,
           "is_pyq_sourced": false
         }
@@ -143,60 +145,56 @@
   ],
   "selection_stats": {
     "total_questions": 8,
-    "pyq_exact_match": 4,
+    "pyq_exact_match": 1,
     "pyq_rephrased_marks": 1,
-    "pyq_rephrased_bloom": 1,
-    "generated_new": 0,
+    "pyq_rephrased_bloom": 0,
+    "generated_new": 4,
     "direct_generated": 2
   },
   "selection_log": [
     {
-      "question_number": "1",
+      "question_number": "1a",
+      "method": "generated_fallback",
+      "pyq_id": null
+    },
+    {
+      "question_number": "1b",
       "method": "pyq_exact",
-      "pyq_id": "pyq_008"
+      "pyq_id": "pyq_007"
     },
     {
-      "question_number": "2",
+      "question_number": "1c",
       "method": "pyq_rephrased_marks",
-      "pyq_id": "pyq_005"
+      "pyq_id": "pyq_019"
     },
     {
-      "question_number": "3",
-      "method": "pyq_rephrased_bloom",
-      "pyq_id": "pyq_004"
-    },
-    {
-      "question_number": "4",
+      "question_number": "1d",
       "method": "generated_direct",
       "pyq_id": null
     },
     {
-      "question_number": "5",
-      "method": "pyq_exact",
-      "pyq_id": "pyq_009"
+      "question_number": "2a",
+      "method": "generated_fallback",
+      "pyq_id": null
     },
     {
-      "question_number": "6",
-      "method": "pyq_exact",
-      "pyq_id": "pyq_012"
-    },
-    {
-      "question_number": "7",
-      "method": "pyq_exact",
-      "pyq_id": "pyq_003"
-    },
-    {
-      "question_number": "8",
+      "question_number": "2b",
       "method": "generated_direct",
+      "pyq_id": null
+    },
+    {
+      "question_number": "2c",
+      "method": "generated_fallback",
+      "pyq_id": null
+    },
+    {
+      "question_number": "2d",
+      "method": "generated_fallback",
       "pyq_id": null
     }
   ],
   "used_pyq_ids": [
-    "pyq_005",
-    "pyq_008",
-    "pyq_012",
-    "pyq_009",
-    "pyq_003",
-    "pyq_004"
+    "pyq_007",
+    "pyq_019"
   ]
 }

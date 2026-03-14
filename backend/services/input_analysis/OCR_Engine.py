@@ -27,8 +27,8 @@ from PIL import Image, ImageEnhance
 # CONFIG  (edit these as needed)
 # ─────────────────────────────────────────────
 INPUT_PDF          = r"F:\AAI syllabus.pdf"    # default PDF path
-OUTPUT_DIR         = r"F:\output_images"       # folder to save enhanced images
-OUTPUT_TXT         = r"F:\extracted_text.txt"  # output text file
+OUTPUT_DIR         = os.path.join(os.getcwd(), "ocr_output", "images")
+OUTPUT_TXT         = os.path.join(os.getcwd(), "ocr_output", "extracted_text.txt")
 ZOOM               = 2                         # PDF to image zoom level
 MAX_WIDTH          = 2000                      # max image width (memory safety)
 LANGUAGES          = ['en']                    # EasyOCR languages
@@ -224,6 +224,7 @@ def main():
         sys.exit(1)
 
     os.makedirs(OUTPUT_DIR, exist_ok=True)
+    os.makedirs(os.path.dirname(OUTPUT_TXT), exist_ok=True)
 
     print(f"[Init] Loading EasyOCR for languages: {LANGUAGES} ...")
     reader = easyocr.Reader(LANGUAGES, gpu=GPU)

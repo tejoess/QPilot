@@ -112,91 +112,61 @@ def generate_blueprint(
     """
     
     # Build comprehensive prompt
-    prompt = f"""You are an expert question paper blueprint planner for Mumbai University.
+    prompt = f"""You are a Mumbai University question paper designer.
 
-Your task is to create a detailed question paper blueprint that satisfies all requirements.
+Your ONLY job: produce a list of questions. Do NOT compute totals, percentages, or metadata.
 
-**INPUT DATA:**
+**PAPER PATTERN:**
+- Total marks: {paper_pattern['total_marks']}
+- Total questions: {paper_pattern['total_questions']}
+- Sections: {json.dumps(paper_pattern['sections'], indent=2)}
 
-1. SYLLABUS:
+**MODULES & TOPICS:**
 {json.dumps(syllabus, indent=2)}
 
-2. PYQ ANALYSIS:
+**PYQ AVAILABILITY:**
 {json.dumps(pyq_analysis, indent=2)}
 
-3. BLOOM'S TAXONOMY COVERAGE REQUIRED:
+**BLOOM'S TARGET DISTRIBUTION:**
 {json.dumps(bloom_coverage, indent=2)}
 
-4. TEACHER PREFERENCES:
+**TEACHER PREFERENCES:**
 {json.dumps(teacher_input, indent=2)}
 
-5. PAPER PATTERN:
-{json.dumps(paper_pattern, indent=2)}
 
-**YOUR TASK:**
+**RULES:**
 
-Create a question paper blueprint following these STRICT RULES:
+MARKS — follow this exactly:
+- Place exactly {paper_pattern['total_questions']} questions across all sections
+- Keep a running total as you assign questions
+- Your last question's marks must close the gap to exactly {paper_pattern['total_marks']}
+- If you cannot reach {paper_pattern['total_marks']} exactly with remaining questions, adjust earlier questions before finalising
 
-HARD CONSTRAINTS (MUST FOLLOW):
-1. Total marks MUST equal exactly {paper_pattern['total_marks']}
-2. Total questions MUST equal exactly {paper_pattern['total_questions']}
-3. Each module weightage MUST be between {paper_pattern['module_weightage_range']['min']} and {paper_pattern['module_weightage_range']['max']}
-4. Follow the section structure exactly as specified
-5. Each question MUST have marks from the allowed values: {paper_pattern['allowed_marks_per_question']}
+MODULE BALANCE — per module, marks / {paper_pattern['total_marks']} must be:
+- At least {paper_pattern['module_weightage_range']['min'] * 100}%
+- At most {paper_pattern['module_weightage_range']['max'] * 100}%
+- Every module in the syllabus must appear in at least 1 question
 
-BLOOM'S TAXONOMY RULES:
-1. Distribution should closely match the required coverage (within ±5%)
-2. Remember: recall facts, definitions
-3. Understand: explain concepts, describe
-4. Apply: solve problems, use methods
-5. Analyze: compare, differentiate, break down
-6. Evaluate: critique, justify, assess
-7. Create: design, formulate, construct
+BLOOM'S — assign levels to match target distribution within ±5%:
+- First 30% of questions: only Remember or Understand
+- Middle 40%: Apply or Analyze
+- Last 30%: Evaluate or Create
 
-PYQ USAGE STRATEGY:
-1. If PYQ count for a topic is HIGH (>5), prefer using actual PYQs (set is_pyq: true)
-2. If PYQ count is MEDIUM (2-5), consider mix of PYQ and new
-3. If PYQ count is LOW (<2), generate new questions (set is_pyq: false)
-4. For topics with NO PYQs, MUST generate new questions
+PYQ USAGE:
+- Topic PYQ count > 5 → is_pyq: true
+- Topic PYQ count 2–5 → mix true/false
+- Topic PYQ count < 2 → is_pyq: false
+- No PYQs for topic → always is_pyq: false
 
-TEACHER PREFERENCE RULES:
-1. If teacher specifies focus modules, increase their weightage (but respect pattern limits)
-2. If teacher prefers PYQs, maximize PYQ usage where available
-3. If teacher wants specific topics emphasized, include them
-
-QUALITY RULES:
-1. Distribute topics evenly - don't repeat same topic too often
-2. Progress from easier to harder questions (Bloom's level should generally increase)
-3. Balance between theory and application
-4. Each module should have at least 1 question unless total questions < number of modules
+TOPIC FIELD:
+- Must exactly match a topic or subtopic name from the syllabus above
+- Do not invent or paraphrase topic names
 
 **OUTPUT FORMAT:**
 
-Return ONLY a valid JSON object (no markdown, no explanation) with this EXACT structure:
+Return ONLY valid JSON. No markdown. No explanation. No metadata fields.
 
 {{
-  "blueprint_metadata": {{
-    "total_marks": <number>,
-    "total_questions": <number>,
-    "bloom_distribution": {{
-      "Remember": <percentage as decimal, e.g., 0.15>,
-      "Understand": <percentage as decimal>,
-      "Apply": <percentage as decimal>,
-      "Analyze": <percentage as decimal>,
-      "Evaluate": <percentage as decimal>,
-      "Create": <percentage as decimal>
-    }},
-    "module_distribution": {{
-      "Module 1": <percentage as decimal>,
-      "Module 2": <percentage as decimal>,
-      ...
-    }},
-    "pyq_usage": {{
-      "actual_pyq_count": <number>,
-      "new_question_count": <number>,
-      "pyq_percentage": <percentage as decimal>
-    }}
-  }},
   "sections": [
     {{
       "section_name": "Section A",
@@ -205,33 +175,19 @@ Return ONLY a valid JSON object (no markdown, no explanation) with this EXACT st
         {{
           "question_number": "1a",
           "module": "Module 1",
-          "topic": "Process Management",
-          "subtopic": "Process States",
+          "topic": "<exact name from syllabus>",
           "marks": 5,
           "bloom_level": "Remember",
           "is_pyq": true,
-          "rationale": "High PYQ availability"
-        }},
-        ...
+          "rationale": "max 10 words"
+        }}
       ]
-    }},
-    ...
-  ],
-  "strategy_notes": "Brief explanation of your strategy and any trade-offs made"
+    }}
+  ]
 }}
 
-**IMPORTANT:**
-- Output ONLY the JSON, nothing else
-- Ensure all marks add up to {paper_pattern['total_marks']}
-- Ensure total questions = {paper_pattern['total_questions']}
-- Each question MUST have all required fields
-- Bloom levels MUST be one of: Remember, Understand, Apply, Analyze, Evaluate, Create
-- Module names MUST match exactly with syllabus module names
-- Keep "rationale" field VERY brief (max 10 words each)
-- Keep "strategy_notes" field VERY brief (max 50 words total)
-- Keep "subtopic" field concise (max 5 words)
-
-Now generate the blueprint:"""
+Bloom level must be one of: Remember, Understand, Apply, Analyze, Evaluate, Create
+"""
 
     # Call LLM with retry logic
     max_retries = 3
@@ -344,25 +300,25 @@ def print_blueprint_summary(blueprint: Dict):
     print("📋 QUESTION PAPER BLUEPRINT GENERATED")
     print("="*80)
     
-    metadata = blueprint['blueprint_metadata']
+    #metadata = blueprint['blueprint_metadata']
     
     print(f"\n📊 OVERVIEW:")
-    print(f"  Total Marks: {metadata['total_marks']}")
-    print(f"  Total Questions: {metadata['total_questions']}")
+    # print(f"  Total Marks: {metadata['total_marks']}")
+    # print(f"  Total Questions: {metadata['total_questions']}")
     
     print(f"\n🧠 BLOOM'S TAXONOMY DISTRIBUTION:")
-    for level, pct in metadata['bloom_distribution'].items():
-        print(f"  {level:12} : {pct*100:5.1f}%")
+    # for level, pct in metadata['bloom_distribution'].items():
+    #     print(f"  {level:12} : {pct*100:5.1f}%")
     
     print(f"\n📚 MODULE DISTRIBUTION:")
-    for module, pct in metadata['module_distribution'].items():
-        print(f"  {module:12} : {pct*100:5.1f}%")
+    # for module, pct in metadata['module_distribution'].items():
+    #     print(f"  {module:12} : {pct*100:5.1f}%")
     
     print(f"\n📝 PYQ USAGE:")
-    pyq_info = metadata['pyq_usage']
-    print(f"  Actual PYQs: {pyq_info['actual_pyq_count']}")
-    print(f"  New Questions: {pyq_info['new_question_count']}")
-    print(f"  PYQ Percentage: {pyq_info['pyq_percentage']*100:.1f}%")
+    # pyq_info = metadata['pyq_usage']
+    # print(f"  Actual PYQs: {pyq_info['actual_pyq_count']}")
+    # print(f"  New Questions: {pyq_info['new_question_count']}")
+    # print(f"  PYQ Percentage: {pyq_info['pyq_percentage']*100:.1f}%")
     
     print(f"\n📄 SECTIONS & QUESTIONS:")
     for section in blueprint['sections']:
@@ -382,66 +338,117 @@ def print_blueprint_summary(blueprint: Dict):
 # ============================================================================
 
 SAMPLE_SYLLABUS = {
-    "course_name": "Database Management Systems",
-    "course_code": "CS301",
-    "modules": {
-        "Module 1": {
-            "name": "Introduction to DBMS",
-            "official_weightage": 0.25,
-            "topics": [
-                {
-                    "name": "Database Concepts",
-                    "subtopics": ["Data vs Information", "DBMS Architecture", "Data Independence"]
-                },
-                {
-                    "name": "ER Modeling",
-                    "subtopics": ["Entities", "Attributes", "Relationships", "ER Diagrams"]
-                }
-            ]
-        },
-        "Module 2": {
-            "name": "Relational Model",
-            "official_weightage": 0.25,
-            "topics": [
-                {
-                    "name": "Relational Algebra",
-                    "subtopics": ["Selection", "Projection", "Joins", "Set Operations"]
-                },
-                {
-                    "name": "SQL",
-                    "subtopics": ["DDL", "DML", "Queries", "Joins"]
-                }
-            ]
-        },
-        "Module 3": {
-            "name": "Normalization",
-            "official_weightage": 0.25,
-            "topics": [
-                {
-                    "name": "Functional Dependencies",
-                    "subtopics": ["FD Rules", "Closure", "Minimal Cover"]
-                },
-                {
-                    "name": "Normal Forms",
-                    "subtopics": ["1NF", "2NF", "3NF", "BCNF"]
-                }
-            ]
-        },
-        "Module 4": {
-            "name": "Transaction Management",
-            "official_weightage": 0.25,
-            "topics": [
-                {
-                    "name": "Transactions",
-                    "subtopics": ["ACID Properties", "Transaction States", "Schedules"]
-                },
-                {
-                    "name": "Concurrency Control",
-                    "subtopics": ["Locking", "Timestamps", "Deadlock"]
-                }
-            ]
-        }
+  "course_code": "CSC701",
+  "course_name": "Deep Learning",
+  "course_objectives": [
+    "To learn the fundamentals of Neural Network.",
+    "To gain an in-depth understanding of training Deep Neural Networks.",
+    "To acquire knowledge of advanced concepts of Convolution Neural Networks, Autoencoders and Recurrent Neural Networks.",
+    "Students should be familiar with the recent trends in Deep Learning."
+  ],
+  "course_outcomes": [
+    "Gain basic knowledge of Neural Networks.",
+    "Acquire in depth understanding of training Deep Neural Networks.",
+    "Design appropriate DNN model for supervised, unsupervised and sequence learning applications.",
+    "Gain familiarity with recent trends and applications of Deep Learning."
+  ],
+  "modules": [
+    {
+      "module_number": 1,
+      "module_name": "Fundamentals of Neural Network",
+      "weightage_hours": 4,
+      "topics": [
+        "History of Deep Learning",
+        "Deep Learning Success Stories",
+        "Multilayer Perceptrons (MLPs)",
+        "Representation Power of MLPs",
+        "Sigmoid Neurons",
+        "Gradient Descent",
+        "Feedforward Neural Networks",
+        "Representation Power of Feedforward Neural Networks",
+        "Deep Networks: Three Classes of Deep Learning",
+        "Basic Terminologies of Deep Learning"
+      ]
+    },
+    {
+      "module_number": 2,
+      "module_name": "Training, Optimization and Regularization of Deep Neural Network",
+      "weightage_hours": 10,
+      "topics": [
+        "Training FeedforwardDNN Multi Layered Feed Forward Neural Network",
+        "Learning Factors",
+        "Activation functions: Tanh, Logistic, Linear, Softmax, ReLU, Leaky ReLU",
+        "Loss functions: Squared Error loss, Cross Entropy",
+        "Choosing output function and loss function",
+        "Optimization Learning with backpropagation",
+        "Learning Parameters: Gradient Descent (GD), Stochastic and Mini Batch GD, Momentum Based GD, Nesterov Accelerated GD, AdaGrad, Adam, RMSProp",
+        "Regularization Overview of Overfitting",
+        "Types of biases",
+        "Bias Variance Tradeoff",
+        "Regularization Methods: L1, L2 regularization, Parameter sharing, Dropout, Weight Decay, Batch normalization, Early stopping, Data Augmentation, Adding noise to input and output"
+      ]
+    },
+    {
+      "module_number": 3,
+      "module_name": "Autoencoders: Unsupervised Learning",
+      "weightage_hours": 6,
+      "topics": [
+        "Introduction",
+        "Linear Autoencoder",
+        "Undercomplete Autoencoder",
+        "Overcomplete Autoencoders",
+        "Regularization in Autoencoders",
+        "Denoising Autoencoders",
+        "Sparse Autoencoders",
+        "Contractive Autoencoders",
+        "Application of Autoencoders: Image Compression"
+      ]
+    },
+    {
+      "module_number": 4,
+      "module_name": "Convolutional Neural Networks (CNN): Supervised Learning",
+      "weightage_hours": 7,
+      "topics": [
+        "Convolution operation",
+        "Padding",
+        "Stride",
+        "Relation between input, output and filter size",
+        "CNN architecture: Convolution layer, Pooling Layer",
+        "Weight Sharing in CNN",
+        "Fully Connected NN vs CNN",
+        "Variants of basic Convolution function",
+        "Multichannel convolution operation",
+        "2D convolution",
+        "Modern Deep Learning Architectures: LeNET: Architecture, AlexNET: Architecture, ResNet : Architecture"
+      ]
+    },
+    {
+      "module_number": 5,
+      "module_name": "Recurrent Neural Networks (RNN)",
+      "weightage_hours": 8,
+      "topics": [
+        "Sequence Learning Problem",
+        "Unfolding Computational graphs",
+        "Recurrent Neural Network",
+        "Bidirectional RNN",
+        "Backpropagation Through Time (BTT)",
+        "Limitation of ' vanilla RNN' Vanishing and Exploding Gradients",
+        "Truncated BTT",
+        "Long Short Term Memory(LSTM): Selective Read, Selective write, Selective Forget",
+        "Gated Recurrent Unit (GRU)"
+      ]
+    },
+    {
+      "module_number": 6,
+      "module_name": "Recent Trends and Applications",
+      "weightage_hours": 4,
+      "topics": [
+        "Generative Adversarial Network (GAN): Architecture",
+        "Applications: Image Generation",
+        "DeepFake"
+      ]
     }
+  ]
 }
 
 SAMPLE_PYQ_ANALYSIS = {
@@ -504,46 +511,42 @@ SAMPLE_BLOOM_COVERAGE = {
 }
 
 SAMPLE_TEACHER_INPUT = {
-    "focus_modules": ["Module 3", "Module 4"],
-    "focus_reason": "Students struggle with normalization and transactions",
-    "prefer_pyqs": True,
-    "difficulty_preference": "medium",
-    "special_instructions": "Include at least one numerical problem on normalization"
+    "input":"I want this paper only on first 3 modules, keep all other accuracy constraint same, but quetion paper should be strictly on 1sst three modules only.",
+    "pyq_percentage": 50
 }
 
 SAMPLE_PAPER_PATTERN = {
     "university": "Mumbai University",
     "exam_type": "Internal Assessment",
-    "total_marks": 80,
-    "total_questions": 8,
-    "duration_minutes": 180,
-    "allowed_marks_per_question": [5, 10, 15, 20],
+    "total_marks": 32,
+    "total_questions": 10,
+    "duration_minutes": 60,
     "module_weightage_range": {
-        "min": 0.20,
+        "min": 0.0,
         "max": 0.30
     },
     "sections": [
         {
             "section_name": "Section A",
-            "description": "Short Answer Questions",
-            "question_count": 4,
-            "marks_per_question": 5,
-            "total_marks": 20
+            "description": "Answer the following(2 marks each)",
+            "question_count": 6,
+            "marks_per_question": 2,
+            "total_marks": 12
         },
         {
             "section_name": "Section B",
             "description": "Long Answer Questions",
             "question_count": 4,
-            "marks_per_question": 15,
-            "total_marks": 60
+            "marks_per_question": 5,
+            "total_marks": 20
         }
     ]
 }
 
 
-# ============================================================================
-# TEST EXECUTION
-# ============================================================================
+#============================================================================
+#TEST EXECUTION
+#============================================================================
 
 # if __name__ == "__main__":
 #     print("🚀 Starting Blueprint Generation...")
@@ -560,7 +563,7 @@ SAMPLE_PAPER_PATTERN = {
 #         )
         
 #         # Print summary
-#         print_blueprint_summary(blueprint)
+#         #print_blueprint_summary(blueprint)
         
 #         # Save to file
 #         output_file = "generated_blueprint.json"

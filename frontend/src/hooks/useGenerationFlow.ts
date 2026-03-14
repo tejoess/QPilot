@@ -1,0 +1,188 @@
+/**
+ * hooks/useGenerationFlow.ts
+ *
+ * Single hook that fires all 3 backend APIs sequentially:
+ *   1. POST /analyze-syllabus
+ *   2. POST /analyze-pyqs
+ *   3. POST /generate-paper
+ *
+ * Each call opens its own WebSocket connection first so logs stream in real time.
+ * Exposes `phase`, `logs`, `progress`, `paperData`, and `runFullGeneration()`.
+ */
+
+import { useCallback, useEffect } from "react";
+import { useOrchestrationStore } from "@/store/orchestrationStore";
+import { analyzeSyllabus, analyzePyqs, generateQuestionPaper } from "@/lib/projectApi";
+import type { BloomLevels } from "@/store/bloomStore";
+import type { PatternSection } from "@/store/patternStore";
+
+export type GenerationPhase =
+    | "idle"
+    | "syllabus"
+    | "pyqs"
+    | "generating"
+    | "done"
+    | "error";
+
+export interface GenerationConfig {
+    // Syllabus input — exactly one of file/text required
+    syllabusFile?: File;
+    syllabusText?: string;
+    // PYQ input — exactly one of file/text required
+    pyqsFile?: File;
+    pyqsText?: string;
+    // Paper config
+    bloomLevels: BloomLevels;
+    sections: PatternSection[];
+    totalMarks: number;
+    totalQuestions: number;
+    teacherInput?: string;
+}
+
+// Derive phase from the three step statuses
+function derivePhase(
+    syllabusStatus: string,
+    pyqsStatus: string,
+    paperStatus: string
+): GenerationPhase {
+    if (
+        syllabusStatus === "failed" ||
+        pyqsStatus === "failed" ||
+        paperStatus === "failed"
+    )
+        return "error";
+    if (paperStatus === "completed") return "done";
+    if (paperStatus === "running") return "generating";
+    if (pyqsStatus === "running") return "pyqs";
+    if (syllabusStatus === "running") return "syllabus";
+    return "idle";
+}
+
+export function useGenerationFlow() {
+    const store = useOrchestrationStore();
+
+    const phase = derivePhase(
+        store.syllabusStatus,
+        store.pyqsStatus,
+        store.paperStatus
+    );
+
+    // Clean up WebSocket on unmount
+    useEffect(() => {
+        return () => store.disconnectWebSocket();
+    }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+    const runFullGeneration = useCallback(
+        async (config: GenerationConfig) => {
+            store.reset();
+
+            // ── Step 1: Analyze Syllabus ──────────────────────────────────────
+            const syllabusSessionId = `syllabus-${Date.now()}`;
+            store.setSyllabusSession(syllabusSessionId);
+            store.setSyllabusStatus("running");
+            store.connectWebSocket(syllabusSessionId);
+
+            // Give WebSocket time to connect
+            await new Promise((r) => setTimeout(r, 400));
+
+            let syllabusId: string;
+            try {
+                const syllabusRes = await analyzeSyllabus({
+                    file: config.syllabusFile,
+                    text: config.syllabusText,
+                    sessionId: syllabusSessionId,
+                });
+                syllabusId = syllabusRes.session_id;
+                store.setSyllabusData(syllabusRes.syllabus);
+                store.setSyllabusStatus("completed");
+            } catch (err) {
+                const msg = err instanceof Error ? err.message : "Syllabus analysis failed";
+                store.setError(msg);
+                store.setSyllabusStatus("failed");
+                return;
+            }
+
+            // ── Step 2: Analyze PYQs ─────────────────────────────────────────
+            const pyqsSessionId = `pyqs-${Date.now()}`;
+            store.setPyqsSession(pyqsSessionId);
+            store.setPyqsStatus("running");
+            store.disconnectWebSocket();
+            await new Promise((r) => setTimeout(r, 200));
+            store.connectWebSocket(pyqsSessionId);
+            await new Promise((r) => setTimeout(r, 400));
+
+            let pyqsId: string;
+            try {
+                const pyqsRes = await analyzePyqs({
+                    syllabusSessionId: syllabusId,
+                    file: config.pyqsFile,
+                    text: config.pyqsText,
+                    sessionId: pyqsSessionId,
+                });
+                pyqsId = pyqsRes.session_id;
+                store.setPyqsData(pyqsRes.pyqs);
+                store.setPyqsStatus("completed");
+            } catch (err) {
+                const msg = err instanceof Error ? err.message : "PYQ analysis failed";
+                store.setError(msg);
+                store.setPyqsStatus("failed");
+                return;
+            }
+
+            // ── Step 3: Generate Paper ────────────────────────────────────────
+            const paperSessionId = `paper-${Date.now()}`;
+            store.setPaperSession(paperSessionId);
+            store.setPaperStatus("running");
+            store.disconnectWebSocket();
+            await new Promise((r) => setTimeout(r, 200));
+            store.connectWebSocket(paperSessionId);
+            await new Promise((r) => setTimeout(r, 400));
+
+            try {
+                const paperPattern =
+                    config.sections.length > 0
+                        ? {
+                              sections: config.sections.map((s) => ({
+                                  name: s.name,
+                                  type: s.type,
+                                  numQuestions: s.numQuestions,
+                                  marksPerQuestion: s.marksPerQuestion,
+                              })),
+                          }
+                        : undefined;
+
+                const paperRes = await generateQuestionPaper({
+                    syllabusSessionId: syllabusId,
+                    pyqsSessionId: pyqsId,
+                    sessionId: paperSessionId,
+                    totalMarks: config.totalMarks,
+                    totalQuestions: config.totalQuestions,
+                    bloomLevels: config.bloomLevels,
+                    paperPattern,
+                    teacherInput: config.teacherInput,
+                });
+                store.setPaperData(paperRes.paper);
+                store.setPaperStatus("completed");
+            } catch (err) {
+                const msg = err instanceof Error ? err.message : "Paper generation failed";
+                store.setError(msg);
+                store.setPaperStatus("failed");
+            }
+        },
+        [store]
+    );
+
+    return {
+        phase,
+        logs: store.logs,
+        progress: store.currentProgress,
+        isConnected: store.isConnected,
+        paperData: store.paperData,
+        error: store.error,
+        syllabusSessionId: store.syllabusSessionId,
+        pyqsSessionId: store.pyqsSessionId,
+        paperSessionId: store.paperSessionId,
+        runFullGeneration,
+        reset: store.reset,
+    };
+}

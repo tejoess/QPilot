@@ -1,3 +1,4 @@
+// @ts-nocheck — legacy hook superseded by useGenerationFlow; kept for reference only
 /**
  * hooks/useWorkflowOrchestrator.ts
  * ─────────────────────────────────────────────────────────────────────────────
@@ -239,6 +240,7 @@ export function useWorkflowOrchestrator() {
         syllabusData: store.syllabusData,
         pyqsData: store.pyqsData,
         paperData: store.paperData,
+        setPaperData: store.setPaperData,
 
         // Messages
         logs: store.logs,

@@ -1,33 +1,11 @@
-/**
+﻿/**
  * store/orchestrationStore.ts
- * ─────────────────────────────────────────────────────────────────────────────
- * Orchestration store for managing the 3-step workflow:
- * 1. Analyze Syllabus → 2. Analyze PYQs → 3. Generate Paper
- * 
- * Features:
- * - Session ID tracking for all 3 steps
- * - WebSocket connection management for real-time updates
- * - Progress and log message storage
- * - Sequential execution queue
- * - Auto-trigger next step on completion
- * ─────────────────────────────────────────────────────────────────────────────
+ * Manages session IDs, step statuses, WebSocket, logs, and paper data.
  */
 
 import { create } from "zustand";
 
-// ─── Types ────────────────────────────────────────────────────────────────────
-
-export type WorkflowStep = "syllabus" | "pyqs" | "paper";
 export type StepStatus = "idle" | "running" | "completed" | "failed";
-
-export interface ProgressMessage {
-    type: "progress";
-    timestamp: string;
-    step: string;
-    status: string;
-    progress: number; // 0-100
-    details: string;
-}
 
 export interface LogMessage {
     type: "log";
@@ -36,16 +14,21 @@ export interface LogMessage {
     message: string;
 }
 
-export interface CompletionMessage {
-    type: "completion";
+export interface ProgressMessage {
+    type: "progress";
     timestamp: string;
-    success: boolean;
-    data: Record<string, any>;
+    step: string;
+    status: string;
+    progress: number;
+    details: string;
 }
 
-export type WebSocketMessage = ProgressMessage | LogMessage | CompletionMessage;
+export type WebSocketMessage =
+    | LogMessage
+    | ProgressMessage
+    | { type: "completion"; timestamp: string; success: boolean; data: Record<string, any> };
 
-export interface WorkflowState {
+interface OrchestrationState {
     // Session IDs
     syllabusSessionId: string | null;
     pyqsSessionId: string | null;
@@ -56,68 +39,48 @@ export interface WorkflowState {
     pyqsStatus: StepStatus;
     paperStatus: StepStatus;
 
-    // Current progress
-    currentStep: WorkflowStep | null;
-    currentProgress: number; // 0-100
+    // Real-time progress (0â€“100)
+    currentProgress: number;
 
-    // WebSocket state
+    // WebSocket
     ws: WebSocket | null;
     isConnected: boolean;
-    
-    // Messages
+
+    // Streaming messages
     logs: LogMessage[];
     progressUpdates: ProgressMessage[];
-    
-    // Data
+
+    // Result data
     syllabusData: any | null;
     pyqsData: any | null;
     paperData: any | null;
 
-    // Errors
     error: string | null;
 
-    // Queue for sequential execution
-    pendingSteps: WorkflowStep[];
+    // Actions
+    setSyllabusSession: (id: string) => void;
+    setPyqsSession: (id: string) => void;
+    setPaperSession: (id: string) => void;
 
-    // ─── Actions ──────────────────────────────────────────────────────────────
+    setSyllabusStatus: (s: StepStatus) => void;
+    setPyqsStatus: (s: StepStatus) => void;
+    setPaperStatus: (s: StepStatus) => void;
 
-    // Session management
-    setSyllabusSession: (sessionId: string) => void;
-    setPyqsSession: (sessionId: string) => void;
-    setPaperSession: (sessionId: string) => void;
-
-    // Status updates
-    setSyllabusStatus: (status: StepStatus) => void;
-    setPyqsStatus: (status: StepStatus) => void;
-    setPaperStatus: (status: StepStatus) => void;
-
-    // WebSocket management
     connectWebSocket: (sessionId: string) => void;
     disconnectWebSocket: () => void;
     addLog: (log: LogMessage) => void;
-    addProgress: (progress: ProgressMessage) => void;
+    addProgress: (msg: ProgressMessage) => void;
 
-    // Data storage
     setSyllabusData: (data: any) => void;
     setPyqsData: (data: any) => void;
     setPaperData: (data: any) => void;
 
-    // Workflow control
-    startWorkflow: (step: WorkflowStep) => void;
-    completeStep: (step: WorkflowStep, data?: any) => void;
-    failStep: (step: WorkflowStep, error: string) => void;
-    queueStep: (step: WorkflowStep) => void;
-    processQueue: () => void;
-
-    // Reset
-    reset: () => void;
+    setError: (err: string | null) => void;
     clearLogs: () => void;
+    reset: () => void;
 }
 
-// ─── Store ────────────────────────────────────────────────────────────────────
-
-export const useOrchestrationStore = create<WorkflowState>((set, get) => ({
-    // Initial state
+export const useOrchestrationStore = create<OrchestrationState>((set, get) => ({
     syllabusSessionId: null,
     pyqsSessionId: null,
     paperSessionId: null,
@@ -126,7 +89,6 @@ export const useOrchestrationStore = create<WorkflowState>((set, get) => ({
     pyqsStatus: "idle",
     paperStatus: "idle",
 
-    currentStep: null,
     currentProgress: 0,
 
     ws: null,
@@ -140,181 +102,65 @@ export const useOrchestrationStore = create<WorkflowState>((set, get) => ({
     paperData: null,
 
     error: null,
-    pendingSteps: [],
 
-    // ─── Session Management ───────────────────────────────────────────────────
+    setSyllabusSession: (id) => set({ syllabusSessionId: id }),
+    setPyqsSession: (id) => set({ pyqsSessionId: id }),
+    setPaperSession: (id) => set({ paperSessionId: id }),
 
-    setSyllabusSession: (sessionId) => set({ syllabusSessionId: sessionId }),
-    setPyqsSession: (sessionId) => set({ pyqsSessionId: sessionId }),
-    setPaperSession: (sessionId) => set({ paperSessionId: sessionId }),
-
-    // ─── Status Updates ───────────────────────────────────────────────────────
-
-    setSyllabusStatus: (status) => set({ syllabusStatus: status }),
-    setPyqsStatus: (status) => set({ pyqsStatus: status }),
-    setPaperStatus: (status) => set({ paperStatus: status }),
-
-    // ─── WebSocket Management ─────────────────────────────────────────────────
+    setSyllabusStatus: (s) => set({ syllabusStatus: s }),
+    setPyqsStatus: (s) => set({ pyqsStatus: s }),
+    setPaperStatus: (s) => set({ paperStatus: s }),
 
     connectWebSocket: (sessionId) => {
-        const state = get();
-        
-        // Disconnect existing connection
-        if (state.ws) {
-            state.ws.close();
-        }
+        const { ws } = get();
+        if (ws) ws.close();
 
-        const wsUrl = `ws://127.0.0.1:8000/ws/${sessionId}`;
-        console.log(`🔌 Connecting to WebSocket: ${wsUrl}`);
+        const socket = new WebSocket(`ws://127.0.0.1:8000/ws/${sessionId}`);
 
-        const ws = new WebSocket(wsUrl);
+        socket.onopen = () => set({ ws: socket, isConnected: true });
 
-        ws.onopen = () => {
-            console.log(`✅ WebSocket connected: ${sessionId}`);
-            set({ ws, isConnected: true });
-        };
-
-        ws.onmessage = (event) => {
+        socket.onmessage = (event) => {
             try {
-                const message: WebSocketMessage = JSON.parse(event.data);
-                
-                if (message.type === "progress") {
-                    get().addProgress(message);
-                    set({ currentProgress: message.progress });
-                } else if (message.type === "log") {
-                    get().addLog(message);
-                } else if (message.type === "completion") {
-                    console.log("✅ Workflow step completed:", message.data);
-                    // Process next queued step
-                    setTimeout(() => get().processQueue(), 500);
+                const msg: WebSocketMessage = JSON.parse(event.data);
+                if (msg.type === "log") {
+                    get().addLog(msg as LogMessage);
+                } else if (msg.type === "progress") {
+                    get().addProgress(msg as ProgressMessage);
+                    set({ currentProgress: (msg as ProgressMessage).progress });
                 }
-            } catch (err) {
-                console.error("Failed to parse WebSocket message:", err);
+            } catch {
+                // ignore malformed messages
             }
         };
 
-        ws.onerror = (error) => {
-            console.error("❌ WebSocket error:", error);
-            set({ isConnected: false, error: "WebSocket connection failed" });
-        };
+        socket.onerror = () => set({ isConnected: false });
+        socket.onclose = () => set({ ws: null, isConnected: false });
 
-        ws.onclose = () => {
-            console.log("🔌 WebSocket disconnected");
-            set({ ws: null, isConnected: false });
-        };
-
-        set({ ws });
+        set({ ws: socket });
     },
 
     disconnectWebSocket: () => {
-        const state = get();
-        if (state.ws) {
-            state.ws.close();
-            set({ ws: null, isConnected: false });
-        }
+        const { ws } = get();
+        if (ws) ws.close();
+        set({ ws: null, isConnected: false });
     },
 
-    addLog: (log) => {
-        set((state) => ({
-            logs: [...state.logs, log].slice(-100) // Keep last 100 logs
-        }));
-    },
+    addLog: (log) =>
+        set((s) => ({ logs: [...s.logs, log].slice(-200) })),
 
-    addProgress: (progress) => {
-        set((state) => ({
-            progressUpdates: [...state.progressUpdates, progress].slice(-50) // Keep last 50 updates
-        }));
-    },
-
-    // ─── Data Storage ─────────────────────────────────────────────────────────
+    addProgress: (msg) =>
+        set((s) => ({ progressUpdates: [...s.progressUpdates, msg].slice(-50) })),
 
     setSyllabusData: (data) => set({ syllabusData: data }),
     setPyqsData: (data) => set({ pyqsData: data }),
     setPaperData: (data) => set({ paperData: data }),
 
-    // ─── Workflow Control ─────────────────────────────────────────────────────
+    setError: (err) => set({ error: err }),
 
-    startWorkflow: (step) => {
-        console.log(`🚀 Starting workflow step: ${step}`);
-        set({ currentStep: step, currentProgress: 0, error: null });
-
-        if (step === "syllabus") {
-            get().setSyllabusStatus("running");
-        } else if (step === "pyqs") {
-            get().setPyqsStatus("running");
-        } else if (step === "paper") {
-            get().setPaperStatus("running");
-        }
-    },
-
-    completeStep: (step, data) => {
-        console.log(`✅ Completed workflow step: ${step}`, data);
-
-        if (step === "syllabus") {
-            get().setSyllabusStatus("completed");
-            if (data) get().setSyllabusData(data);
-        } else if (step === "pyqs") {
-            get().setPyqsStatus("completed");
-            if (data) get().setPyqsData(data);
-        } else if (step === "paper") {
-            get().setPaperStatus("completed");
-            if (data) get().setPaperData(data);
-        }
-
-        set({ currentProgress: 100 });
-        
-        // Process next step in queue
-        setTimeout(() => get().processQueue(), 1000);
-    },
-
-    failStep: (step, error) => {
-        console.error(`❌ Failed workflow step: ${step}`, error);
-
-        if (step === "syllabus") {
-            get().setSyllabusStatus("failed");
-        } else if (step === "pyqs") {
-            get().setPyqsStatus("failed");
-        } else if (step === "paper") {
-            get().setPaperStatus("failed");
-        }
-
-        set({ error, currentStep: null });
-    },
-
-    queueStep: (step) => {
-        set((state) => ({
-            pendingSteps: [...state.pendingSteps, step]
-        }));
-        console.log(`📋 Queued step: ${step}`);
-    },
-
-    processQueue: () => {
-        const state = get();
-        
-        if (state.pendingSteps.length === 0) {
-            console.log("✅ Queue empty, all steps complete");
-            return;
-        }
-
-        const nextStep = state.pendingSteps[0];
-        console.log(`🔄 Processing queued step: ${nextStep}`);
-
-        set((state) => ({
-            pendingSteps: state.pendingSteps.slice(1)
-        }));
-
-        // Trigger the next step (implementation in hook)
-        get().startWorkflow(nextStep);
-    },
-
-    // ─── Reset ────────────────────────────────────────────────────────────────
+    clearLogs: () => set({ logs: [], progressUpdates: [] }),
 
     reset: () => {
-        const state = get();
-        if (state.ws) {
-            state.ws.close();
-        }
-
+        get().disconnectWebSocket();
         set({
             syllabusSessionId: null,
             pyqsSessionId: null,
@@ -322,21 +168,16 @@ export const useOrchestrationStore = create<WorkflowState>((set, get) => ({
             syllabusStatus: "idle",
             pyqsStatus: "idle",
             paperStatus: "idle",
-            currentStep: null,
             currentProgress: 0,
-            ws: null,
-            isConnected: false,
             logs: [],
             progressUpdates: [],
             syllabusData: null,
             pyqsData: null,
             paperData: null,
             error: null,
-            pendingSteps: []
         });
     },
-
-    clearLogs: () => {
-        set({ logs: [], progressUpdates: [] });
-    }
 }));
+
+
+

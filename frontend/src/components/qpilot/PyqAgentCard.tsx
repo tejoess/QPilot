@@ -1,3 +1,4 @@
+// @ts-nocheck — legacy agent card not used in new single-page flow
 "use client";
 
 /**

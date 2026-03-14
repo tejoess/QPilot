@@ -1,71 +1,62 @@
 {
-  "blueprint_metadata": {
-    "total_marks": 80,
-    "total_questions": 8,
-    "bloom_distribution": {
-      "Remember": 0.125,
-      "Understand": 0.3125,
-      "Apply": 0.375,
-      "Analyze": 0.1875,
-      "Evaluate": 0.0,
-      "Create": 0.0
-    },
-    "module_distribution": {
-      "Module 1": 0.25,
-      "Module 2": 0.25,
-      "Module 3": 0.25,
-      "Module 4": 0.25
-    },
-    "pyq_usage": {
-      "actual_pyq_count": 8,
-      "new_question_count": 0,
-      "pyq_percentage": 1.0
-    }
-  },
   "sections": [
     {
       "section_name": "Section A",
-      "section_description": "Short Answer Questions",
+      "section_description": "Answer the following(2 marks each)",
       "questions": [
         {
           "question_number": "1a",
           "module": "Module 1",
-          "topic": "Database Concepts",
-          "subtopic": "Data vs Information",
-          "marks": 5,
+          "topic": "History of Deep Learning",
+          "marks": 2,
           "bloom_level": "Remember",
           "is_pyq": true,
-          "rationale": "High PYQ count."
+          "rationale": "max 10 words"
         },
         {
           "question_number": "1b",
-          "module": "Module 2",
-          "topic": "SQL",
-          "subtopic": "DDL",
-          "marks": 5,
+          "module": "Module 1",
+          "topic": "Deep Learning Success Stories",
+          "marks": 2,
           "bloom_level": "Understand",
           "is_pyq": true,
-          "rationale": "High PYQ count."
+          "rationale": "max 10 words"
         },
         {
           "question_number": "1c",
-          "module": "Module 3",
-          "topic": "Functional Dependencies",
-          "subtopic": "FD Rules",
-          "marks": 5,
-          "bloom_level": "Understand",
+          "module": "Module 1",
+          "topic": "Multilayer Perceptrons (MLPs)",
+          "marks": 2,
+          "bloom_level": "Remember",
           "is_pyq": true,
-          "rationale": "Medium PYQ count."
+          "rationale": "max 10 words"
         },
         {
           "question_number": "1d",
-          "module": "Module 4",
-          "topic": "Transactions",
-          "subtopic": "ACID Properties",
-          "marks": 5,
+          "module": "Module 2",
+          "topic": "Activation functions: Tanh, Logistic, Linear, Softmax, ReLU, Leaky ReLU",
+          "marks": 2,
+          "bloom_level": "Understand",
+          "is_pyq": false,
+          "rationale": "max 10 words"
+        },
+        {
+          "question_number": "1e",
+          "module": "Module 2",
+          "topic": "Loss functions: Squared Error loss, Cross Entropy",
+          "marks": 2,
           "bloom_level": "Remember",
           "is_pyq": true,
-          "rationale": "High PYQ count."
+          "rationale": "max 10 words"
+        },
+        {
+          "question_number": "1f",
+          "module": "Module 2",
+          "topic": "Regularization Overview of Overfitting",
+          "marks": 2,
+          "bloom_level": "Understand",
+          "is_pyq": false,
+          "rationale": "max 10 words"
         }
       ]
     },
@@ -75,46 +66,32 @@
       "questions": [
         {
           "question_number": "2a",
-          "module": "Module 1",
-          "topic": "ER Modeling",
-          "subtopic": "ER Diagrams",
-          "marks": 15,
+          "module": "Module 2",
+          "topic": "Optimization Learning with backpropagation",
+          "marks": 5,
           "bloom_level": "Apply",
           "is_pyq": true,
-          "rationale": "High PYQ count."
+          "rationale": "max 10 words"
         },
         {
           "question_number": "2b",
-          "module": "Module 2",
-          "topic": "Relational Algebra",
-          "subtopic": "Joins",
-          "marks": 15,
-          "bloom_level": "Apply",
-          "is_pyq": true,
-          "rationale": "High PYQ count."
+          "module": "Module 3",
+          "topic": "Denoising Autoencoders",
+          "marks": 5,
+          "bloom_level": "Analyze",
+          "is_pyq": false,
+          "rationale": "max 10 words"
         },
         {
           "question_number": "2c",
           "module": "Module 3",
-          "topic": "Normal Forms",
-          "subtopic": "BCNF",
-          "marks": 15,
-          "bloom_level": "Analyze",
-          "is_pyq": true,
-          "rationale": "High PYQ, numerical problem."
-        },
-        {
-          "question_number": "2d",
-          "module": "Module 4",
-          "topic": "Concurrency Control",
-          "subtopic": "Deadlock",
-          "marks": 15,
-          "bloom_level": "Understand",
-          "is_pyq": true,
-          "rationale": "Medium PYQ count."
+          "topic": "Application of Autoencoders: Image Compression",
+          "marks": 5,
+          "bloom_level": "Evaluate",
+          "is_pyq": false,
+          "rationale": "max 10 words"
         }
       ]
     }
-  ],
-  "strategy_notes": "Module weightage is 0.25 for all due to fixed 5/15 mark questions, limiting teacher's 'focus modules' preference. Bloom's distribution for Understand, Apply, and Evaluate could not be met within \u00b15% deviation due to fixed question marks (5/15) and single Bloom level per question."
+  ]
 }

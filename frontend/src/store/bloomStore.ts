@@ -1,14 +1,12 @@
 /**
  * store/bloomStore.ts
- * ─────────────────────────────────────────────────────────────────────────────
- * Zustand store for the Blooxanomy (Bloom's Taxonomy) Agent.
- * Manages cognitive level distribution and subprocess steps.
- * ─────────────────────────────────────────────────────────────────────────────
+ * Bloom's Taxonomy percentage distribution (all 6 levels must sum to 100).
+ * setLevel() auto-redistributes the delta across other levels so total stays 100.
  */
 
 import { create } from "zustand";
 
-export type BloomStatus = "idle" | "running" | "completed" | "failed";
+export type BloomKey = "remember" | "understand" | "apply" | "analyze" | "evaluate" | "create";
 
 export interface BloomLevels {
     remember: number;
@@ -19,88 +17,78 @@ export interface BloomLevels {
     create: number;
 }
 
-export interface SubprocessStep {
-    id: number;
-    label: string;
-    status: "pending" | "running" | "completed" | "failed";
-}
+const BLOOM_KEYS: BloomKey[] = ["remember", "understand", "apply", "analyze", "evaluate", "create"];
 
-interface BloomState {
-    bloomLevels: BloomLevels;
-    status: BloomStatus;
-    currentStepIndex: number;
-    steps: SubprocessStep[];
-    error: string | null;
-
-    // Actions
-    setLevel: (level: keyof BloomLevels, value: number) => void;
-    setBloomLevels: (levels: BloomLevels) => void;
-    setStatus: (status: BloomStatus) => void;
-    updateStep: (index: number, status: SubprocessStep["status"]) => void;
-    reset: () => void;
-    startBloomProcess: () => void;
-    setError: (msg: string | null) => void;
-    getTotalAssigned: () => number;
-}
-
-const INITIAL_STEPS: SubprocessStep[] = [
-    { id: 0, label: "Validating Distribution", status: "pending" },
-    { id: 1, label: "Mapping Questions to Levels", status: "pending" },
-    { id: 2, label: "Adjusting Difficulty", status: "pending" },
-    { id: 3, label: "Completed", status: "pending" },
-];
-
-const INITIAL_LEVELS: BloomLevels = {
-    remember: 0,
-    understand: 0,
-    apply: 0,
-    analyze: 0,
+const DEFAULT_LEVELS: BloomLevels = {
+    remember: 20,
+    understand: 30,
+    apply: 30,
+    analyze: 20,
     evaluate: 0,
     create: 0,
 };
 
+interface BloomState {
+    bloomLevels: BloomLevels;
+    // Sets one level; redistributes the change across all other levels proportionally
+    setLevel: (key: BloomKey, newValue: number) => void;
+    reset: () => void;
+    getTotal: () => number;
+}
+
 export const useBloomStore = create<BloomState>((set, get) => ({
-    bloomLevels: INITIAL_LEVELS,
-    status: "idle",
-    currentStepIndex: 0,
-    steps: INITIAL_STEPS,
-    error: null,
+    bloomLevels: { ...DEFAULT_LEVELS },
 
-    setLevel: (level, value) => set((state) => ({
-        bloomLevels: { ...state.bloomLevels, [level]: Math.max(0, value) }
-    })),
+    setLevel: (key, newValue) => {
+        const clamped = Math.max(0, Math.min(100, Math.round(newValue)));
+        set((state) => {
+            const prev = state.bloomLevels;
+            const oldValue = prev[key];
+            const delta = clamped - oldValue; // how much this key changed
+            if (delta === 0) return state;
 
-    setBloomLevels: (bloomLevels) => set({ bloomLevels }),
+            // Keys that can absorb the change
+            const others = BLOOM_KEYS.filter((k) => k !== key);
+            const othersTotal = others.reduce((s, k) => s + prev[k], 0);
 
-    setStatus: (status) => set({ status }),
+            const next = { ...prev, [key]: clamped };
 
-    updateStep: (index, status) => set((state) => {
-        const newSteps = [...state.steps];
-        if (newSteps[index]) {
-            newSteps[index] = { ...newSteps[index], status };
-        }
-        return { steps: newSteps, currentStepIndex: index };
-    }),
+            if (othersTotal === 0) {
+                // All other levels are 0 — can only shrink this key, not grow it
+                next[key] = Math.min(clamped, 100);
+            } else {
+                // Distribute -delta proportionally across others
+                let remaining = -delta;
+                const adjusted = others.map((k) => {
+                    const share = Math.round((prev[k] / othersTotal) * (-delta));
+                    return { k, share };
+                });
+                // Apply shares
+                adjusted.forEach(({ k, share }) => {
+                    next[k] = Math.max(0, prev[k] + share);
+                    remaining -= share;
+                });
+                // Fix any rounding drift on the first adjustable key
+                for (const { k } of adjusted) {
+                    if (next[k] + remaining >= 0) {
+                        next[k] += remaining;
+                        break;
+                    }
+                }
+            }
 
-    setError: (error) => set({ error }),
+            // Final safety clamp so total = 100
+            const total = BLOOM_KEYS.reduce((s, k) => s + next[k], 0);
+            if (total !== 100) {
+                const largest = BLOOM_KEYS.reduce((a, b) => (next[a] > next[b] ? a : b));
+                next[largest] += 100 - total;
+            }
 
-    getTotalAssigned: () => {
-        const l = get().bloomLevels;
-        return l.remember + l.understand + l.apply + l.analyze + l.evaluate + l.create;
+            return { bloomLevels: next };
+        });
     },
 
-    reset: () => set({
-        bloomLevels: INITIAL_LEVELS,
-        status: "idle",
-        currentStepIndex: 0,
-        steps: INITIAL_STEPS,
-        error: null
-    }),
+    reset: () => set({ bloomLevels: { ...DEFAULT_LEVELS } }),
 
-    startBloomProcess: () => set((state) => ({
-        status: "running",
-        currentStepIndex: 0,
-        steps: INITIAL_STEPS.map((s, i) => i === 0 ? { ...s, status: "running" } : s),
-        error: null
-    })),
+    getTotal: () => BLOOM_KEYS.reduce((s, k) => s + get().bloomLevels[k], 0),
 }));

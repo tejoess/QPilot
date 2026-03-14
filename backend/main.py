@@ -4,6 +4,7 @@ import os
 from fastapi import FastAPI, WebSocket, File, UploadFile, Form, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from starlette.websockets import WebSocketDisconnect
 from typing import Optional
 from backend.websocket.manager import manager
 from backend.services.pipeline import (
@@ -28,8 +29,11 @@ backend.add_middleware(
 @backend.websocket("/ws/{session_id}")
 async def websocket_logs(websocket: WebSocket, session_id: str):
     await manager.connect(session_id, websocket)
-    while True:
-        await websocket.receive_text()
+    try:
+        while True:
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        manager.disconnect(session_id)
 
 
 # ==========================================
@@ -144,6 +148,8 @@ async def analyze_pyqs(
     print(f"📝 Using PYQs session_id: {pyqs_session_id}")
     
     try:
+        os.makedirs(os.path.join("backend", "services", "data", pyqs_session_id), exist_ok=True)
+
         # If file uploaded, save it temporarily
         pdf_path = None
         if file:
@@ -182,8 +188,8 @@ async def analyze_pyqs(
 async def generate_paper(
     syllabus_session_id: str = Form(...),
     pyqs_session_id: str = Form(...),
-    total_marks: int = Form(80),
-    total_questions: int = Form(10),
+    total_marks: Optional[int] = Form(None),
+    total_questions: Optional[int] = Form(None),
     # Bloom Taxonomy Levels (percentages)
     bloom_remember: Optional[int] = Form(None),
     bloom_understand: Optional[int] = Form(None),
@@ -223,30 +229,25 @@ async def generate_paper(
         raise HTTPException(status_code=404, detail=f"PYQs session {pyqs_session_id} not found")
     
     # Parse Bloom Taxonomy levels
-    bloom_levels = {}
-    if any([bloom_remember, bloom_understand, bloom_apply, bloom_analyze, bloom_evaluate, bloom_create]):
-        bloom_levels = {
-            "remember": bloom_remember or 0,
-            "understand": bloom_understand or 0,
-            "apply": bloom_apply or 0,
-            "analyze": bloom_analyze or 0,
-            "evaluate": bloom_evaluate or 0,
-            "create": bloom_create or 0
-        }
-        # Validate sum to 100
-        total_bloom = sum(bloom_levels.values())
-        if total_bloom != 100 and total_bloom != 0:
-            raise HTTPException(status_code=400, detail=f"Bloom taxonomy levels must sum to 100, got {total_bloom}")
+    raw_bloom = {
+        "remember": bloom_remember or 0,
+        "understand": bloom_understand or 0,
+        "apply": bloom_apply or 0,
+        "analyze": bloom_analyze or 0,
+        "evaluate": bloom_evaluate or 0,
+        "create": bloom_create or 0,
+    }
+    total_bloom = sum(raw_bloom.values())
+    if total_bloom > 0:
+        # Auto-normalize to 100 so partial inputs still work
+        bloom_levels = {k: round(v / total_bloom * 100) for k, v in raw_bloom.items()}
+        # Fix any rounding drift on the largest key
+        drift = 100 - sum(bloom_levels.values())
+        if drift:
+            largest = max(bloom_levels, key=bloom_levels.get)  # type: ignore[arg-type]
+            bloom_levels[largest] += drift
     else:
-        # Default distribution
-        bloom_levels = {
-            "remember": 20,
-            "understand": 30,
-            "apply": 30,
-            "analyze": 20,
-            "evaluate": 0,
-            "create": 0
-        }
+        bloom_levels = {"remember": 20, "understand": 30, "apply": 30, "analyze": 20, "evaluate": 0, "create": 0}
     
     # Parse paper pattern
     sections = None
@@ -278,8 +279,8 @@ async def generate_paper(
             session_id=paper_session_id,
             syllabus_session_id=syllabus_session_id,
             pyqs_session_id=pyqs_session_id,
-            total_marks=total_marks,
-            total_questions=total_questions,
+            total_marks=total_marks or 0,
+            total_questions=total_questions or 0,
             bloom_levels=bloom_levels,
             paper_sections=sections,
             teacher_inputs=teacher_instructions

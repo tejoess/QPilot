@@ -26,7 +26,43 @@ export interface PaperGenerationRequest {
 /** POST /generate-paper  –  response body */
 export interface PaperGenerationResponse {
     status: "success" | "error";
-    file_path: string;
+    session_id?: string;
+    paper?: DraftPaper;
+    verification?: any;
+    pdf_path?: string;
+    file_path?: string;
+    message?: string;
+}
+
+/** Draft Paper Structure from Backend */
+export interface DraftPaper {
+    sections: PaperSection[];
+    selection_stats?: {
+        total_questions: number;
+        pyq_exact_match: number;
+        pyq_rephrased_marks: number;
+        pyq_rephrased_bloom: number;
+        generated_new: number;
+        direct_generated: number;
+    };
+}
+
+export interface PaperSection {
+    section_name: string;
+    section_description: string;
+    questions: PaperQuestion[];
+}
+
+export interface PaperQuestion {
+    question_number: string;
+    module: string;
+    topic: string;
+    subtopic: string;
+    marks: number;
+    bloom_level: string;
+    question_text: string;
+    selection_method: string;
+    source_pyq_id?: string | null;
 }
 
 // ─── Domain types (NOT in guide – frontend stubs) ─────────────────────────────

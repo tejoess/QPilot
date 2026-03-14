@@ -79,7 +79,9 @@ export function useProcessing(projectId: string, requestData: PaperGenerationReq
                 for (let i = 1; i <= 9; i++) {
                     updateStep(i.toString(), "completed");
                 }
-                setResult(response.file_path);
+                // Store both file path and paper data
+                const filePath = response.pdf_path || response.file_path || "";
+                setResult(filePath, response.paper);
             } else {
                 setError("Generation failed on backend.");
             }

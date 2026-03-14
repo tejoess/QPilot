@@ -1,0 +1,649 @@
+<svg width="1000" height="4050" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <style>
+      .title { font-family: 'Arial', sans-serif; font-size: 18px; font-weight: bold; fill: #2c3e50; }
+      .subtitle { font-family: 'Arial', sans-serif; font-size: 12px; fill: #7f8c8d; }
+      .folder-text { font-family: 'Consolas', 'Courier New', monospace; font-size: 14px; fill: #27ae60; font-weight: bold; }
+      .file-text { font-family: 'Consolas', 'Courier New', monospace; font-size: 14px; fill: #3498db; }
+      .icon { font-family: 'Arial', sans-serif; font-size: 16px; }
+      .line { stroke: #bdc3c7; stroke-width: 1.5; }
+      .background { fill: #f8f9fa; }
+      .header-bg { fill: #ecf0f1; }    </style>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1000" height="4050" class="background"/>
+
+  <!-- Header -->
+  <rect x="0" y="0" width="1000" height="60" class="header-bg"/>
+  <text x="20" y="25" class="title">📁 File Tree: backend</text>
+  <text x="20" y="45" class="subtitle">Generated: 3/14/2026, 12:38:44 PM | FileTree Pro Extension</text>
+
+  <!-- Tree Structure -->
+    <line x1="15" y1="80" x2="25" y2="80" class="line"/>
+    <text x="30" y="85" class="icon">📁</text>
+    <text x="55" y="85" class="folder-text">Storage/</text>
+    <line x1="45" y1="100" x2="45" y2="110" class="line"/>
+    <line x1="45" y1="110" x2="55" y2="110" class="line"/>
+    <text x="60" y="115" class="icon">📁</text>
+    <text x="85" y="115" class="folder-text">Blob_Storage/</text>
+    <line x1="75" y1="130" x2="75" y2="140" class="line"/>
+    <line x1="75" y1="140" x2="85" y2="140" class="line"/>
+    <text x="90" y="145" class="icon">🐍</text>
+    <text x="115" y="145" class="file-text">__init__.py</text>
+    <line x1="75" y1="165" x2="75" y2="175" class="line"/>
+    <line x1="75" y1="175" x2="85" y2="175" class="line"/>
+    <text x="90" y="180" class="icon">🐍</text>
+    <text x="115" y="180" class="file-text">blob_upload.py</text>
+    <line x1="45" y1="235" x2="45" y2="245" class="line"/>
+    <line x1="45" y1="245" x2="55" y2="245" class="line"/>
+    <text x="60" y="250" class="icon">🐍</text>
+    <text x="85" y="250" class="file-text">__init__.py</text>
+    <line x1="15" y1="315" x2="25" y2="315" class="line"/>
+    <text x="30" y="320" class="icon">📁</text>
+    <text x="55" y="320" class="folder-text">schemas/</text>
+    <line x1="45" y1="335" x2="45" y2="345" class="line"/>
+    <line x1="45" y1="345" x2="55" y2="345" class="line"/>
+    <text x="60" y="350" class="icon">🐍</text>
+    <text x="85" y="350" class="file-text">__init__.py</text>
+    <line x1="45" y1="370" x2="45" y2="380" class="line"/>
+    <line x1="45" y1="380" x2="55" y2="380" class="line"/>
+    <text x="60" y="385" class="icon">🐍</text>
+    <text x="85" y="385" class="file-text">request.py</text>
+    <line x1="45" y1="405" x2="45" y2="415" class="line"/>
+    <line x1="45" y1="415" x2="55" y2="415" class="line"/>
+    <text x="60" y="420" class="icon">🐍</text>
+    <text x="85" y="420" class="file-text">response.py</text>
+    <line x1="15" y1="485" x2="25" y2="485" class="line"/>
+    <text x="30" y="490" class="icon">📁</text>
+    <text x="55" y="490" class="folder-text">services/</text>
+    <line x1="45" y1="505" x2="45" y2="515" class="line"/>
+    <line x1="45" y1="515" x2="55" y2="515" class="line"/>
+    <text x="60" y="520" class="icon">📁</text>
+    <text x="85" y="520" class="folder-text">Answer_Key_Generator/</text>
+    <line x1="75" y1="535" x2="75" y2="545" class="line"/>
+    <line x1="75" y1="545" x2="85" y2="545" class="line"/>
+    <text x="90" y="550" class="icon">🐍</text>
+    <text x="115" y="550" class="file-text">__init__.py</text>
+    <line x1="75" y1="570" x2="75" y2="580" class="line"/>
+    <line x1="75" y1="580" x2="85" y2="580" class="line"/>
+    <text x="90" y="585" class="icon">🐍</text>
+    <text x="115" y="585" class="file-text">answer_key.py</text>
+    <line x1="45" y1="640" x2="45" y2="650" class="line"/>
+    <line x1="45" y1="650" x2="55" y2="650" class="line"/>
+    <text x="60" y="655" class="icon">📁</text>
+    <text x="85" y="655" class="folder-text">Paper_Templete/</text>
+    <line x1="75" y1="670" x2="75" y2="680" class="line"/>
+    <line x1="75" y1="680" x2="85" y2="680" class="line"/>
+    <text x="90" y="685" class="icon">📄</text>
+    <text x="115" y="685" class="file-text">generate_qp.js</text>
+    <line x1="75" y1="705" x2="75" y2="715" class="line"/>
+    <line x1="75" y1="715" x2="85" y2="715" class="line"/>
+    <text x="90" y="720" class="icon">⚙️</text>
+    <text x="115" y="720" class="file-text">meta.json</text>
+    <line x1="75" y1="740" x2="75" y2="750" class="line"/>
+    <line x1="75" y1="750" x2="85" y2="750" class="line"/>
+    <text x="90" y="755" class="icon">📕</text>
+    <text x="115" y="755" class="file-text">question_paper.pdf</text>
+    <line x1="75" y1="775" x2="75" y2="785" class="line"/>
+    <line x1="75" y1="785" x2="85" y2="785" class="line"/>
+    <text x="90" y="790" class="icon">⚙️</text>
+    <text x="115" y="790" class="file-text">questions.json</text>
+    <line x1="75" y1="810" x2="75" y2="820" class="line"/>
+    <line x1="75" y1="820" x2="85" y2="820" class="line"/>
+    <text x="90" y="825" class="icon">🐍</text>
+    <text x="115" y="825" class="file-text">run_qp_generator.py</text>
+    <line x1="45" y1="880" x2="45" y2="890" class="line"/>
+    <line x1="45" y1="890" x2="55" y2="890" class="line"/>
+    <text x="60" y="895" class="icon">📁</text>
+    <text x="85" y="895" class="folder-text">blueprint/</text>
+    <line x1="75" y1="910" x2="75" y2="920" class="line"/>
+    <line x1="75" y1="920" x2="85" y2="920" class="line"/>
+    <text x="90" y="925" class="icon">🐍</text>
+    <text x="115" y="925" class="file-text">__init__.py</text>
+    <line x1="75" y1="945" x2="75" y2="955" class="line"/>
+    <line x1="75" y1="955" x2="85" y2="955" class="line"/>
+    <text x="90" y="960" class="icon">🐍</text>
+    <text x="115" y="960" class="file-text">blueprint_service.py</text>
+    <line x1="75" y1="980" x2="75" y2="990" class="line"/>
+    <line x1="75" y1="990" x2="85" y2="990" class="line"/>
+    <text x="90" y="995" class="icon">🐍</text>
+    <text x="115" y="995" class="file-text">blueprint_verify.py</text>
+    <line x1="45" y1="1050" x2="45" y2="1060" class="line"/>
+    <line x1="45" y1="1060" x2="55" y2="1060" class="line"/>
+    <text x="60" y="1065" class="icon">📁</text>
+    <text x="85" y="1065" class="folder-text">data/</text>
+    <line x1="75" y1="1080" x2="75" y2="1090" class="line"/>
+    <line x1="75" y1="1090" x2="85" y2="1090" class="line"/>
+    <text x="90" y="1095" class="icon">📁</text>
+    <text x="115" y="1095" class="folder-text">paper-1773111675191/</text>
+    <line x1="105" y1="1110" x2="105" y2="1120" class="line"/>
+    <line x1="105" y1="1120" x2="115" y2="1120" class="line"/>
+    <text x="120" y="1125" class="icon">⚙️</text>
+    <text x="145" y="1125" class="file-text">blueprint.json</text>
+    <line x1="75" y1="1180" x2="75" y2="1190" class="line"/>
+    <line x1="75" y1="1190" x2="85" y2="1190" class="line"/>
+    <text x="90" y="1195" class="icon">📁</text>
+    <text x="115" y="1195" class="folder-text">paper-1773114352158/</text>
+    <line x1="105" y1="1210" x2="105" y2="1220" class="line"/>
+    <line x1="105" y1="1220" x2="115" y2="1220" class="line"/>
+    <text x="120" y="1225" class="icon">⚙️</text>
+    <text x="145" y="1225" class="file-text">blueprint.json</text>
+    <line x1="75" y1="1280" x2="75" y2="1290" class="line"/>
+    <line x1="75" y1="1290" x2="85" y2="1290" class="line"/>
+    <text x="90" y="1295" class="icon">📁</text>
+    <text x="115" y="1295" class="folder-text">paper-1773335947873/</text>
+    <line x1="105" y1="1310" x2="105" y2="1320" class="line"/>
+    <line x1="105" y1="1320" x2="115" y2="1320" class="line"/>
+    <text x="120" y="1325" class="icon">⚙️</text>
+    <text x="145" y="1325" class="file-text">blueprint.json</text>
+    <line x1="75" y1="1380" x2="75" y2="1390" class="line"/>
+    <line x1="75" y1="1390" x2="85" y2="1390" class="line"/>
+    <text x="90" y="1395" class="icon">📁</text>
+    <text x="115" y="1395" class="folder-text">paper-1773336032373/</text>
+    <line x1="105" y1="1410" x2="105" y2="1420" class="line"/>
+    <line x1="105" y1="1420" x2="115" y2="1420" class="line"/>
+    <text x="120" y="1425" class="icon">⚙️</text>
+    <text x="145" y="1425" class="file-text">blueprint.json</text>
+    <line x1="105" y1="1445" x2="105" y2="1455" class="line"/>
+    <line x1="105" y1="1455" x2="115" y2="1455" class="line"/>
+    <text x="120" y="1460" class="icon">⚙️</text>
+    <text x="145" y="1460" class="file-text">blueprint_verification.json</text>
+    <line x1="105" y1="1480" x2="105" y2="1490" class="line"/>
+    <line x1="105" y1="1490" x2="115" y2="1490" class="line"/>
+    <text x="120" y="1495" class="icon">⚙️</text>
+    <text x="145" y="1495" class="file-text">draft_paper.json</text>
+    <line x1="105" y1="1515" x2="105" y2="1525" class="line"/>
+    <line x1="105" y1="1525" x2="115" y2="1525" class="line"/>
+    <text x="120" y="1530" class="icon">⚙️</text>
+    <text x="145" y="1530" class="file-text">final_paper.json</text>
+    <line x1="105" y1="1550" x2="105" y2="1560" class="line"/>
+    <line x1="105" y1="1560" x2="115" y2="1560" class="line"/>
+    <text x="120" y="1565" class="icon">⚙️</text>
+    <text x="145" y="1565" class="file-text">paper_verification.json</text>
+    <line x1="105" y1="1585" x2="105" y2="1595" class="line"/>
+    <line x1="105" y1="1595" x2="115" y2="1595" class="line"/>
+    <text x="120" y="1600" class="icon">⚙️</text>
+    <text x="145" y="1600" class="file-text">session_summary.json</text>
+    <line x1="75" y1="1655" x2="75" y2="1665" class="line"/>
+    <line x1="75" y1="1665" x2="85" y2="1665" class="line"/>
+    <text x="90" y="1670" class="icon">📁</text>
+    <text x="115" y="1670" class="folder-text">paper-1773336577329/</text>
+    <line x1="105" y1="1685" x2="105" y2="1695" class="line"/>
+    <line x1="105" y1="1695" x2="115" y2="1695" class="line"/>
+    <text x="120" y="1700" class="icon">⚙️</text>
+    <text x="145" y="1700" class="file-text">blueprint.json</text>
+    <line x1="105" y1="1720" x2="105" y2="1730" class="line"/>
+    <line x1="105" y1="1730" x2="115" y2="1730" class="line"/>
+    <text x="120" y="1735" class="icon">⚙️</text>
+    <text x="145" y="1735" class="file-text">blueprint_verification.json</text>
+    <line x1="105" y1="1755" x2="105" y2="1765" class="line"/>
+    <line x1="105" y1="1765" x2="115" y2="1765" class="line"/>
+    <text x="120" y="1770" class="icon">⚙️</text>
+    <text x="145" y="1770" class="file-text">draft_paper.json</text>
+    <line x1="105" y1="1790" x2="105" y2="1800" class="line"/>
+    <line x1="105" y1="1800" x2="115" y2="1800" class="line"/>
+    <text x="120" y="1805" class="icon">⚙️</text>
+    <text x="145" y="1805" class="file-text">final_paper.json</text>
+    <line x1="105" y1="1825" x2="105" y2="1835" class="line"/>
+    <line x1="105" y1="1835" x2="115" y2="1835" class="line"/>
+    <text x="120" y="1840" class="icon">⚙️</text>
+    <text x="145" y="1840" class="file-text">paper_verification.json</text>
+    <line x1="105" y1="1860" x2="105" y2="1870" class="line"/>
+    <line x1="105" y1="1870" x2="115" y2="1870" class="line"/>
+    <text x="120" y="1875" class="icon">⚙️</text>
+    <text x="145" y="1875" class="file-text">session_summary.json</text>
+    <line x1="75" y1="1930" x2="75" y2="1940" class="line"/>
+    <line x1="75" y1="1940" x2="85" y2="1940" class="line"/>
+    <text x="90" y="1945" class="icon">📁</text>
+    <text x="115" y="1945" class="folder-text">paper-1773338943446/</text>
+    <line x1="105" y1="1960" x2="105" y2="1970" class="line"/>
+    <line x1="105" y1="1970" x2="115" y2="1970" class="line"/>
+    <text x="120" y="1975" class="icon">⚙️</text>
+    <text x="145" y="1975" class="file-text">blueprint.json</text>
+    <line x1="105" y1="1995" x2="105" y2="2005" class="line"/>
+    <line x1="105" y1="2005" x2="115" y2="2005" class="line"/>
+    <text x="120" y="2010" class="icon">⚙️</text>
+    <text x="145" y="2010" class="file-text">blueprint_verification.json</text>
+    <line x1="105" y1="2030" x2="105" y2="2040" class="line"/>
+    <line x1="105" y1="2040" x2="115" y2="2040" class="line"/>
+    <text x="120" y="2045" class="icon">⚙️</text>
+    <text x="145" y="2045" class="file-text">draft_paper.json</text>
+    <line x1="105" y1="2065" x2="105" y2="2075" class="line"/>
+    <line x1="105" y1="2075" x2="115" y2="2075" class="line"/>
+    <text x="120" y="2080" class="icon">⚙️</text>
+    <text x="145" y="2080" class="file-text">final_paper.json</text>
+    <line x1="105" y1="2100" x2="105" y2="2110" class="line"/>
+    <line x1="105" y1="2110" x2="115" y2="2110" class="line"/>
+    <text x="120" y="2115" class="icon">⚙️</text>
+    <text x="145" y="2115" class="file-text">paper_verification.json</text>
+    <line x1="105" y1="2135" x2="105" y2="2145" class="line"/>
+    <line x1="105" y1="2145" x2="115" y2="2145" class="line"/>
+    <text x="120" y="2150" class="icon">⚙️</text>
+    <text x="145" y="2150" class="file-text">session_summary.json</text>
+    <line x1="75" y1="2205" x2="75" y2="2215" class="line"/>
+    <line x1="75" y1="2215" x2="85" y2="2215" class="line"/>
+    <text x="90" y="2220" class="icon">📁</text>
+    <text x="115" y="2220" class="folder-text">paper-1773341315594/</text>
+    <line x1="105" y1="2235" x2="105" y2="2245" class="line"/>
+    <line x1="105" y1="2245" x2="115" y2="2245" class="line"/>
+    <text x="120" y="2250" class="icon">⚙️</text>
+    <text x="145" y="2250" class="file-text">blueprint.json</text>
+    <line x1="105" y1="2270" x2="105" y2="2280" class="line"/>
+    <line x1="105" y1="2280" x2="115" y2="2280" class="line"/>
+    <text x="120" y="2285" class="icon">⚙️</text>
+    <text x="145" y="2285" class="file-text">blueprint_verification.json</text>
+    <line x1="105" y1="2305" x2="105" y2="2315" class="line"/>
+    <line x1="105" y1="2315" x2="115" y2="2315" class="line"/>
+    <text x="120" y="2320" class="icon">⚙️</text>
+    <text x="145" y="2320" class="file-text">draft_paper.json</text>
+    <line x1="105" y1="2340" x2="105" y2="2350" class="line"/>
+    <line x1="105" y1="2350" x2="115" y2="2350" class="line"/>
+    <text x="120" y="2355" class="icon">⚙️</text>
+    <text x="145" y="2355" class="file-text">final_paper.json</text>
+    <line x1="105" y1="2375" x2="105" y2="2385" class="line"/>
+    <line x1="105" y1="2385" x2="115" y2="2385" class="line"/>
+    <text x="120" y="2390" class="icon">⚙️</text>
+    <text x="145" y="2390" class="file-text">paper_verification.json</text>
+    <line x1="105" y1="2410" x2="105" y2="2420" class="line"/>
+    <line x1="105" y1="2420" x2="115" y2="2420" class="line"/>
+    <text x="120" y="2425" class="icon">⚙️</text>
+    <text x="145" y="2425" class="file-text">session_summary.json</text>
+    <line x1="75" y1="2480" x2="75" y2="2490" class="line"/>
+    <line x1="75" y1="2490" x2="85" y2="2490" class="line"/>
+    <text x="90" y="2495" class="icon">📁</text>
+    <text x="115" y="2495" class="folder-text">paper-1773342125495/</text>
+    <line x1="105" y1="2510" x2="105" y2="2520" class="line"/>
+    <line x1="105" y1="2520" x2="115" y2="2520" class="line"/>
+    <text x="120" y="2525" class="icon">⚙️</text>
+    <text x="145" y="2525" class="file-text">blueprint.json</text>
+    <line x1="105" y1="2545" x2="105" y2="2555" class="line"/>
+    <line x1="105" y1="2555" x2="115" y2="2555" class="line"/>
+    <text x="120" y="2560" class="icon">⚙️</text>
+    <text x="145" y="2560" class="file-text">blueprint_verification.json</text>
+    <line x1="105" y1="2580" x2="105" y2="2590" class="line"/>
+    <line x1="105" y1="2590" x2="115" y2="2590" class="line"/>
+    <text x="120" y="2595" class="icon">⚙️</text>
+    <text x="145" y="2595" class="file-text">draft_paper.json</text>
+    <line x1="105" y1="2615" x2="105" y2="2625" class="line"/>
+    <line x1="105" y1="2625" x2="115" y2="2625" class="line"/>
+    <text x="120" y="2630" class="icon">⚙️</text>
+    <text x="145" y="2630" class="file-text">final_paper.json</text>
+    <line x1="105" y1="2650" x2="105" y2="2660" class="line"/>
+    <line x1="105" y1="2660" x2="115" y2="2660" class="line"/>
+    <text x="120" y="2665" class="icon">⚙️</text>
+    <text x="145" y="2665" class="file-text">paper_verification.json</text>
+    <line x1="105" y1="2685" x2="105" y2="2695" class="line"/>
+    <line x1="105" y1="2695" x2="115" y2="2695" class="line"/>
+    <text x="120" y="2700" class="icon">⚙️</text>
+    <text x="145" y="2700" class="file-text">session_summary.json</text>
+    <line x1="75" y1="2755" x2="75" y2="2765" class="line"/>
+    <line x1="75" y1="2765" x2="85" y2="2765" class="line"/>
+    <text x="90" y="2770" class="icon">📁</text>
+    <text x="115" y="2770" class="folder-text">pyqs-1773111268588/</text>
+    <line x1="105" y1="2785" x2="105" y2="2795" class="line"/>
+    <line x1="105" y1="2795" x2="115" y2="2795" class="line"/>
+    <text x="120" y="2800" class="icon">📁</text>
+    <text x="145" y="2800" class="folder-text">uploads/</text>
+    <line x1="135" y1="2815" x2="135" y2="2825" class="line"/>
+    <line x1="135" y1="2825" x2="145" y2="2825" class="line"/>
+    <text x="150" y="2830" class="icon">📕</text>
+    <text x="175" y="2830" class="file-text">pyqs.pdf</text>
+    <line x1="105" y1="2885" x2="105" y2="2895" class="line"/>
+    <line x1="105" y1="2895" x2="115" y2="2895" class="line"/>
+    <text x="120" y="2900" class="icon">⚙️</text>
+    <text x="145" y="2900" class="file-text">pyqs.json</text>
+    <line x1="105" y1="2920" x2="105" y2="2930" class="line"/>
+    <line x1="105" y1="2930" x2="115" y2="2930" class="line"/>
+    <text x="120" y="2935" class="icon">📄</text>
+    <text x="145" y="2935" class="file-text">pyqs_raw.txt</text>
+    <line x1="75" y1="2990" x2="75" y2="3000" class="line"/>
+    <line x1="75" y1="3000" x2="85" y2="3000" class="line"/>
+    <text x="90" y="3005" class="icon">📁</text>
+    <text x="115" y="3005" class="folder-text">pyqs-1773335828917/</text>
+    <line x1="105" y1="3020" x2="105" y2="3030" class="line"/>
+    <line x1="105" y1="3030" x2="115" y2="3030" class="line"/>
+    <text x="120" y="3035" class="icon">📁</text>
+    <text x="145" y="3035" class="folder-text">uploads/</text>
+    <line x1="135" y1="3050" x2="135" y2="3060" class="line"/>
+    <line x1="135" y1="3060" x2="145" y2="3060" class="line"/>
+    <text x="150" y="3065" class="icon">📕</text>
+    <text x="175" y="3065" class="file-text">pyqs.pdf</text>
+    <line x1="105" y1="3120" x2="105" y2="3130" class="line"/>
+    <line x1="105" y1="3130" x2="115" y2="3130" class="line"/>
+    <text x="120" y="3135" class="icon">⚙️</text>
+    <text x="145" y="3135" class="file-text">pyqs.json</text>
+    <line x1="105" y1="3155" x2="105" y2="3165" class="line"/>
+    <line x1="105" y1="3165" x2="115" y2="3165" class="line"/>
+    <text x="120" y="3170" class="icon">📄</text>
+    <text x="145" y="3170" class="file-text">pyqs_raw.txt</text>
+    <line x1="75" y1="3225" x2="75" y2="3235" class="line"/>
+    <line x1="75" y1="3235" x2="85" y2="3235" class="line"/>
+    <text x="90" y="3240" class="icon">📁</text>
+    <text x="115" y="3240" class="folder-text">pyqs-1773336449053/</text>
+    <line x1="105" y1="3255" x2="105" y2="3265" class="line"/>
+    <line x1="105" y1="3265" x2="115" y2="3265" class="line"/>
+    <text x="120" y="3270" class="icon">📁</text>
+    <text x="145" y="3270" class="folder-text">uploads/</text>
+    <line x1="135" y1="3285" x2="135" y2="3295" class="line"/>
+    <line x1="135" y1="3295" x2="145" y2="3295" class="line"/>
+    <text x="150" y="3300" class="icon">📕</text>
+    <text x="175" y="3300" class="file-text">pyqs.pdf</text>
+    <line x1="105" y1="3355" x2="105" y2="3365" class="line"/>
+    <line x1="105" y1="3365" x2="115" y2="3365" class="line"/>
+    <text x="120" y="3370" class="icon">⚙️</text>
+    <text x="145" y="3370" class="file-text">pyqs.json</text>
+    <line x1="105" y1="3390" x2="105" y2="3400" class="line"/>
+    <line x1="105" y1="3400" x2="115" y2="3400" class="line"/>
+    <text x="120" y="3405" class="icon">📄</text>
+    <text x="145" y="3405" class="file-text">pyqs_raw.txt</text>
+    <line x1="75" y1="3460" x2="75" y2="3470" class="line"/>
+    <line x1="75" y1="3470" x2="85" y2="3470" class="line"/>
+    <text x="90" y="3475" class="icon">📁</text>
+    <text x="115" y="3475" class="folder-text">pyqs-1773338935281/</text>
+    <line x1="105" y1="3490" x2="105" y2="3500" class="line"/>
+    <line x1="105" y1="3500" x2="115" y2="3500" class="line"/>
+    <text x="120" y="3505" class="icon">📁</text>
+    <text x="145" y="3505" class="folder-text">uploads/</text>
+    <line x1="135" y1="3520" x2="135" y2="3530" class="line"/>
+    <line x1="135" y1="3530" x2="145" y2="3530" class="line"/>
+    <text x="150" y="3535" class="icon">📕</text>
+    <text x="175" y="3535" class="file-text">pyqs.pdf</text>
+    <line x1="105" y1="3590" x2="105" y2="3600" class="line"/>
+    <line x1="105" y1="3600" x2="115" y2="3600" class="line"/>
+    <text x="120" y="3605" class="icon">⚙️</text>
+    <text x="145" y="3605" class="file-text">pyqs.json</text>
+    <line x1="105" y1="3625" x2="105" y2="3635" class="line"/>
+    <line x1="105" y1="3635" x2="115" y2="3635" class="line"/>
+    <text x="120" y="3640" class="icon">📄</text>
+    <text x="145" y="3640" class="file-text">pyqs_raw.txt</text>
+    <line x1="75" y1="3695" x2="75" y2="3705" class="line"/>
+    <line x1="75" y1="3705" x2="85" y2="3705" class="line"/>
+    <text x="90" y="3710" class="icon">📁</text>
+    <text x="115" y="3710" class="folder-text">pyqs-1773341308719/</text>
+    <line x1="105" y1="3725" x2="105" y2="3735" class="line"/>
+    <line x1="105" y1="3735" x2="115" y2="3735" class="line"/>
+    <text x="120" y="3740" class="icon">📁</text>
+    <text x="145" y="3740" class="folder-text">uploads/</text>
+    <line x1="135" y1="3755" x2="135" y2="3765" class="line"/>
+    <line x1="135" y1="3765" x2="145" y2="3765" class="line"/>
+    <text x="150" y="3770" class="icon">📕</text>
+    <text x="175" y="3770" class="file-text">pyqs.pdf</text>
+    <line x1="105" y1="3825" x2="105" y2="3835" class="line"/>
+    <line x1="105" y1="3835" x2="115" y2="3835" class="line"/>
+    <text x="120" y="3840" class="icon">⚙️</text>
+    <text x="145" y="3840" class="file-text">pyqs.json</text>
+    <line x1="105" y1="3860" x2="105" y2="3870" class="line"/>
+    <line x1="105" y1="3870" x2="115" y2="3870" class="line"/>
+    <text x="120" y="3875" class="icon">📄</text>
+    <text x="145" y="3875" class="file-text">pyqs_raw.txt</text>
+    <line x1="75" y1="3930" x2="75" y2="3940" class="line"/>
+    <line x1="75" y1="3940" x2="85" y2="3940" class="line"/>
+    <text x="90" y="3945" class="icon">📁</text>
+    <text x="115" y="3945" class="folder-text">pyqs-1773342099209/</text>
+    <line x1="105" y1="3960" x2="105" y2="3970" class="line"/>
+    <line x1="105" y1="3970" x2="115" y2="3970" class="line"/>
+    <text x="120" y="3975" class="icon">⚙️</text>
+    <text x="145" y="3975" class="file-text">pyqs.json</text>
+    <line x1="105" y1="3995" x2="105" y2="4005" class="line"/>
+    <line x1="105" y1="4005" x2="115" y2="4005" class="line"/>
+    <text x="120" y="4010" class="icon">📄</text>
+    <text x="145" y="4010" class="file-text">pyqs_raw.txt</text>
+    <line x1="75" y1="4065" x2="75" y2="4075" class="line"/>
+    <line x1="75" y1="4075" x2="85" y2="4075" class="line"/>
+    <text x="90" y="4080" class="icon">📁</text>
+    <text x="115" y="4080" class="folder-text">syllabus-1773111253452/</text>
+    <line x1="105" y1="4095" x2="105" y2="4105" class="line"/>
+    <line x1="105" y1="4105" x2="115" y2="4105" class="line"/>
+    <text x="120" y="4110" class="icon">📁</text>
+    <text x="145" y="4110" class="folder-text">uploads/</text>
+    <line x1="135" y1="4125" x2="135" y2="4135" class="line"/>
+    <line x1="135" y1="4135" x2="145" y2="4135" class="line"/>
+    <text x="150" y="4140" class="icon">📕</text>
+    <text x="175" y="4140" class="file-text">syllabus.pdf</text>
+    <line x1="105" y1="4195" x2="105" y2="4205" class="line"/>
+    <line x1="105" y1="4205" x2="115" y2="4205" class="line"/>
+    <text x="120" y="4210" class="icon">⚙️</text>
+    <text x="145" y="4210" class="file-text">syllabus.json</text>
+    <line x1="105" y1="4230" x2="105" y2="4240" class="line"/>
+    <line x1="105" y1="4240" x2="115" y2="4240" class="line"/>
+    <text x="120" y="4245" class="icon">📄</text>
+    <text x="145" y="4245" class="file-text">syllabus_raw.txt</text>
+    <line x1="75" y1="4300" x2="75" y2="4310" class="line"/>
+    <line x1="75" y1="4310" x2="85" y2="4310" class="line"/>
+    <text x="90" y="4315" class="icon">📁</text>
+    <text x="115" y="4315" class="folder-text">syllabus-1773335806400/</text>
+    <line x1="105" y1="4330" x2="105" y2="4340" class="line"/>
+    <line x1="105" y1="4340" x2="115" y2="4340" class="line"/>
+    <text x="120" y="4345" class="icon">📁</text>
+    <text x="145" y="4345" class="folder-text">uploads/</text>
+    <line x1="135" y1="4360" x2="135" y2="4370" class="line"/>
+    <line x1="135" y1="4370" x2="145" y2="4370" class="line"/>
+    <text x="150" y="4375" class="icon">📕</text>
+    <text x="175" y="4375" class="file-text">syllabus.pdf</text>
+    <line x1="105" y1="4430" x2="105" y2="4440" class="line"/>
+    <line x1="105" y1="4440" x2="115" y2="4440" class="line"/>
+    <text x="120" y="4445" class="icon">⚙️</text>
+    <text x="145" y="4445" class="file-text">syllabus.json</text>
+    <line x1="105" y1="4465" x2="105" y2="4475" class="line"/>
+    <line x1="105" y1="4475" x2="115" y2="4475" class="line"/>
+    <text x="120" y="4480" class="icon">📄</text>
+    <text x="145" y="4480" class="file-text">syllabus_raw.txt</text>
+    <line x1="75" y1="4535" x2="75" y2="4545" class="line"/>
+    <line x1="75" y1="4545" x2="85" y2="4545" class="line"/>
+    <text x="90" y="4550" class="icon">📁</text>
+    <text x="115" y="4550" class="folder-text">syllabus-1773336425650/</text>
+    <line x1="105" y1="4565" x2="105" y2="4575" class="line"/>
+    <line x1="105" y1="4575" x2="115" y2="4575" class="line"/>
+    <text x="120" y="4580" class="icon">📁</text>
+    <text x="145" y="4580" class="folder-text">uploads/</text>
+    <line x1="135" y1="4595" x2="135" y2="4605" class="line"/>
+    <line x1="135" y1="4605" x2="145" y2="4605" class="line"/>
+    <text x="150" y="4610" class="icon">📕</text>
+    <text x="175" y="4610" class="file-text">syllabus.pdf</text>
+    <line x1="105" y1="4665" x2="105" y2="4675" class="line"/>
+    <line x1="105" y1="4675" x2="115" y2="4675" class="line"/>
+    <text x="120" y="4680" class="icon">⚙️</text>
+    <text x="145" y="4680" class="file-text">syllabus.json</text>
+    <line x1="105" y1="4700" x2="105" y2="4710" class="line"/>
+    <line x1="105" y1="4710" x2="115" y2="4710" class="line"/>
+    <text x="120" y="4715" class="icon">📄</text>
+    <text x="145" y="4715" class="file-text">syllabus_raw.txt</text>
+    <line x1="75" y1="4770" x2="75" y2="4780" class="line"/>
+    <line x1="75" y1="4780" x2="85" y2="4780" class="line"/>
+    <text x="90" y="4785" class="icon">📁</text>
+    <text x="115" y="4785" class="folder-text">syllabus-1773338914311/</text>
+    <line x1="105" y1="4800" x2="105" y2="4810" class="line"/>
+    <line x1="105" y1="4810" x2="115" y2="4810" class="line"/>
+    <text x="120" y="4815" class="icon">📁</text>
+    <text x="145" y="4815" class="folder-text">uploads/</text>
+    <line x1="135" y1="4830" x2="135" y2="4840" class="line"/>
+    <line x1="135" y1="4840" x2="145" y2="4840" class="line"/>
+    <text x="150" y="4845" class="icon">📕</text>
+    <text x="175" y="4845" class="file-text">syllabus.pdf</text>
+    <line x1="105" y1="4900" x2="105" y2="4910" class="line"/>
+    <line x1="105" y1="4910" x2="115" y2="4910" class="line"/>
+    <text x="120" y="4915" class="icon">⚙️</text>
+    <text x="145" y="4915" class="file-text">syllabus.json</text>
+    <line x1="105" y1="4935" x2="105" y2="4945" class="line"/>
+    <line x1="105" y1="4945" x2="115" y2="4945" class="line"/>
+    <text x="120" y="4950" class="icon">📄</text>
+    <text x="145" y="4950" class="file-text">syllabus_raw.txt</text>
+    <line x1="75" y1="5005" x2="75" y2="5015" class="line"/>
+    <line x1="75" y1="5015" x2="85" y2="5015" class="line"/>
+    <text x="90" y="5020" class="icon">📁</text>
+    <text x="115" y="5020" class="folder-text">syllabus-1773341284031/</text>
+    <line x1="105" y1="5035" x2="105" y2="5045" class="line"/>
+    <line x1="105" y1="5045" x2="115" y2="5045" class="line"/>
+    <text x="120" y="5050" class="icon">📁</text>
+    <text x="145" y="5050" class="folder-text">uploads/</text>
+    <line x1="135" y1="5065" x2="135" y2="5075" class="line"/>
+    <line x1="135" y1="5075" x2="145" y2="5075" class="line"/>
+    <text x="150" y="5080" class="icon">📕</text>
+    <text x="175" y="5080" class="file-text">syllabus.pdf</text>
+    <line x1="105" y1="5135" x2="105" y2="5145" class="line"/>
+    <line x1="105" y1="5145" x2="115" y2="5145" class="line"/>
+    <text x="120" y="5150" class="icon">⚙️</text>
+    <text x="145" y="5150" class="file-text">syllabus.json</text>
+    <line x1="105" y1="5170" x2="105" y2="5180" class="line"/>
+    <line x1="105" y1="5180" x2="115" y2="5180" class="line"/>
+    <text x="120" y="5185" class="icon">📄</text>
+    <text x="145" y="5185" class="file-text">syllabus_raw.txt</text>
+    <line x1="75" y1="5240" x2="75" y2="5250" class="line"/>
+    <line x1="75" y1="5250" x2="85" y2="5250" class="line"/>
+    <text x="90" y="5255" class="icon">📁</text>
+    <text x="115" y="5255" class="folder-text">syllabus-1773341742103/</text>
+    <line x1="105" y1="5270" x2="105" y2="5280" class="line"/>
+    <line x1="105" y1="5280" x2="115" y2="5280" class="line"/>
+    <text x="120" y="5285" class="icon">📁</text>
+    <text x="145" y="5285" class="folder-text">uploads/</text>
+    <line x1="135" y1="5300" x2="135" y2="5310" class="line"/>
+    <line x1="135" y1="5310" x2="145" y2="5310" class="line"/>
+    <text x="150" y="5315" class="icon">📕</text>
+    <text x="175" y="5315" class="file-text">syllabus.pdf</text>
+    <line x1="105" y1="5370" x2="105" y2="5380" class="line"/>
+    <line x1="105" y1="5380" x2="115" y2="5380" class="line"/>
+    <text x="120" y="5385" class="icon">⚙️</text>
+    <text x="145" y="5385" class="file-text">syllabus.json</text>
+    <line x1="105" y1="5405" x2="105" y2="5415" class="line"/>
+    <line x1="105" y1="5415" x2="115" y2="5415" class="line"/>
+    <text x="120" y="5420" class="icon">📄</text>
+    <text x="145" y="5420" class="file-text">syllabus_raw.txt</text>
+    <line x1="75" y1="5475" x2="75" y2="5485" class="line"/>
+    <line x1="75" y1="5485" x2="85" y2="5485" class="line"/>
+    <text x="90" y="5490" class="icon">📁</text>
+    <text x="115" y="5490" class="folder-text">syllabus-1773342079705/</text>
+    <line x1="105" y1="5505" x2="105" y2="5515" class="line"/>
+    <line x1="105" y1="5515" x2="115" y2="5515" class="line"/>
+    <text x="120" y="5520" class="icon">📁</text>
+    <text x="145" y="5520" class="folder-text">uploads/</text>
+    <line x1="135" y1="5535" x2="135" y2="5545" class="line"/>
+    <line x1="135" y1="5545" x2="145" y2="5545" class="line"/>
+    <text x="150" y="5550" class="icon">📕</text>
+    <text x="175" y="5550" class="file-text">syllabus.pdf</text>
+    <line x1="105" y1="5605" x2="105" y2="5615" class="line"/>
+    <line x1="105" y1="5615" x2="115" y2="5615" class="line"/>
+    <text x="120" y="5620" class="icon">⚙️</text>
+    <text x="145" y="5620" class="file-text">syllabus.json</text>
+    <line x1="105" y1="5640" x2="105" y2="5650" class="line"/>
+    <line x1="105" y1="5650" x2="115" y2="5650" class="line"/>
+    <text x="120" y="5655" class="icon">📄</text>
+    <text x="145" y="5655" class="file-text">syllabus_raw.txt</text>
+    <line x1="75" y1="5710" x2="75" y2="5720" class="line"/>
+    <line x1="75" y1="5720" x2="85" y2="5720" class="line"/>
+    <text x="90" y="5725" class="icon">⚙️</text>
+    <text x="115" y="5725" class="file-text">.gitignore</text>
+    <line x1="75" y1="5745" x2="75" y2="5755" class="line"/>
+    <line x1="75" y1="5755" x2="85" y2="5755" class="line"/>
+    <text x="90" y="5760" class="icon">📝</text>
+    <text x="115" y="5760" class="file-text">README.md</text>
+    <line x1="75" y1="5780" x2="75" y2="5790" class="line"/>
+    <line x1="75" y1="5790" x2="85" y2="5790" class="line"/>
+    <text x="90" y="5795" class="icon">⚙️</text>
+    <text x="115" y="5795" class="file-text">ai_knowledge_base.json</text>
+    <line x1="45" y1="5850" x2="45" y2="5860" class="line"/>
+    <line x1="45" y1="5860" x2="55" y2="5860" class="line"/>
+    <text x="60" y="5865" class="icon">📁</text>
+    <text x="85" y="5865" class="folder-text">input_analysis/</text>
+    <line x1="75" y1="5880" x2="75" y2="5890" class="line"/>
+    <line x1="75" y1="5890" x2="85" y2="5890" class="line"/>
+    <text x="90" y="5895" class="icon">🐍</text>
+    <text x="115" y="5895" class="file-text">OCR_Engine.py</text>
+    <line x1="75" y1="5915" x2="75" y2="5925" class="line"/>
+    <line x1="75" y1="5925" x2="85" y2="5925" class="line"/>
+    <text x="90" y="5930" class="icon">🐍</text>
+    <text x="115" y="5930" class="file-text">__init__.py</text>
+    <line x1="75" y1="5950" x2="75" y2="5960" class="line"/>
+    <line x1="75" y1="5960" x2="85" y2="5960" class="line"/>
+    <text x="90" y="5965" class="icon">🐍</text>
+    <text x="115" y="5965" class="file-text">analyze_input.py</text>
+    <line x1="75" y1="5985" x2="75" y2="5995" class="line"/>
+    <line x1="75" y1="5995" x2="85" y2="5995" class="line"/>
+    <text x="90" y="6000" class="icon">🐍</text>
+    <text x="115" y="6000" class="file-text">knowledge_graph.py</text>
+    <line x1="75" y1="6020" x2="75" y2="6030" class="line"/>
+    <line x1="75" y1="6030" x2="85" y2="6030" class="line"/>
+    <text x="90" y="6035" class="icon">🐍</text>
+    <text x="115" y="6035" class="file-text">process_pdf.py</text>
+    <line x1="75" y1="6055" x2="75" y2="6065" class="line"/>
+    <line x1="75" y1="6065" x2="85" y2="6065" class="line"/>
+    <text x="90" y="6070" class="icon">🐍</text>
+    <text x="115" y="6070" class="file-text">pyq_service.py</text>
+    <line x1="75" y1="6090" x2="75" y2="6100" class="line"/>
+    <line x1="75" y1="6100" x2="85" y2="6100" class="line"/>
+    <text x="90" y="6105" class="icon">🐍</text>
+    <text x="115" y="6105" class="file-text">syllabus_service.py</text>
+    <line x1="45" y1="6160" x2="45" y2="6170" class="line"/>
+    <line x1="45" y1="6170" x2="55" y2="6170" class="line"/>
+    <text x="60" y="6175" class="icon">📁</text>
+    <text x="85" y="6175" class="folder-text">question_selection/</text>
+    <line x1="75" y1="6190" x2="75" y2="6200" class="line"/>
+    <line x1="75" y1="6200" x2="85" y2="6200" class="line"/>
+    <text x="90" y="6205" class="icon">🐍</text>
+    <text x="115" y="6205" class="file-text">__init__.py</text>
+    <line x1="75" y1="6225" x2="75" y2="6235" class="line"/>
+    <line x1="75" y1="6235" x2="85" y2="6235" class="line"/>
+    <text x="90" y="6240" class="icon">🐍</text>
+    <text x="115" y="6240" class="file-text">question_service.py</text>
+    <line x1="45" y1="6295" x2="45" y2="6305" class="line"/>
+    <line x1="45" y1="6305" x2="55" y2="6305" class="line"/>
+    <text x="60" y="6310" class="icon">📁</text>
+    <text x="85" y="6310" class="folder-text">question_verification/</text>
+    <line x1="75" y1="6325" x2="75" y2="6335" class="line"/>
+    <line x1="75" y1="6335" x2="85" y2="6335" class="line"/>
+    <text x="90" y="6340" class="icon">🐍</text>
+    <text x="115" y="6340" class="file-text">__init__.py</text>
+    <line x1="75" y1="6360" x2="75" y2="6370" class="line"/>
+    <line x1="75" y1="6370" x2="85" y2="6370" class="line"/>
+    <text x="90" y="6375" class="icon">🐍</text>
+    <text x="115" y="6375" class="file-text">verify_paper.py</text>
+    <line x1="45" y1="6430" x2="45" y2="6440" class="line"/>
+    <line x1="45" y1="6440" x2="55" y2="6440" class="line"/>
+    <text x="60" y="6445" class="icon">📁</text>
+    <text x="85" y="6445" class="folder-text">schemas/</text>
+    <line x1="75" y1="6460" x2="75" y2="6470" class="line"/>
+    <line x1="75" y1="6470" x2="85" y2="6470" class="line"/>
+    <text x="90" y="6475" class="icon">🐍</text>
+    <text x="115" y="6475" class="file-text">__init__.py</text>
+    <line x1="75" y1="6495" x2="75" y2="6505" class="line"/>
+    <line x1="75" y1="6505" x2="85" y2="6505" class="line"/>
+    <text x="90" y="6510" class="icon">🐍</text>
+    <text x="115" y="6510" class="file-text">llm_schemas.py</text>
+    <line x1="45" y1="6565" x2="45" y2="6575" class="line"/>
+    <line x1="45" y1="6575" x2="55" y2="6575" class="line"/>
+    <text x="60" y="6580" class="icon">🐍</text>
+    <text x="85" y="6580" class="file-text">__init__.py</text>
+    <line x1="45" y1="6600" x2="45" y2="6610" class="line"/>
+    <line x1="45" y1="6610" x2="55" y2="6610" class="line"/>
+    <text x="60" y="6615" class="icon">🐍</text>
+    <text x="85" y="6615" class="file-text">llm_service.py</text>
+    <line x1="45" y1="6635" x2="45" y2="6645" class="line"/>
+    <line x1="45" y1="6645" x2="55" y2="6645" class="line"/>
+    <text x="60" y="6650" class="icon">🐍</text>
+    <text x="85" y="6650" class="file-text">pipeline.py</text>
+    <line x1="45" y1="6670" x2="45" y2="6680" class="line"/>
+    <line x1="45" y1="6680" x2="55" y2="6680" class="line"/>
+    <text x="60" y="6685" class="icon">🐍</text>
+    <text x="85" y="6685" class="file-text">prompts.py</text>
+    <line x1="45" y1="6705" x2="45" y2="6715" class="line"/>
+    <line x1="45" y1="6715" x2="55" y2="6715" class="line"/>
+    <text x="60" y="6720" class="icon">🐍</text>
+    <text x="85" y="6720" class="file-text">test_llm.py</text>
+    <line x1="15" y1="6785" x2="25" y2="6785" class="line"/>
+    <text x="30" y="6790" class="icon">📁</text>
+    <text x="55" y="6790" class="folder-text">websocket/</text>
+    <line x1="45" y1="6805" x2="45" y2="6815" class="line"/>
+    <line x1="45" y1="6815" x2="55" y2="6815" class="line"/>
+    <text x="60" y="6820" class="icon">🐍</text>
+    <text x="85" y="6820" class="file-text">__init__.py</text>
+    <line x1="45" y1="6840" x2="45" y2="6850" class="line"/>
+    <line x1="45" y1="6850" x2="55" y2="6850" class="line"/>
+    <text x="60" y="6855" class="icon">🐍</text>
+    <text x="85" y="6855" class="file-text">manager.py</text>
+    <line x1="15" y1="6920" x2="25" y2="6920" class="line"/>
+    <text x="30" y="6925" class="icon">🐍</text>
+    <text x="55" y="6925" class="file-text">__init__.py</text>
+    <line x1="15" y1="6955" x2="25" y2="6955" class="line"/>
+    <text x="30" y="6960" class="icon">🐍</text>
+    <text x="55" y="6960" class="file-text">main.py</text>
+</svg>
