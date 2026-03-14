@@ -56,7 +56,7 @@ const INITIAL_STEPS: SubprocessStep[] = [
 
 export const usePatternStore = create<PatternState>((set, get) => ({
     sections: [],
-    totalMarks: 80, // Default fallback
+    totalMarks: 0,
     status: "idle",
     steps: INITIAL_STEPS,
     error: null,

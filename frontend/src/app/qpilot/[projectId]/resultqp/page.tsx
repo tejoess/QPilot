@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useMemo } from "react";
 import {
     Download,
     Printer,
@@ -27,12 +27,19 @@ import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import { QPilotSidebar } from "@/components/qpilot/QPilotSidebar";
 import Link from "next/link";
 import { useParams } from "next/navigation";
+import { useOrchestrationStore } from "@/store/orchestrationStore";
+import { useQPilotStore } from "@/store/qpilotStore";
 
-// 📄 SAMPLE DATA
+interface Question {
+    text: string;
+    marks: number;
+    bloom?: string;
+}
+
 interface QuestionSection {
     title: string;
     instructions: string;
-    questions: string[];
+    questions: Question[];
 }
 
 interface ExamPaper {
@@ -55,30 +62,30 @@ const EXAM_DATA: ExamPaper = {
             title: "Section A",
             instructions: "Answer all questions. Each question carries 2 marks.",
             questions: [
-                "Define Intelligent Agent.",
-                "Explain PEAS description.",
-                "What is Bayesian Network?",
-                "State the purpose of GAN."
+                { text: "Define Intelligent Agent.", marks: 2 },
+                { text: "Explain PEAS description.", marks: 2 },
+                { text: "What is Bayesian Network?", marks: 2 },
+                { text: "State the purpose of GAN.", marks: 2 }
             ]
         },
         {
             title: "Section B",
             instructions: "Answer any 5 questions. Each carries 6 marks.",
             questions: [
-                "Explain GAN architecture with diagram.",
-                "Compare GAN and VAE.",
-                "Discuss Hidden Markov Models.",
-                "Explain Transfer Learning techniques.",
-                "Describe XGBoost algorithm."
+                { text: "Explain GAN architecture with diagram.", marks: 6 },
+                { text: "Compare GAN and VAE.", marks: 6 },
+                { text: "Discuss Hidden Markov Models.", marks: 6 },
+                { text: "Explain Transfer Learning techniques.", marks: 6 },
+                { text: "Describe XGBoost algorithm.", marks: 6 }
             ]
         },
         {
             title: "Section C",
             instructions: "Answer any 2 questions. Each carries 10 marks.",
             questions: [
-                "Design a GAN model for image generation.",
-                "Explain ensemble learning methods in detail.",
-                "Discuss emerging AI technologies."
+                { text: "Design a GAN model for image generation.", marks: 10 },
+                { text: "Explain ensemble learning methods in detail.", marks: 10 },
+                { text: "Discuss emerging AI technologies.", marks: 10 }
             ]
         }
     ]
@@ -86,22 +93,52 @@ const EXAM_DATA: ExamPaper = {
 
 export default function ResultQPPage() {
     const { projectId } = useParams<{ projectId: string }>();
+    const { paperData } = useOrchestrationStore();
+    const { currentMetadata } = useQPilotStore();
+
+    // Build exam paper from real backend data, fall back to sample data
+    const examPaper: ExamPaper = useMemo(() => {
+        if (paperData && Array.isArray(paperData.sections) && paperData.sections.length > 0) {
+            const totalMarks = (paperData.sections as any[]).reduce(
+                (sum: number, s: any) =>
+                    sum + (s.questions as any[]).reduce((qs: number, q: any) => qs + (q.marks || 0), 0),
+                0
+            );
+            return {
+                examTitle: currentMetadata?.examTitle || "Question Paper",
+                subject: currentMetadata?.subject || "—",
+                grade: currentMetadata?.grade || "—",
+                totalMarks: currentMetadata?.totalMarks || totalMarks,
+                duration: currentMetadata?.duration || "3 Hours",
+                sections: (paperData.sections as any[]).map((s: any) => ({
+                    title: s.section_name || "Section",
+                    instructions: s.section_description || "",
+                    questions: (s.questions as any[]).map((q: any) => ({
+                        text: q.question_text || "",
+                        marks: q.marks || 0,
+                        bloom: q.bloom_level || "",
+                    })),
+                })),
+            };
+        }
+        return EXAM_DATA;
+    }, [paperData, currentMetadata]);
 
     const handlePrint = () => {
         window.print();
     };
 
     const handleCopy = () => {
-        let text = `${EXAM_DATA.examTitle}\n`;
-        text += `Subject: ${EXAM_DATA.subject}\n`;
-        text += `Grade: ${EXAM_DATA.grade} | Duration: ${EXAM_DATA.duration} | Total Marks: ${EXAM_DATA.totalMarks}\n`;
+        let text = `${examPaper.examTitle}\n`;
+        text += `Subject: ${examPaper.subject}\n`;
+        text += `Grade: ${examPaper.grade} | Duration: ${examPaper.duration} | Total Marks: ${examPaper.totalMarks}\n`;
         text += `--------------------------------------------------\n\n`;
 
-        EXAM_DATA.sections.forEach((section) => {
+        examPaper.sections.forEach((section) => {
             text += `${section.title.toUpperCase()}\n`;
             text += `Instructions: ${section.instructions}\n\n`;
             section.questions.forEach((q, i) => {
-                text += `${i + 1}. ${q}\n`;
+                text += `${i + 1}. ${q.text}${q.marks ? ` [${q.marks} marks]` : ""}\n`;
             });
             text += `\n`;
         });
@@ -223,22 +260,22 @@ export default function ResultQPPage() {
                                 {/* Paper Header */}
                                 <header className="text-center mb-12">
                                     <h1 className="text-2xl md:text-3xl font-black uppercase tracking-tight mb-2 text-zinc-900 dark:text-zinc-100 print:text-black">
-                                        {EXAM_DATA.examTitle}
+                                        {examPaper.examTitle}
                                     </h1>
                                     <div className="h-1.5 w-24 bg-zinc-900 dark:bg-white mx-auto mb-8 rounded-full print:bg-black" />
 
                                     <div className="grid grid-cols-2 gap-y-4 text-[13px] font-bold uppercase tracking-widest text-zinc-600 dark:text-zinc-400 print:text-black">
                                         <div className="text-left border-b border-zinc-100 dark:border-zinc-800 pb-2 inline-block">
-                                            Subject: <span className="text-zinc-950 dark:text-zinc-200 print:text-black">{EXAM_DATA.subject}</span>
+                                            Subject: <span className="text-zinc-950 dark:text-zinc-200 print:text-black">{examPaper.subject}</span>
                                         </div>
                                         <div className="text-right border-b border-zinc-100 dark:border-zinc-800 pb-2 inline-block">
-                                            Grade/Year: <span className="text-zinc-950 dark:text-zinc-200 print:text-black">{EXAM_DATA.grade}</span>
+                                            Grade/Year: <span className="text-zinc-950 dark:text-zinc-200 print:text-black">{examPaper.grade}</span>
                                         </div>
                                         <div className="text-left border-b border-zinc-100 dark:border-zinc-800 pb-2 inline-block">
-                                            Duration: <span className="text-zinc-950 dark:text-zinc-200 print:text-black">{EXAM_DATA.duration}</span>
+                                            Duration: <span className="text-zinc-950 dark:text-zinc-200 print:text-black">{examPaper.duration}</span>
                                         </div>
                                         <div className="text-right border-b border-zinc-100 dark:border-zinc-800 pb-2 inline-block">
-                                            Total Marks: <span className="text-zinc-950 dark:text-zinc-200 print:text-black">{EXAM_DATA.totalMarks}</span>
+                                            Total Marks: <span className="text-zinc-950 dark:text-zinc-200 print:text-black">{examPaper.totalMarks}</span>
                                         </div>
                                     </div>
                                 </header>
@@ -247,7 +284,7 @@ export default function ResultQPPage() {
 
                                 {/* SECTIONS */}
                                 <div className="space-y-12">
-                                    {EXAM_DATA.sections.map((section, sIdx) => (
+                                    {examPaper.sections.map((section, sIdx) => (
                                         <div key={sIdx} className="space-y-6">
                                             <div className="flex items-center gap-4">
                                                 <h2 className="text-lg font-black uppercase tracking-widest border-l-[6px] border-primary pl-4 print:border-black text-zinc-900 dark:text-zinc-100">
@@ -264,8 +301,13 @@ export default function ResultQPPage() {
                                                     <li key={qIdx} className="flex gap-4 group">
                                                         <span className="font-bold tabular-nums text-zinc-400 print:text-black text-sm">{qIdx + 1}.</span>
                                                         <p className="text-[17px] leading-relaxed font-medium flex-1 text-zinc-800 dark:text-zinc-200 print:text-black">
-                                                            {question}
+                                                            {question.text}
                                                         </p>
+                                                        {question.marks > 0 && (
+                                                            <span className="text-[11px] font-black text-zinc-400 dark:text-zinc-500 tabular-nums shrink-0 print:text-black">
+                                                                [{question.marks}M]
+                                                            </span>
+                                                        )}
                                                         <div className="opacity-0 group-hover:opacity-100 transition-opacity print:hidden">
                                                             <Button variant="ghost" size="icon" className="h-7 w-7 rounded-full hover:bg-primary/10 hover:text-primary">
                                                                 <RefreshCw className="h-3.5 w-3.5" />

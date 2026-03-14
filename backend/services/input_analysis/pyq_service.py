@@ -59,7 +59,17 @@ STRICT RULES:
    - Extract if explicitly present.
    - If not present, infer only from complexity: 2, 5, or 10.
 
-5. Cleanliness:
+5. Bloom's Taxonomy Level:
+   - Classify each question into one of: Remember, Understand, Apply, Analyze, Evaluate, Create.
+   - Use the action verb in the question to determine the level:
+     * Remember: List, Define, State, Name
+     * Understand: Explain, Describe, Discuss, Summarize
+     * Apply: Calculate, Solve, Demonstrate, Design
+     * Analyze: Compare, Differentiate, Examine, Analyze
+     * Evaluate: Evaluate, Justify, Critique, Assess
+     * Create: Design, Propose, Develop, Formulate
+
+6. Cleanliness:
    - Remove numbering artifacts.
    - Normalize spacing and broken words.
 
@@ -116,6 +126,9 @@ Return ONLY valid JSON matching the schema above.
                 # Rename 'question' to 'text' for compatibility with question_service.py
                 if "question" in q and "text" not in q:
                     q["text"] = q["question"]
+                # Ensure bloom_level exists (default to Understand if missing)
+                if "bloom_level" not in q:
+                    q["bloom_level"] = "Understand"
                 question_id_counter += 1
                 unique_questions.append(q)
 

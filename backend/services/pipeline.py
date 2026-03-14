@@ -163,6 +163,7 @@ async def pyqs_fetch(state: PipelineState):
     if pyqs_text:
         await manager.send_progress(session_id, "pyqs_fetch", "running", 75, "Saving raw text")
         session_folder = os.path.join("backend", "services", "data", state["session_id"])
+        os.makedirs(session_folder, exist_ok=True)
         text_path = os.path.join(session_folder, "pyqs_raw.txt")
         with open(text_path, 'w', encoding='utf-8') as f:
             f.write(pyqs_text)
@@ -211,11 +212,11 @@ async def blueprint_build_node(state: PipelineState):
     
     # Get inputs with defaults for missing values
     await manager.send_progress(session_id, "blueprint_build", "running", 20, "Gathering requirements")
-    syllabus = state.get("syllabus", {})
-    pyqs = state.get("pyqs", {})
-    teacher_inputs = state.get("teacher_inputs", {"focus_areas": [], "preferences": ""})
-    bloom_levels = state.get("bloom_taxanomy_levels", {"remember": 20, "understand": 30, "apply": 30, "analyze": 20})
-    qp_pattern = state.get("qp_pattern", {"total_marks": 80, "sections": []})
+    syllabus = state.get("syllabus") or {}
+    pyqs = state.get("pyqs") or {}
+    teacher_inputs = state.get("teacher_inputs") or {"focus_areas": [], "preferences": ""}
+    bloom_levels = state.get("bloom_taxanomy_levels") or {"remember": 20, "understand": 30, "apply": 30, "analyze": 20}
+    qp_pattern = state.get("qp_pattern") or {"total_marks": 0, "sections": []}
     
     await manager.send_progress(session_id, "blueprint_build", "running", 40, "Generating blueprint with AI...")
     await manager.send_log(session_id, "info", "🤖 AI is analyzing syllabus and generating blueprint structure")
@@ -247,11 +248,17 @@ async def blueprint_verify_node(state: PipelineState):
     
     await manager.send_progress(session_id, "blueprint_verify", "running", 30, "Analyzing blueprint structure")
     blueprint = state.get("blueprint", {})
-    syllabus = state.get("syllabus", {})
-    pyqs_analysis = state.get("pyqs_analysis", {})
-    bloom_levels = state.get("bloom_taxanomy_levels", {})
-    teacher_inputs = state.get("teacher_inputs", {})
-    qp_pattern = state.get("qp_pattern", {})
+    
+    # Safety check: ensure blueprint is not None
+    if blueprint is None:
+        await manager.send_log(session_id, "warning", "⚠️ Blueprint is None, using empty dict")
+        blueprint = {}
+    
+    syllabus = state.get("syllabus") or {}
+    pyqs_analysis = state.get("pyqs_analysis") or {}
+    bloom_levels = state.get("bloom_taxanomy_levels") or {}
+    teacher_inputs = state.get("teacher_inputs") or {}
+    qp_pattern = state.get("qp_pattern") or {}
     
     await manager.send_progress(session_id, "blueprint_verify", "running", 60, "AI is critiquing blueprint...")
     await manager.send_log(session_id, "info", "🔍 AI analyzing blueprint quality and requirements match")
@@ -319,13 +326,13 @@ async def paper_verify_node(state: PipelineState):
     await manager.send_log(session_id, "info", "Step 8: Verifying drafted question paper")
     
     await manager.send_progress(session_id, "paper_verify", "running", 25, "Loading draft paper and requirements")
-    draft_paper = state.get("draft_paper", {})
-    syllabus = state.get("syllabus", {})
-    pyqs_analysis = state.get("pyqs_analysis", {})
-    blueprint = state.get("blueprint", {})
-    bloom_levels = state.get("bloom_taxanomy_levels", {})
-    qp_pattern = state.get("qp_pattern", {})
-    teacher_inputs = state.get("teacher_inputs", {})
+    draft_paper = state.get("draft_paper") or {}
+    syllabus = state.get("syllabus") or {}
+    pyqs_analysis = state.get("pyqs_analysis") or {}
+    blueprint = state.get("blueprint") or {}
+    bloom_levels = state.get("bloom_taxanomy_levels") or {}
+    qp_pattern = state.get("qp_pattern") or {}
+    teacher_inputs = state.get("teacher_inputs") or {}
     
     await manager.send_progress(session_id, "paper_verify", "running", 50, "AI running comprehensive verification...")
     await manager.send_log(session_id, "info", "📋 AI verifying paper quality, marks, and requirements")

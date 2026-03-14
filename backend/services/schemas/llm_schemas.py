@@ -11,26 +11,18 @@ from pydantic import BaseModel, Field
 # SYLLABUS SCHEMAS
 # ============================================================================
 
-class SyllabusSubtopic(BaseModel):
-    name: str = Field(description="Subtopic name")
-    description: Optional[str] = Field(default="", description="Brief description")
-
-
-class SyllabusTopic(BaseModel):
-    name: str = Field(description="Topic name")
-    subtopics: List[SyllabusSubtopic] = Field(default_factory=list)
-
-
 class SyllabusModule(BaseModel):
-    module_number: str = Field(description="Module number (e.g., 'Module 1')")
+    module_number: int = Field(description="Module number (e.g., 1, 2, 3)")
     module_name: str = Field(description="Module name")
-    weightage: float = Field(description="Weightage as decimal (e.g., 0.20 for 20%)")
-    topics: List[SyllabusTopic] = Field(default_factory=list)
+    weightage_hours: Optional[int] = Field(default=None, description="Weightage in hours")
+    topics: List[str] = Field(default_factory=list, description="List of topic names as strings")
 
 
 class SyllabusOutput(BaseModel):
     course_code: Optional[str] = Field(default="", description="Course code")
     course_name: Optional[str] = Field(default="", description="Course name")
+    course_objectives: Optional[List[str]] = Field(default_factory=list, description="Course objectives")
+    course_outcomes: Optional[List[str]] = Field(default_factory=list, description="Course outcomes")
     modules: List[SyllabusModule] = Field(description="List of modules")
 
 
@@ -38,11 +30,13 @@ class SyllabusOutput(BaseModel):
 # PYQ SCHEMAS
 # ============================================================================
 
+
 class PYQQuestion(BaseModel):
     question: str = Field(description="Full question text")
     topic: str = Field(description="Topic from syllabus")
     subtopic: str = Field(description="Subtopic from syllabus")
     marks: int = Field(description="Marks for the question")
+    bloom_level: str = Field(default="Understand", description="Bloom's taxonomy level: Remember, Understand, Apply, Analyze, Evaluate, or Create")
 
 
 class PYQOutput(BaseModel):
@@ -57,7 +51,6 @@ class BlueprintQuestion(BaseModel):
     question_number: str = Field(description="Question identifier (e.g., '1a')")
     module: str = Field(description="Module name")
     topic: str = Field(description="Topic name")
-    subtopic: str = Field(description="Subtopic name")
     marks: int = Field(description="Marks allocated")
     bloom_level: str = Field(description="Bloom's taxonomy level")
     is_pyq: bool = Field(description="Whether to use a PYQ")
@@ -87,19 +80,65 @@ class BlueprintOutput(BaseModel):
 # BLUEPRINT VERIFICATION SCHEMAS
 # ============================================================================
 
+# NEW FORMAT (matches updated prompt)
+class ComputedMetrics(BaseModel):
+    total_marks: int = Field(description="Computed total marks")
+    total_questions: int = Field(description="Computed total questions")
+    module_distribution: Dict[str, int] = Field(description="Marks per module")
+    bloom_distribution: Dict[str, float] = Field(description="Bloom level percentages")
+    pyq_count: int = Field(description="Number of PYQs used")
+
+
+class VerificationIssue(BaseModel):
+    question: str = Field(description="Question identifier or 'overall'")
+    metric: str = Field(description="Metric name (e.g., constraint_compliance)")
+    severity: str = Field(description="critical, high, medium, or low")
+    problem: str = Field(description="Problem description")
+    fix: str = Field(description="How to fix")
+
+
+class VerificationScores(BaseModel):
+    constraint_compliance: int = Field(ge=0, le=10)
+    bloom_balance: int = Field(ge=0, le=10)
+    module_balance: int = Field(ge=0, le=10)
+    pyq_utilization: int = Field(ge=0, le=10)
+    difficulty_progression: int = Field(ge=0, le=10)
+    topic_diversity: int = Field(ge=0, le=10)
+    syllabus_coverage: int = Field(ge=0, le=10)
+    teacher_alignment: int = Field(ge=0, le=10)
+
+
+class VerificationOverall(BaseModel):
+    total: int = Field(description="Sum of all scores")
+    out_of: int = Field(default=100, description="Maximum possible score")
+    verdict: str = Field(description="APPROVED | APPROVED_WITH_WARNINGS | NEEDS_REVISION | REJECTED")
+    summary: str = Field(description="2-sentence summary")
+
+
+class BlueprintVerificationOutputNew(BaseModel):
+    """New format matching updated prompt"""
+    computed: ComputedMetrics = Field(description="Computed metrics")
+    issues: List[VerificationIssue] = Field(default_factory=list, description="List of issues")
+    scores: VerificationScores = Field(description="Individual metric scores")
+    overall: VerificationOverall = Field(description="Overall verdict")
+
+
+# LEGACY FORMAT (for backwards compatibility)
 class MetricScore(BaseModel):
     score: int = Field(ge=0, le=10, description="Score out of 10")
     status: str = Field(description="excellent, good, acceptable, or poor")
-    feedback: str = Field(description="Brief feedback")
+    details: str = Field(description="Brief feedback")
 
 
 class BlueprintVerificationOutput(BaseModel):
     overall_rating: Dict[str, Any] = Field(description="Overall rating details")
     metric_scores: Dict[str, MetricScore] = Field(description="Individual metric scores")
-    critical_issues: List[str] = Field(default_factory=list, description="Critical issues found")
-    warnings: List[str] = Field(default_factory=list, description="Warnings")
-    recommendations: List[str] = Field(default_factory=list, description="Recommendations")
-    statistics: Dict[str, Any] = Field(default_factory=dict, description="Statistics")
+    critical_issues: List[Dict[str, Any]] = Field(default_factory=list, description="Critical issues found")
+    warnings: List[Dict[str, Any]] = Field(default_factory=list, description="Warnings")
+    recommendations: Dict[str, List[str]] = Field(default_factory=dict, description="Recommendations")
+    detailed_analysis: Dict[str, Any] = Field(default_factory=dict, description="Detailed analysis")
+    pass_fail_decision: Dict[str, Any] = Field(default_factory=dict, description="Pass/fail decision")
+    statistics: Optional[Dict[str, Any]] = Field(default=None, description="Statistics")
 
 
 # ============================================================================

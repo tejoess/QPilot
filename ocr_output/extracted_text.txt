@@ -1,0 +1,87 @@
+============================================================
+  PAGE 1
+============================================================
+Paper Subject Code: 42371 'Deep Learning 26-Dec-2023 10.30 am 01330 pm 1T01877 B.E:. Computer Science & Engineering (Artificial Intelligence & Machine Learning) (R-2019-20 C Scheme) (Sem VII) 42371 Deep Learning QP CODE: 10043892 Duration: 3Hrs. Maximum Marks 80
+NB:
+Question No. 1 is compulsory- Attempt any three questions out of the remaining five: All questions carry equal marks Assume suitable data, if required and state it clearly.
+Q1_
+ATTEMPT ANY FOUR Design AND gatc using Perccptron. b. Supposc wc have N input-output pairs Our goal is to find thc parameters that prcdict thc output y from thc input X according to some function y= x' Calculatc the sum-of squarcd crror function E bctwccn prcdictions y and inputs X_ Thc paramctcr w can be dctcrmincd itcrativcly using gradicnt desccnt: For thc calculatcd crror function E, dcrivc thc gradient dcsccnt update rulc Wc_W-a dE dw Explain dropout How does it solvc thc problem of ovcrfitting? Explain dcnoising auto cncodcr modcl Dcscribc scqucncc lcarning problem
+[20]
+02. Explain Gatcd Recurrent Unit in dctail b. What is an activation function? Dcscribe any four activation functions. 03. Explain CNN architccturc in dctail. Suppose, wc havc input volume of 32*32*3 for a laycr in CNN and there are ten 5*5 filtcrs with stridc and pad 2; calculatc the numbcr of paramcters in this laycr of CNN_ Explain carly stopping, batch normalization, and data augmentation _ Explain RNN architccture in dctail. b Explain thc working of Gcnerativc Advcrsarial Nctwork Explain Stochastic Gradicnt Dcsccnt and momcntum bascd gradicnt desccnt optimization tcchniqucs_ b. Explain LSTM architccturc _
+[10] [10] [10]
+[10] {L03 [10]
+06
+Dcscribc LeNET architccturc b. Explain vanishing and cxploding gradicnt in RNNs
+{LOJ [10]
+x*****xxxtxxxxxtxxxxxxxxxxx
+43892
+Page 1 of 1
+309CBE773807C22D23F8737IAC623534
+
+============================================================
+  PAGE 2
+============================================================
+Paper / Subject Code: 42371 Deep Learning
+12/11/2024 CSE-AIML SEM-VII C SCHEME DEEP LEARNING QP CODE: 10065146
+Duration: 3 Hours
+[Max Marks: 80]
+1) Question No is Compulsory. (2) Attempt any three questions Out of the remaining five_ (3) All questions carry equal marks _ Assume suitable data, if required and state it clearly:
+Attempt any four Comment on the Representation Power of MLPs_ b) Explain Gradient Descent in Deep Learning; c) Explain the dropout method and it'$ advantages d) What are Denoising Autoencoders? e) Explain Pooling operation in CNN_
+{20]
+2) What are the Three Classes of Deep Learning explain each? b) Explain and analyze the architectural of AlexNet Convolution Neural Network_
+[10} [10]
+What are the different types of Gradient Descent methods, explain any three of [10] them b) Differentiate between the architecture of LSTM and GRU network. [10]
+a) Explain the key components of an RNN. b) Consider & CNN layer with the following configuration: The input to the layer has 32 channels and a spatial size of 64x64. ~The convolutional layer has 64 filters (kerels), each of size 3x3, with a stride of 1 and no padding ~Each filter is applied to every channel of the input_ Calculate the total number of parameters (weights) in this convolutional layer:
+[10] [10]
+a) Comment on the significance of Loss functions ad explain different types of Loss functions while training & network: b) Explain any three types of Autoencoders_
+[10]
+[10]
+a)
+What is the significance of Activation Functions in Neural Networks, explain different types Activation functions used in NN_ b) Explain Generative Adversarial Networks Architecture &nd its applications_
+[10]
+[10]
+#***88****88*80***8*0
+65146
+Page 1 of 1
+XSZSYEE7CO9XSZSYEEZCO9XS2SYEEZCO9XS2SYEEZCO9
+
+============================================================
+  PAGE 3
+============================================================
+Paper Subject Code: 42371 'Deep Learning
+Duration: 3hrs
+[Max Marks:80]
+Question No 1 is Compulsory. 2) Attempt any three questions out of the remaining five: 3) All questions carry equal marks: Assume suitable data, if required and state it clearly-
+Attcmpt any four What arc Fecd Forward Ncural Nctwork? Explain Gradicnt Descent in Dccp Lcarning ; Explain thc dropout mcthod and it's advantagcs_ What arc Undcrcomplctc Autocncodcrs? Explain Pooling opcration in CNN
+[20]
+b) What arc thc Thrcc Classcs of Dcep Lcarning, cxplain cach? Explain thc architccturc of CNN with thc help of a diagram
+[10] [10]
+a) What arc thc differcnt typcs of Gradicnt Dcsccnt methods, cxplain any three of thcm: b) Explain main componcnts of an Autocncoder and it's architccturc_
+[10]
+[10]
+Explain LSTM modcl, how it overcomes thc limitation of RNN. b) What arc thc issucs faccd by Vanilla GAN modcls?
+{183 What arc Ll and L2 rcgularization methods? b) {103 Explain any thrcc typcS of Autocncodcrs_ a) What is thc significance of Activation Functions in Ncural Nctworks, cxplain [10] diffcrent typcs Activation functions uscd in NN. b) What arc Gcncrative Adversarial Nctworks, comment on it'$ applications_ [10]
+****+****************
+55301
+XSZSYADA494XS2SYADA494XS2SYADA494XS2SYADA494
+
+============================================================
+  PAGE 4
+============================================================
+Paper Subject Code: 42371 Deep Learning
+02/06/2025 BE CSE-AIML SEM-VII C-SCHEME DEEP LEARNING QP CODE: 10082863
+Duration: 3hrs
+Marks:80
+(1) Qucstion No is Compulsory_ Attcmpt any thrcc qucstions out of thc rcmaining five_ (3) All qucstions carry cqual marks_ Assumc suitablc data, if rcquircd and statc it clearly.
+Attcmpt any four a) Explain basic architccturc of fccdforward ncural nctwork. b) Explain rcgularization in ncural nctwork c) Explain typcs of ncural nctwork_ d) Explain thc conccpt of ovcrfitting and undcr fitting in ncural nctwork c) Explain basic working of CNN.
+[20]
+Explain the gradicnt dcsccnt algorithm uscd in ncural nctwork Also discuss typcs of gradicnt desccnt in detail. b) Explain thc working of auto cncodcrs Also discuss typc of auto cncodcrs in detail_
+[10]
+[10]
+a) Draw and cxplain any two modcrn dccp lcarning architcctures_ 6) Diffcrcntiatc bctwccn thc LSTM and GRU nctwork_
+{Io3 a) Explain thc working of RNN with the hclp of suitable diagram: [1 6) for {Yo3 Explain how Rccurrcnt Ncural Networks RNNs) are suitcd scqucntial data Comparc thc standard RNN architecturc with Long Short- Term Mcmory (LSTM) nctworks in tcrms of their ability to handlc long-tcri dcpcndcncies Providc a rcal-world application wherc using an LSTM would bc   significantly mOrc bcncficial than a simplc RNN and justify YOur rcasoning
+a) Discuss thc rolc of a loss function in training a neural nctwork. Comparc Mcan [10] Squarcd Error (MSE) and Cross-Entropy Loss in tems of thcir usagc, charactcristics, and impact on modcl pcrforancc In which sccnarios would using Cross-Entropy Loss bc morc appropriatc than MSE? Justify YOuI answcr with a suitable example: b) Explain architccturc of GAN in dctail. Also commcnt on applications of GAN. [10]
+What is thc significancc of Activation Functions in Ncural Nctworks, cxplain [10] different types Activation functions uscd in NN. 6) Explain the lcarning proccss in a ncural nctwork. How docs a ncural nctwork [10] updatc its wcights during training? Dcscribe the rolc of forward propagation; loss calculation, backpropagation, and optimization in this lcarning proccss_
+*********************
+82863
+X525Y400412XS2SY400412XS2SY40U4IZXS2SY400412

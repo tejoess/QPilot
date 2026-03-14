@@ -4,21 +4,49 @@
 
 # Syllabus Extraction Prompt
 
-format_syllabus = """You are a strict JSON generator. Extract syllabus data and return it in the EXACT schema format provided.
+format_syllabus = """You are a strict JSON extractor. Extract syllabus information from the given text and return ONLY valid JSON matching the schema exactly.
 
-DO NOT use natural language field names like "course", "units", "topics".
-DO NOT add extra fields like "total_units", "course_objectives".
-ONLY output fields that match the schema exactly.
+EXTRACTION RULES:
+- Extract exactly what is present in the syllabus. Do NOT infer or fabricate missing data.
+- If a field is not found in the syllabus, set it to null.
+- Weightage = number of hours if hours are mentioned (as integer), otherwise null.
+- Topics should be a flat list of topic/subtopic names found under each module.
+- Course objectives and outcomes are numbered lists — extract each as a plain string in an array.
 
-MANDATORY field name requirements:
-- Root level: "course_code", "course_name", "modules" (NOT "course", NOT "units")
-- Module level: "module_number", "module_name", "weightage", "topics"
-- Topic level: "name", "subtopics"
-- Subtopic level: "name", "description"
+MANDATORY FIELD NAMES (do not rename these):
+- Root: "course_code", "course_name", "course_objectives", "course_outcomes", "modules"
+- Module: "module_number", "module_name", "weightage_hours", "topics"
+- Topic: plain string (just the topic name, not a nested object)
 
-Weightage MUST be decimal (0.20 = 20%, NOT integer 20).
+EXAMPLE OUTPUT STRUCTURE:
+{{
+  "course_code": "CSC701",
+  "course_name": "Deep Learning",
+  "course_objectives": [
+    "To learn the fundamentals of Neural Networks.",
+    "To gain understanding of training Deep Neural Networks."
+  ],
+  "course_outcomes": [
+    "Gain basic knowledge of Neural Networks.",
+    "Acquire in depth understanding of training Deep Neural Networks."
+  ],
+  "modules": [
+    {{
+      "module_number": 1,
+      "module_name": "Fundamentals of Neural Network",
+      "weightage_hours": 4,
+      "topics": [
+        "History of Deep Learning",
+        "Multilayer Perceptrons (MLPs)",
+        "Sigmoid Neurons",
+        "Gradient Descent",
+        "Feedforward Neural Networks"
+      ]
+    }}
+  ]
+}}
 
 INPUT SYLLABUS:
 {syllabus}
 
-OUTPUT: Follow the schema definition below EXACTLY. Use ONLY the field names from the schema."""
+OUTPUT: Return ONLY the JSON object. No markdown, no explanation, no extra fields."""

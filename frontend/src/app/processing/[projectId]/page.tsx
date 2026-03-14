@@ -28,6 +28,7 @@ import { Badge } from "@/components/ui/badge";
 import { PipelineSteps } from "@/components/processing/PipelineSteps";
 import { LogPanel } from "@/components/processing/LogPanel";
 import { ProcessingProgress } from "@/components/processing/ProcessingProgress";
+import { GeneratedPaperView } from "@/components/processing/GeneratedPaperView";
 
 import { useProcessing } from "@/hooks/useProcessing";
 import { useProcessingStore } from "@/store/processingStore";
@@ -38,7 +39,7 @@ export default function ProcessingPage() {
     const { projectId } = useParams<{ projectId: string }>();
     const router = useRouter();
 
-    const { status, error, resultFilePath, reset } = useProcessingStore();
+    const { status, error, resultFilePath, paperData, reset } = useProcessingStore();
     const [requestData, setRequestData] = useState<PaperGenerationRequest | null>(null);
     const [isInitializing, setIsInitializing] = useState(true);
 
@@ -71,15 +72,15 @@ export default function ProcessingPage() {
         }
     }, [requestData, status, runGeneration]);
 
-    // Success redirection
-    useEffect(() => {
-        if (status === "completed" && resultFilePath) {
-            const timer = setTimeout(() => {
-                router.push(`/output/${projectId}`);
-            }, 3000);
-            return () => clearTimeout(timer);
-        }
-    }, [status, resultFilePath, router, projectId]);
+    // Success redirection (disabled to let user view the paper)
+    // useEffect(() => {
+    //     if (status === "completed" && resultFilePath) {
+    //         const timer = setTimeout(() => {
+    //             router.push(`/output/${projectId}`);
+    //         }, 3000);
+    //         return () => clearTimeout(timer);
+    //     }
+    // }, [status, resultFilePath, router, projectId]);
 
     // Clean up on unmount
     useEffect(() => {
@@ -120,7 +121,7 @@ export default function ProcessingPage() {
                                     "Generating Question Paper"}
                         </h1>
                         <p className="text-sm text-muted-foreground max-w-md mx-auto">
-                            {status === "completed" ? "Successfully constructed your paper. Redirecting to output..." :
+                            {status === "completed" ? "Successfully constructed your paper. View it below or download the result." :
                                 status === "failed" ? "An error occurred during the multi-agent pipeline." :
                                     "Our specialized agents are collaborating to build your question paper."}
                         </p>
@@ -170,6 +171,22 @@ export default function ProcessingPage() {
                         <LogPanel />
                     </aside>
                 </div>
+
+                {/* ══ Generated Paper Preview ══════════════════════════════════ */}
+                {status === "completed" && paperData && (
+                    <div className="space-y-4">
+                        <Separator className="opacity-50" />
+                        <div className="flex items-center justify-between">
+                            <h2 className="text-sm font-bold uppercase tracking-widest text-muted-foreground/70">
+                                Generated Question Paper
+                            </h2>
+                            <Badge variant="secondary" className="text-xs">
+                                {paperData.sections.reduce((sum, s) => sum + s.questions.length, 0)} Questions
+                            </Badge>
+                        </div>
+                        <GeneratedPaperView paper={paperData} />
+                    </div>
+                )}
 
                 {/* ══ Footer Actions ════════════════════════════════════════════ */}
                 <Separator className="opacity-50" />

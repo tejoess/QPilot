@@ -18,7 +18,7 @@ import { useOrchestrationStore } from "@/store/orchestrationStore";
 import { cn } from "@/lib/utils";
 
 export function WebSocketLogPanel() {
-    const { isConnected, logs, progressUpdates, currentProgress, currentStep, error } =
+    const { isConnected, logs, progressUpdates, currentProgress, error } =
         useOrchestrationStore();
     
     const scrollRef = useRef<HTMLDivElement>(null);
@@ -63,10 +63,10 @@ export function WebSocketLogPanel() {
                 </div>
 
                 {/* Current Progress Bar */}
-                {isConnected && currentStep && (
+                {isConnected && currentProgress > 0 && (
                     <div className="mt-4 space-y-2">
                         <div className="flex items-center justify-between text-sm">
-                            <span className="font-medium capitalize">{currentStep}</span>
+                            <span className="font-medium">Processing…</span>
                             <span className="text-muted-foreground">{currentProgress}%</span>
                         </div>
                         <Progress value={currentProgress} className="h-2" />

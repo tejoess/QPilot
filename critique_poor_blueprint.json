@@ -1,0 +1,172 @@
+{
+  "overall_rating": {
+    "total_score": 32,
+    "max_possible": 80,
+    "percentage": 40.0,
+    "grade": "F",
+    "verdict": "REJECTED",
+    "summary": "The total marks in the blueprint are 78, which is below the expected 80. Additionally, there are several critical issues regarding PYQ utilization and syllabus coverage."
+  },
+  "metric_scores": {
+    "constraint_compliance": {
+      "score": 0,
+      "status": "poor",
+      "details": "Score: 0/10"
+    },
+    "syllabus_coverage": {
+      "score": 4,
+      "status": "poor",
+      "details": "Module 5 (Recurrent Neural Networks) has zero questions."
+    },
+    "bloom_balance": {
+      "score": 1,
+      "status": "poor",
+      "details": "Score: 1/10"
+    },
+    "pyq_utilization": {
+      "score": 6,
+      "status": "acceptable",
+      "details": "Q4 is marked as is_pyq: false, but the topic has a PYQ count of 10."
+    },
+    "difficulty_progression": {
+      "score": 7,
+      "status": "good",
+      "details": "Marks for Q4 (3) do not align with the Bloom level 'Remember' which typically requires more complex understanding."
+    },
+    "topic_distribution": {
+      "score": 5,
+      "status": "acceptable",
+      "details": "Module 2 has multiple questions on SQL, specifically Q1, Q2, and Q6."
+    },
+    "teacher_alignment": {
+      "score": 5,
+      "status": "acceptable",
+      "details": "Marks share for Modules 2 and 3 does not reflect the teacher's preference for more focus on these modules."
+    }
+  },
+  "critical_issues": [
+    {
+      "severity": "high",
+      "category": "pyq_utilization",
+      "issue": "Q4 is marked as is_pyq: false, but the topic has a PYQ count of 10.",
+      "impact": "Affects Q4 | Section A | overall",
+      "fix": "Change Q4 to is_pyq: true."
+    },
+    {
+      "severity": "high",
+      "category": "syllabus_coverage",
+      "issue": "Module 5 (Recurrent Neural Networks) has zero questions.",
+      "impact": "Affects overall",
+      "fix": "Add at least one question from Module 5 to ensure coverage."
+    }
+  ],
+  "warnings": [
+    {
+      "category": "difficulty_progression",
+      "warning": "Marks for Q4 (3) do not align with the Bloom level 'Remember' which typically requires more complex understanding.",
+      "suggestion": "Adjust the marks for Q4 to better reflect the Bloom level."
+    },
+    {
+      "category": "topic_diversity",
+      "warning": "Module 2 has multiple questions on SQL, specifically Q1, Q2, and Q6.",
+      "suggestion": "Introduce a different topic from Module 2 for one of the questions."
+    },
+    {
+      "category": "teacher_alignment",
+      "warning": "Marks share for Modules 2 and 3 does not reflect the teacher's preference for more focus on these modules.",
+      "suggestion": "Reallocate marks to increase the share for Modules 2 and 3."
+    }
+  ],
+  "strengths": [],
+  "recommendations": {
+    "immediate_fixes": [
+      "Change Q4 to is_pyq: true.",
+      "Add at least one question from Module 5 to ensure coverage."
+    ],
+    "suggested_improvements": [
+      "Adjust the marks for Q4 to better reflect the Bloom level.",
+      "Introduce a different topic from Module 2 for one of the questions.",
+      "Reallocate marks to increase the share for Modules 2 and 3."
+    ],
+    "alternative_approaches": []
+  },
+  "detailed_analysis": {
+    "bloom_distribution_analysis": {
+      "required": {},
+      "actual": {},
+      "deviations": {}
+    },
+    "module_distribution_analysis": {
+      "required": {},
+      "actual": {},
+      "deviations": {}
+    },
+    "pyq_usage_analysis": {
+      "total_pyqs_available": 0,
+      "pyqs_used": 2,
+      "utilization_rate": 0
+    },
+    "topic_coverage_analysis": {
+      "missing_topics": [],
+      "repeated_topics": []
+    }
+  },
+  "pass_fail_decision": {
+    "decision": "REJECTED",
+    "can_proceed": false,
+    "requires_iteration": true,
+    "iteration_priority": "high"
+  },
+  "computed": {
+    "total_marks": 78,
+    "total_questions": 8,
+    "marks_correct": false,
+    "count_correct": true,
+    "module_distribution": {
+      "Module 2": 0.3846,
+      "Module 3": 0.2308,
+      "Module 1": 0.1923,
+      "Module 4": 0.1923
+    },
+    "bloom_actual": {
+      "Remember": 0.375,
+      "Understand": 0.5,
+      "Apply": 0.125
+    },
+    "bloom_deviations": {
+      "Understand": 25.0,
+      "Create": -3.0,
+      "Analyze": -20.0,
+      "Remember": 22.5,
+      "Evaluate": -7.0,
+      "Apply": -17.5
+    },
+    "max_bloom_deviation_pct": 25.0,
+    "pyq_count": 2,
+    "constraint_violations": [
+      "Total marks: got 78, expected 80",
+      "Q4: 3 not in {10, 20, 5, 15}",
+      "Module 2: 38.5% outside [20%, 30%]",
+      "Module 1: 19.2% outside [20%, 30%]",
+      "Module 4: 19.2% outside [20%, 30%]"
+    ],
+    "module_weight_violations": [
+      "Module 2: 38.5% outside [20%, 30%]",
+      "Module 1: 19.2% outside [20%, 30%]",
+      "Module 4: 19.2% outside [20%, 30%]"
+    ],
+    "illegal_mark_values": [
+      "Q4: 3 not in {10, 20, 5, 15}"
+    ]
+  },
+  "raw_scores": {
+    "constraint_compliance": 0,
+    "module_balance": 4,
+    "bloom_balance": 1,
+    "pyq_utilization": 6,
+    "difficulty_progression": 7,
+    "topic_diversity": 5,
+    "syllabus_coverage": 4,
+    "teacher_alignment": 5
+  }
+}

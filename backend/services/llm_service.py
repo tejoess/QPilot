@@ -14,7 +14,7 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
 # --- OpenRouter LLM ---
 openrouter_llm = ChatOpenAI(
-    model="openai/gpt-4o-mini",
+    model="qwen/qwen3-4b:free",
     openai_api_key=OPENROUTER_API_KEY,
     openai_api_base="https://openrouter.ai/api/v1",
     temperature=0.1,

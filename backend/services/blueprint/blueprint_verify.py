@@ -10,6 +10,146 @@ from backend.services.llm_service import openai_llm as llm
 from langchain_core.messages import HumanMessage
 
 
+def transform_critique_to_legacy_format(critique: Dict) -> Dict:
+    """
+    Transform new critique format to legacy format for compatibility
+    New format: {computed, issues, scores, overall}
+    Legacy format: {overall_rating, metric_scores, critical_issues, warnings, ...}
+    """
+    # Safety check for None input
+    if critique is None:
+        print("⚠️ transform_critique_to_legacy_format received None, returning minimal fallback")
+        return {
+            "overall_rating": {
+                "total_score": 0,
+                "max_possible": 100,
+                "percentage": 0,
+                "grade": "F",
+                "verdict": "REJECTED",
+                "summary": "Critique generation failed"
+            },
+            "metric_scores": {},
+            "critical_issues": [],
+            "warnings": [],
+            "strengths": [],
+            "recommendations": {"immediate_fixes": [], "suggested_improvements": [], "alternative_approaches": []},
+            "detailed_analysis": {
+                "bloom_distribution_analysis": {"required": {}, "actual": {}, "deviations": {}},
+                "module_distribution_analysis": {"required": {}, "actual": {}, "deviations": {}},
+                "pyq_usage_analysis": {"total_pyqs_available": 0, "pyqs_used": 0, "utilization_rate": 0},
+                "topic_coverage_analysis": {"missing_topics": [], "repeated_topics": []}
+            },
+            "pass_fail_decision": {
+                "decision": "REJECTED",
+                "can_proceed": False,
+                "requires_iteration": True,
+                "iteration_priority": "high"
+            }
+        }
+    
+    scores = critique.get('scores', {})
+    overall = critique.get('overall', {})
+    issues = critique.get('issues', [])
+    
+    # Convert individual scores to metric_scores format
+    metric_scores = {}
+    score_mapping = {
+        'constraint_compliance': 'constraint_compliance',
+        'bloom_balance': 'bloom_balance',
+        'module_balance': 'syllabus_coverage',
+        'pyq_utilization': 'pyq_utilization',
+        'difficulty_progression': 'difficulty_progression',
+        'topic_diversity': 'topic_distribution',
+        'syllabus_coverage': 'syllabus_coverage',
+        'teacher_alignment': 'teacher_alignment'
+    }
+    
+    for score_key, score_val in scores.items():
+        metric_key = score_mapping.get(score_key, score_key)
+        status = 'excellent' if score_val >= 9 else 'good' if score_val >= 7 else 'acceptable' if score_val >= 5 else 'poor'
+        
+        # Find related issues for details
+        related_issues = [iss for iss in issues if iss.get('metric') == score_key]
+        details = related_issues[0]['problem'] if related_issues else f'Score: {score_val}/10'
+        
+        metric_scores[metric_key] = {
+            'score': score_val,
+            'status': status,
+            'details': details
+        }
+    
+    # Categorize issues by severity
+    critical_issues = []
+    warnings = []
+    
+    for issue in issues:
+        severity = issue.get('severity', 'low')
+        if severity in ['critical', 'high']:
+            critical_issues.append({
+                'severity': severity,
+                'category': issue.get('metric', 'general'),
+                'issue': issue.get('problem', ''),
+                'impact': f"Affects {issue.get('question', 'blueprint')}",
+                'fix': issue.get('fix', '')
+            })
+        else:
+            warnings.append({
+                'category': issue.get('metric', 'general'),
+                'warning': issue.get('problem', ''),
+                'suggestion': issue.get('fix', '')
+            })
+    
+    # Build overall rating
+    total_score = overall.get('total', 0)
+    max_possible = overall.get('out_of', 100)
+    percentage = (total_score / max_possible * 100) if max_possible > 0 else 0
+    
+    grade_map = {
+        'APPROVED': 'A',
+        'APPROVED_WITH_WARNINGS': 'B+',
+        'NEEDS_REVISION': 'C',
+        'REJECTED': 'F'
+    }
+    
+    return {
+        'overall_rating': {
+            'total_score': total_score,
+            'max_possible': max_possible,
+            'percentage': percentage,
+            'grade': grade_map.get(overall.get('verdict', 'NEEDS_REVISION'), 'B'),
+            'verdict': overall.get('verdict', 'NEEDS_REVISION'),
+            'summary': overall.get('summary', 'Blueprint evaluated')
+        },
+        'metric_scores': metric_scores,
+        'critical_issues': critical_issues,
+        'warnings': warnings,
+        'strengths': [],
+        'recommendations': {
+            'immediate_fixes': [iss['fix'] for iss in critical_issues],
+            'suggested_improvements': [w['suggestion'] for w in warnings],
+            'alternative_approaches': []
+        },
+        'detailed_analysis': {
+            'bloom_distribution_analysis': {'required': {}, 'actual': {}, 'deviations': {}},
+            'module_distribution_analysis': {'required': {}, 'actual': {}, 'deviations': {}},
+            'pyq_usage_analysis': {
+                'total_pyqs_available': 0,
+                'pyqs_used': critique.get('computed', {}).get('pyq_count', 0),
+                'utilization_rate': 0
+            },
+            'topic_coverage_analysis': {'missing_topics': [], 'repeated_topics': []}
+        },
+        'pass_fail_decision': {
+            'decision': overall.get('verdict', 'NEEDS_REVISION'),
+            'can_proceed': overall.get('verdict', '') in ['APPROVED', 'APPROVED_WITH_WARNINGS'],
+            'requires_iteration': overall.get('verdict', '') in ['NEEDS_REVISION', 'REJECTED'],
+            'iteration_priority': 'high' if overall.get('verdict', '') == 'REJECTED' else 'medium'
+        },
+        'computed': critique.get('computed', {}),
+        'raw_scores': scores
+    }
+
+
 def create_fallback_critique(blueprint: Dict) -> Dict:
     """
     Create a minimal valid critique when LLM fails
@@ -22,25 +162,40 @@ def create_fallback_critique(blueprint: Dict) -> Dict:
     return {
         "overall_rating": {
             "total_score": 70,
-            "max_possible": 80,
-            "percentage": 87.5,
+            "max_possible": 100,
+            "percentage": 70.0,
             "grade": "B+",
             "verdict": "APPROVED_WITH_WARNINGS",
             "summary": "Blueprint generated with fallback critique. Manual review recommended."
         },
         "metric_scores": {
-            "constraint_compliance": {"score": 8, "status": "good", "feedback": "Basic constraints met"},
-            "bloom_balance": {"score": 7, "status": "good", "feedback": "Acceptable distribution"},
-            "syllabus_coverage": {"score": 8, "status": "good", "feedback": "Adequate coverage"},
-            "pyq_utilization": {"score": 7, "status": "good", "feedback": "Standard PYQ usage"},
-            "difficulty_progression": {"score": 8, "status": "good", "feedback": "Progressive difficulty"},
-            "topic_distribution": {"score": 9, "status": "excellent", "feedback": "Well distributed"},
-            "teacher_alignment": {"score": 8, "status": "good", "feedback": "Meets preferences"},
-            "quality_assurance": {"score": 8, "status": "good", "feedback": "Acceptable quality"}
+            "constraint_compliance": {"score": 8, "status": "good", "details": "Basic constraints met"},
+            "bloom_balance": {"score": 7, "status": "good", "details": "Acceptable distribution"},
+            "syllabus_coverage": {"score": 8, "status": "good", "details": "Adequate coverage"},
+            "pyq_utilization": {"score": 7, "status": "good", "details": "Standard PYQ usage"},
+            "difficulty_progression": {"score": 8, "status": "good", "details": "Progressive difficulty"},
+            "topic_distribution": {"score": 9, "status": "excellent", "details": "Well distributed"},
+            "teacher_alignment": {"score": 8, "status": "good", "details": "Meets preferences"}
         },
         "critical_issues": [],
-        "warnings": ["This is a fallback critique - consider manual review"],
-        "recommendations": ["Review blueprint manually", "Verify all requirements are met"],
+        "warnings": [{"category": "general", "warning": "Fallback critique used", "suggestion": "Manual review recommended"}],
+        "strengths": [],
+        "recommendations": {
+            "immediate_fixes": [],
+            "suggested_improvements": ["Review blueprint manually", "Verify all requirements are met"],
+            "alternative_approaches": []
+        },
+        "detailed_analysis": {
+            "bloom_distribution_analysis": {"required": {}, "actual": {}, "deviations": {}},
+            "module_distribution_analysis": {"required": {}, "actual": {}, "deviations": {}},
+            "pyq_usage_analysis": {"total_pyqs_available": 0, "pyqs_used": 0, "utilization_rate": 0},
+            "topic_coverage_analysis": {"missing_topics": [], "repeated_topics": []}
+        },
+        "pass_fail_decision": {
+            "decision": "APPROVED_WITH_WARNINGS",
+            "can_proceed": True,
+            "requires_iteration": False
+        },
         "statistics": {
             "total_questions": total_questions,
             "total_marks": total_marks,
@@ -77,369 +232,281 @@ def fix_incomplete_json(json_str: str) -> str:
     
     return json_str
 
-
-def critique_blueprint(
-    blueprint: Dict,
-    syllabus: Dict,
-    pyq_analysis: Dict,
-    bloom_coverage: Dict,
-    teacher_input: Dict,
-    paper_pattern: Dict
-) -> Dict:
+def precompute_blueprint_facts(blueprint: Dict, paper_pattern: Dict, pyq_analysis: Dict, bloom_coverage: Dict) -> Dict:
     """
-    Critique and evaluate a question paper blueprint
-    
-    Args:
-        blueprint: The blueprint to evaluate
-        syllabus: Module-wise topics and weightages
-        pyq_analysis: PYQ availability statistics
-        bloom_coverage: Required Bloom's taxonomy distribution
-        teacher_input: Teacher preferences
-        paper_pattern: University pattern requirements
-    
-    Returns:
-        Critique dict with scores, issues, and recommendations
+    Compute all arithmetic facts from blueprint before calling LLM.
+    These are injected as ground truth — LLM cannot contradict them.
     """
+    # Safety check for None blueprint
+    if blueprint is None:
+        print("⚠️ precompute_blueprint_facts received None blueprint")
+        return {
+            "total_marks": 0,
+            "total_questions": 0,
+            "marks_correct": False,
+            "count_correct": False,
+            "module_distribution": {},
+            "bloom_actual": {},
+            "bloom_deviations": {},
+            "max_bloom_deviation_pct": 100,
+            "pyq_count": 0,
+            "constraint_violations": ["Blueprint is None"],
+            "module_weight_violations": [],
+            "illegal_mark_values": [],
+        }
     
-    prompt = f"""You are an expert question paper quality evaluator for Mumbai University.
+    all_questions = [q for s in blueprint.get('sections', []) for q in s.get('questions', [])]
 
-Your task is to thoroughly critique a question paper blueprint and provide detailed feedback.
+    # Marks and counts
+    total_marks = sum(q.get('marks', 0) for q in all_questions)
+    total_questions = len(all_questions)
+    marks_correct = total_marks == paper_pattern['total_marks']
+    count_correct = total_questions == paper_pattern['total_questions']
 
-**BLUEPRINT TO EVALUATE:**
-{json.dumps(blueprint, indent=2)}
+    # Illegal mark values
+    allowed = set(paper_pattern['allowed_marks_per_question'])
+    illegal_marks = [
+        f"Q{q['question_number']}: {q['marks']} not in {allowed}"
+        for q in all_questions if q.get('marks') not in allowed
+    ]
 
-**CONTEXT DATA:**
+    # Module distribution
+    module_marks = {}
+    for q in all_questions:
+        module_marks[q['module']] = module_marks.get(q['module'], 0) + q.get('marks', 0)
 
-1. SYLLABUS:
-{json.dumps(syllabus, indent=2)}
+    min_w = paper_pattern['module_weightage_range']['min']
+    max_w = paper_pattern['module_weightage_range']['max']
+    module_distribution = {m: round(v / total_marks, 4) if total_marks else 0 for m, v in module_marks.items()}
+    module_violations = [
+        f"{m}: {w:.1%} outside [{min_w:.0%}, {max_w:.0%}]"
+        for m, w in module_distribution.items()
+        if not (min_w <= w <= max_w)
+    ]
 
-2. PYQ ANALYSIS:
-{json.dumps(pyq_analysis, indent=2)}
+    # Bloom distribution
+    bloom_counts = {}
+    for q in all_questions:
+        bloom_counts[q['bloom_level']] = bloom_counts.get(q['bloom_level'], 0) + 1
+    bloom_actual = {k: round(v / total_questions, 4) if total_questions else 0 for k, v in bloom_counts.items()}
 
-3. BLOOM'S TAXONOMY REQUIREMENTS:
-{json.dumps(bloom_coverage, indent=2)}
+    required = bloom_coverage.get('required_distribution', bloom_coverage)
+    bloom_deviations = {
+        level: round((bloom_actual.get(level, 0) - required.get(level, 0)) * 100, 1)
+        for level in set(list(bloom_actual.keys()) + list(required.keys()))
+    }
+    max_bloom_deviation = max(abs(v) for v in bloom_deviations.values()) if bloom_deviations else 0
 
-4. TEACHER PREFERENCES:
-{json.dumps(teacher_input, indent=2)}
+    # PYQ mismatches
+    topic_pyq_counts = {}
+    for module_data in (pyq_analysis or {}).get('module_wise_count', {}).values():
+        pass  # extend if you have topic-level PYQ counts
 
-5. PAPER PATTERN:
-{json.dumps(paper_pattern, indent=2)}
+    pyq_count = sum(1 for q in all_questions if q.get('is_pyq'))
 
-**EVALUATION CRITERIA:**
+    # Constraint violations list
+    constraint_violations = []
+    if not marks_correct:
+        constraint_violations.append(f"Total marks: got {total_marks}, expected {paper_pattern['total_marks']}")
+    if not count_correct:
+        constraint_violations.append(f"Total questions: got {total_questions}, expected {paper_pattern['total_questions']}")
+    constraint_violations.extend(illegal_marks)
+    constraint_violations.extend(module_violations)
 
-You must evaluate the blueprint on these 8 METRICS (each scored 0-10):
+    return {
+        "total_marks": total_marks,
+        "total_questions": total_questions,
+        "marks_correct": marks_correct,
+        "count_correct": count_correct,
+        "module_distribution": module_distribution,
+        "bloom_actual": bloom_actual,
+        "bloom_deviations": bloom_deviations,
+        "max_bloom_deviation_pct": round(max_bloom_deviation, 1),
+        "pyq_count": pyq_count,
+        "constraint_violations": constraint_violations,
+        "module_weight_violations": module_violations,
+        "illegal_mark_values": illegal_marks,
+    }
 
-1. **CONSTRAINT COMPLIANCE (0-10)**
-   - Total marks equals {paper_pattern['total_marks']} (CRITICAL)
-   - Total questions equals {paper_pattern['total_questions']} (CRITICAL)
-   - Module weightages within {paper_pattern['module_weightage_range']['min']}-{paper_pattern['module_weightage_range']['max']} range
-   - Section structure matches pattern
-   - Question marks from allowed values only
-   
-   Scoring:
-   - 10: All constraints perfectly met
-   - 7-9: Minor deviations (1-2 marks off, slight weightage issues)
-   - 4-6: Moderate violations (3-5 marks off, multiple weightage issues)
-   - 0-3: Major violations (completely wrong totals, invalid structure)
 
-2. **BLOOM'S TAXONOMY BALANCE (0-10)**
-   - Distribution matches required percentages (±5% tolerance)
-   - Appropriate cognitive level progression (easier to harder)
-   - No over-reliance on lower levels (Remember/Understand shouldn't exceed 45%)
-   - Higher-order thinking represented (Analyze/Evaluate/Create at least 25%)
-   
-   Scoring:
-   - 10: Perfect match within ±3%
-   - 7-9: Good match within ±5-7%
-   - 4-6: Acceptable match within ±8-12%
-   - 0-3: Poor distribution, >15% deviation
+def critique_blueprint(blueprint, syllabus, pyq_analysis, bloom_coverage, teacher_input, paper_pattern):
 
-3. **SYLLABUS COVERAGE (0-10)**
-   - All modules covered appropriately
-   - Important topics included
-   - No topic over-repetition
-   - Coverage gaps identified
-   
-   Scoring:
-   - 10: Excellent coverage, all important topics included
-   - 7-9: Good coverage, 1-2 minor topics missing
-   - 4-6: Moderate coverage, some important topics missing
-   - 0-3: Poor coverage, major gaps
+    # STEP 1: Python computes all arithmetic — LLM never touches these
+    facts = precompute_blueprint_facts(blueprint, paper_pattern, pyq_analysis, bloom_coverage)
 
-4. **PYQ UTILIZATION STRATEGY (0-10)**
-   - Appropriate PYQ reuse (HIGH availability → use PYQs)
-   - Sensible generation decisions (LOW availability → generate new)
-   - Balance between PYQs and new questions
-   - Aligns with teacher preference for PYQ usage
-   
-   Scoring:
-   - 10: Optimal strategy, smart decisions
-   - 7-9: Good strategy with minor inefficiencies
-   - 4-6: Suboptimal but acceptable
-   - 0-3: Poor strategy, ignores availability data
+    # STEP 2: Derive hard scores in Python — not delegated to LLM
+    if not facts['marks_correct'] or not facts['count_correct']:
+        constraint_score = 0
+    elif facts['illegal_mark_values']:
+        constraint_score = 4
+    else:
+        constraint_score = 10
 
-5. **MODULE BALANCE (0-10)**
-   - Weightages match syllabus recommendations
-   - Teacher focus areas appropriately emphasized
-   - No module is over/under-represented beyond limits
-   - Fair distribution across modules
-   
-   Scoring:
-   - 10: Perfect balance, all modules within ±3% of target
-   - 7-9: Good balance within ±5%
-   - 4-6: Acceptable imbalance within ±10%
-   - 0-3: Poor balance, major disparities
+    if not facts['module_weight_violations']:
+        module_score = 10
+    elif len(facts['module_weight_violations']) == 1:
+        module_score = 7
+    else:
+        module_score = 4
 
-6. **DIFFICULTY PROGRESSION (0-10)**
-   - Questions progress from easier to harder
-   - Bloom's levels show logical flow
-   - Mark allocation matches difficulty
-   - No sudden difficulty spikes
-   
-   Scoring:
-   - 10: Smooth progression, excellent flow
-   - 7-9: Generally good with minor irregularities
-   - 4-6: Somewhat erratic but manageable
-   - 0-3: Poor progression, illogical ordering
+    dev = facts['max_bloom_deviation_pct']
+    if dev <= 3:
+        bloom_score = 10
+    elif dev <= 7:
+        bloom_score = 7
+    elif dev <= 12:
+        bloom_score = 4
+    else:
+        bloom_score = 1
 
-7. **TOPIC DIVERSITY (0-10)**
-   - No excessive repetition of same topic
-   - Good spread across subtopics
-   - Avoids testing same concept multiple times
-   - Each question tests distinct knowledge
-   
-   Scoring:
-   - 10: Excellent diversity, all unique
-   - 7-9: Good diversity, 1-2 minor overlaps
-   - 4-6: Moderate diversity, some repetition
-   - 0-3: Poor diversity, heavy repetition
+    hard_scores = {
+        "constraint_compliance": constraint_score,
+        "module_balance": module_score,
+        "bloom_balance": bloom_score,
+    }
 
-8. **TEACHER PREFERENCE ALIGNMENT (0-10)**
-   - Focus modules/topics appropriately emphasized
-   - PYQ preference respected
-   - Special instructions followed
-   - Difficulty preference matched
-   
-   Scoring:
-   - 10: Perfectly aligned with all preferences
-   - 7-9: Mostly aligned, 1-2 minor misses
-   - 4-6: Partially aligned, some preferences ignored
-   - 0-3: Poorly aligned, preferences not considered
+    # STEP 3: LLM receives facts + hard scores — only judges qualitative metrics
+    prompt = f"""
+You are a Mumbai University question paper reviewer.
 
-**OUTPUT FORMAT:**
+All arithmetic has been computed in Python. These are GROUND TRUTH — do not recompute or contradict them.
 
-Return ONLY a valid JSON object (no markdown, no explanation) with this structure:
+**PRECOMPUTED FACTS:**
+- Total marks in blueprint: {facts['total_marks']} (expected: {paper_pattern['total_marks']}) → {"✓ CORRECT" if facts['marks_correct'] else "✗ WRONG"}
+- Total questions: {facts['total_questions']} (expected: {paper_pattern['total_questions']}) → {"✓ CORRECT" if facts['count_correct'] else "✗ WRONG"}
+- Module distribution (actual): {json.dumps(facts['module_distribution'], indent=2)}
+- Bloom distribution (actual): {json.dumps(facts['bloom_actual'], indent=2)}
+- Bloom deviations vs target: {json.dumps(facts['bloom_deviations'], indent=2)}
+- Constraint violations: {json.dumps(facts['constraint_violations'])}
+- PYQ count: {facts['pyq_count']}
+
+**HARD SCORES (already computed — copy these exactly into your output):**
+- constraint_compliance: {hard_scores['constraint_compliance']}
+- module_balance: {hard_scores['module_balance']}
+- bloom_balance: {hard_scores['bloom_balance']}
+
+**BLUEPRINT QUESTIONS:**
+{json.dumps(blueprint['sections'], indent=2)}
+
+**CONTEXT:**
+- Syllabus: {json.dumps(syllabus, indent=2)}
+- PYQ Analysis: {json.dumps(pyq_analysis, indent=2)}
+- Bloom Target: {json.dumps(bloom_coverage, indent=2)}
+- Teacher Preferences: {json.dumps(teacher_input, indent=2)}
+
+**YOUR TASK — evaluate only these 4 qualitative metrics (0-10 each):**
+
+1. pyq_utilization
+   - Any topic with PYQ count > 5 marked is_pyq: false? Cite question number.
+   - Any topic with PYQ count < 2 marked is_pyq: true? Cite question number.
+
+2. difficulty_progression
+   - Do Bloom levels flow easy → hard across sections?
+   - Any question where marks mismatch Bloom level? Cite question number.
+
+3. topic_diversity
+   - Any topic appearing more than twice? Cite question numbers.
+   - Any module where all questions test same subtopic?
+
+4. syllabus_coverage
+   - Any module with zero questions?
+   - Any high-weightage topic completely absent?
+
+5. teacher_alignment
+   - Focus modules emphasized in marks share?
+   - PYQ preference ({teacher_input.get('pyq_preference', 'not specified')}) respected?
+
+For every issue found, cite the exact question number (e.g. Q2c) or section.
+
+**OUTPUT — return ONLY this JSON:**
 
 {{
-  "overall_rating": {{
-    "total_score": <sum of all 8 metric scores>,
-    "max_possible": 80,
-    "percentage": <percentage score>,
-    "grade": "<A+/A/B+/B/C+/C/D/F>",
-    "verdict": "<APPROVED / APPROVED_WITH_WARNINGS / NEEDS_REVISION / REJECTED>",
-    "summary": "<1-2 sentence overall assessment>"
-  }},
-  "metric_scores": {{
-    "constraint_compliance": {{
-      "score": <0-10>,
-      "max": 10,
-      "status": "<excellent/good/acceptable/poor>",
-      "details": "<specific evaluation>"
-    }},
-    "blooms_balance": {{
-      "score": <0-10>,
-      "max": 10,
-      "status": "<excellent/good/acceptable/poor>",
-      "details": "<specific evaluation>"
-    }},
-    "syllabus_coverage": {{
-      "score": <0-10>,
-      "max": 10,
-      "status": "<excellent/good/acceptable/poor>",
-      "details": "<specific evaluation>"
-    }},
-    "pyq_utilization": {{
-      "score": <0-10>,
-      "max": 10,
-      "status": "<excellent/good/acceptable/poor>",
-      "details": "<specific evaluation>"
-    }},
-    "module_balance": {{
-      "score": <0-10>,
-      "max": 10,
-      "status": "<excellent/good/acceptable/poor>",
-      "details": "<specific evaluation>"
-    }},
-    "difficulty_progression": {{
-      "score": <0-10>,
-      "max": 10,
-      "status": "<excellent/good/acceptable/poor>",
-      "details": "<specific evaluation>"
-    }},
-    "topic_diversity": {{
-      "score": <0-10>,
-      "max": 10,
-      "status": "<excellent/good/acceptable/poor>",
-      "details": "<specific evaluation>"
-    }},
-    "teacher_alignment": {{
-      "score": <0-10>,
-      "max": 10,
-      "status": "<excellent/good/acceptable/poor>",
-      "details": "<specific evaluation>"
-    }}
-  }},
-  "critical_issues": [
+  "issues": [
     {{
-      "severity": "<critical/high/medium/low>",
-      "category": "<which metric>",
-      "issue": "<specific problem>",
-      "impact": "<what's the consequence>",
-      "fix": "<how to resolve it>"
+      "question": "<Q2c | Section B | overall>",
+      "metric": "<pyq_utilization | difficulty_progression | topic_diversity | syllabus_coverage | teacher_alignment | constraint_compliance | module_balance | bloom_balance>",
+      "severity": "<critical | high | medium | low>",
+      "problem": "<specific problem>",
+      "fix": "<how to fix>"
     }}
   ],
-  "warnings": [
-    {{
-      "category": "<which metric>",
-      "warning": "<what's not ideal>",
-      "suggestion": "<how to improve>"
-    }}
-  ],
-  "strengths": [
-    "<what's done well - be specific>"
-  ],
-  "recommendations": {{
-    "immediate_fixes": [
-      "<critical changes needed before approval>"
-    ],
-    "suggested_improvements": [
-      "<optional improvements for better quality>"
-    ],
-    "alternative_approaches": [
-      "<different strategies that could work>"
-    ]
+  "scores": {{
+    "constraint_compliance": {hard_scores['constraint_compliance']},
+    "module_balance": {hard_scores['module_balance']},
+    "bloom_balance": {hard_scores['bloom_balance']},
+    "pyq_utilization": <your score 0-10>,
+    "difficulty_progression": <your score 0-10>,
+    "topic_diversity": <your score 0-10>,
+    "syllabus_coverage": <your score 0-10>,
+    "teacher_alignment": <your score 0-10>
   }},
-  "detailed_analysis": {{
-    "bloom_distribution_analysis": {{
-      "required": {{...}},
-      "actual": {{...}},
-      "deviations": {{...}}
-    }},
-    "module_distribution_analysis": {{
-      "required": {{...}},
-      "actual": {{...}},
-      "deviations": {{...}}
-    }},
-    "pyq_usage_analysis": {{
-      "total_pyqs_available": <number>,
-      "pyqs_used": <number>,
-      "utilization_rate": <percentage>,
-      "missed_opportunities": [<topics where PYQs could have been used>]
-    }},
-    "topic_coverage_analysis": {{
-      "covered_topics": [<list>],
-      "missing_topics": [<list>],
-      "repeated_topics": [<list>]
-    }}
-  }},
-  "pass_fail_decision": {{
-    "decision": "<PASS / FAIL>",
-    "can_proceed": <true/false>,
-    "requires_iteration": <true/false>,
-    "iteration_priority": "<what to fix first>"
+  "overall": {{
+    "total": <sum of all 8 scores>,
+    "out_of": 80,
+    "verdict": "<APPROVED | APPROVED_WITH_WARNINGS | NEEDS_REVISION | REJECTED>",
+    "summary": "<2 sentences — reference only the precomputed facts above>"
   }}
 }}
 
-**GRADING SCALE:**
-- A+ (95-100%): Exceptional blueprint, ready for immediate use
-- A  (90-94%): Excellent blueprint, minor tweaks optional
-- B+ (85-89%): Very good blueprint, 1-2 improvements recommended
-- B  (80-84%): Good blueprint, few changes needed
-- C+ (75-79%): Acceptable blueprint, needs moderate revision
-- C  (70-74%): Passable blueprint, significant improvements needed
-- D  (60-69%): Poor blueprint, major revisions required
-- F  (<60%): Unacceptable blueprint, complete overhaul needed
+Verdict rules:
+- APPROVED: total ≥ 68 AND constraint_compliance = 10
+- APPROVED_WITH_WARNINGS: total 56–67 AND constraint_compliance ≥ 4
+- NEEDS_REVISION: total 40–55 OR constraint_compliance = 4
+- REJECTED: total < 40 OR constraint_compliance = 0
 
-**VERDICT DEFINITIONS:**
-- APPROVED: Score ≥85%, no critical issues
-- APPROVED_WITH_WARNINGS: Score 70-84%, no critical issues but has warnings
-- NEEDS_REVISION: Score 60-69% OR has 1-2 critical issues
-- REJECTED: Score <60% OR has 3+ critical issues
+If no issues, return "issues": [].
+"""
 
-Be thorough, specific, and constructive in your critique. Provide actionable feedback.
+    # STEP 4: After LLM responds, enforce hard scores in Python (override any drift)
+    try:
+        message = HumanMessage(content=prompt)
+        response = llm.invoke([message])
+        
+        if not response or not response.content:
+            print("⚠️ LLM returned empty response, using fallback critique")
+            return create_fallback_critique(blueprint)
+        
+        critique = json.loads(response.content.strip())
+        
+        # Validate critique structure
+        if not isinstance(critique, dict) or 'scores' not in critique or 'overall' not in critique:
+            print("⚠️ Invalid critique structure, using fallback")
+            return create_fallback_critique(blueprint)
 
-Now evaluate the blueprint:"""
+        # Hard override — LLM cannot inflate these
+        critique['scores']['constraint_compliance'] = hard_scores['constraint_compliance']
+        critique['scores']['module_balance'] = hard_scores['module_balance']
+        critique['scores']['bloom_balance'] = hard_scores['bloom_balance']
 
-    max_retries = 3
+        # Recompute total from actual scores (don't trust LLM's sum)
+        critique['overall']['total'] = sum(critique['scores'].values())
+
+        # Inject precomputed facts so downstream code has ground truth
+        critique['computed'] = facts
+
+        # Re-enforce verdict based on actual scores
+        total = critique['overall']['total']
+        cc = critique['scores']['constraint_compliance']
+        if total >= 68 and cc == 10:
+            critique['overall']['verdict'] = 'APPROVED'
+        elif total >= 56 and cc >= 4:
+            critique['overall']['verdict'] = 'APPROVED_WITH_WARNINGS'
+        elif total >= 40 or cc == 4:
+            critique['overall']['verdict'] = 'NEEDS_REVISION'
+        else:
+            critique['overall']['verdict'] = 'REJECTED'
+
+        return transform_critique_to_legacy_format(critique)
     
-    for attempt in range(max_retries):
-        try:
-            # Call LLM
-            message = HumanMessage(content=prompt)
-            response = llm.invoke([message])
-            
-            # Extract and parse
-            response_text = response.content.strip()
-            
-            print(f"\n📥 Critique Response Length: {len(response_text)} characters")
-            print(f"📥 First 200 chars: {response_text[:200]}")
-            
-            # Clean markdown
-            if response_text.startswith("```json"):
-                response_text = response_text.replace("```json", "").replace("```", "").strip()
-            elif response_text.startswith("```"):
-                response_text = response_text.replace("```", "").strip()
-            
-            # Try to extract JSON using regex
-            json_match = re.search(r'\{[\s\S]*\}', response_text)
-            if json_match:
-                response_text = json_match.group(0)
-                print(f"✅ Extracted JSON from response")
-            
-            try:
-                critique = json.loads(response_text)
-                print(f"✅ Successfully parsed critique JSON")
-            except json.JSONDecodeError as parse_error:
-                print(f"⚠️ Initial parse failed: {parse_error}")
-                print(f"⚠️ Attempting to fix incomplete JSON...")
-                fixed_json = fix_incomplete_json(response_text)
-                critique = json.loads(fixed_json)
-                print(f"✅ Successfully fixed and parsed JSON")
-            
-            # Validate structure
-            if not isinstance(critique, dict) or 'overall_rating' not in critique:
-                raise ValueError("Invalid critique structure: missing 'overall_rating' key")
-            
-            print(f"✅ Successfully generated critique on attempt {attempt + 1}")
-            return critique
-            
-        except Exception as e:
-            error_type = type(e).__name__
-            print(f"\n❌ Attempt {attempt + 1}/{max_retries} failed: {error_type}")
-            print(f"Error: {str(e)[:200]}")
-            
-            # Check if it's a connection/network error
-            if "Connection" in error_type or "Timeout" in error_type or "APIConnectionError" in error_type:
-                print(f"⚠️ Network/Connection error detected")
-                if attempt < max_retries - 1:
-                    import time
-                    wait_time = (attempt + 1) * 2  # Exponential backoff: 2s, 4s, 6s
-                    print(f"🔄 Waiting {wait_time}s before retry...")
-                    time.sleep(wait_time)
-                    continue
-            
-            # For other errors, try adjusted prompt
-            if attempt < max_retries - 1 and 'response_text' in locals():
-                print(f"🔄 Retrying with adjusted prompt...")
-                prompt += "\n\nCRITICAL: Return ONLY valid JSON. No explanations. Keep feedback SHORT. Ensure JSON is complete."
-            else:
-                print(f"\n❌ ERROR: Failed after {max_retries} attempts")
-                if 'response_text' in locals():
-                    print(f"\nLLM Response (first 500 chars):\n{response_text[:500]}")
-                
-                # Return fallback critique instead of crashing
-                print("\n🔧 Returning fallback critique...")
-                return create_fallback_critique(blueprint)
+    except json.JSONDecodeError as e:
+        print(f"⚠️ Failed to parse LLM response as JSON: {e}")
+        print(f"Raw response: {response.content if response else 'None'}")
+        return create_fallback_critique(blueprint)
+    except Exception as e:
+        print(f"⚠️ Unexpected error in critique_blueprint: {e}")
+        import traceback
+        traceback.print_exc()
+        return create_fallback_critique(blueprint)
 
 
 def print_critique_report(critique: Dict):
@@ -578,52 +645,149 @@ def print_critique_report(critique: Dict):
 # ============================================================================
 
 # Reuse syllabus and other data from blueprint generator
+
 SAMPLE_SYLLABUS = {
-    "course_name": "Database Management Systems",
-    "course_code": "CS301",
-    "modules": {
-        "Module 1": {
-            "name": "Introduction to DBMS",
-            "official_weightage": 0.25,
-            "topics": [
-                {"name": "Database Concepts", "subtopics": ["Data vs Information", "DBMS Architecture"]},
-                {"name": "ER Modeling", "subtopics": ["Entities", "Relationships", "ER Diagrams"]}
-            ]
-        },
-        "Module 2": {
-            "name": "Relational Model",
-            "official_weightage": 0.25,
-            "topics": [
-                {"name": "Relational Algebra", "subtopics": ["Selection", "Projection", "Joins"]},
-                {"name": "SQL", "subtopics": ["DDL", "DML", "Queries"]}
-            ]
-        },
-        "Module 3": {
-            "name": "Normalization",
-            "official_weightage": 0.25,
-            "topics": [
-                {"name": "Functional Dependencies", "subtopics": ["FD Rules", "Closure"]},
-                {"name": "Normal Forms", "subtopics": ["1NF", "2NF", "3NF", "BCNF"]}
-            ]
-        },
-        "Module 4": {
-            "name": "Transaction Management",
-            "official_weightage": 0.25,
-            "topics": [
-                {"name": "Transactions", "subtopics": ["ACID Properties", "States"]},
-                {"name": "Concurrency Control", "subtopics": ["Locking", "Deadlock"]}
-            ]
-        }
+  "course_code": "CSC701",
+  "course_name": "Deep Learning",
+  "course_objectives": [
+    "To learn the fundamentals of Neural Network.",
+    "To gain an in-depth understanding of training Deep Neural Networks.",
+    "To acquire knowledge of advanced concepts of Convolution Neural Networks, Autoencoders and Recurrent Neural Networks.",
+    "Students should be familiar with the recent trends in Deep Learning."
+  ],
+  "course_outcomes": [
+    "Gain basic knowledge of Neural Networks.",
+    "Acquire in depth understanding of training Deep Neural Networks.",
+    "Design appropriate DNN model for supervised, unsupervised and sequence learning applications.",
+    "Gain familiarity with recent trends and applications of Deep Learning."
+  ],
+  "modules": [
+    {
+      "module_number": 1,
+      "module_name": "Fundamentals of Neural Network",
+      "weightage_hours": 4,
+      "topics": [
+        "History of Deep Learning",
+        "Deep Learning Success Stories",
+        "Multilayer Perceptrons (MLPs)",
+        "Representation Power of MLPs",
+        "Sigmoid Neurons",
+        "Gradient Descent",
+        "Feedforward Neural Networks",
+        "Representation Power of Feedforward Neural Networks",
+        "Deep Networks: Three Classes of Deep Learning",
+        "Basic Terminologies of Deep Learning"
+      ]
+    },
+    {
+      "module_number": 2,
+      "module_name": "Training, Optimization and Regularization of Deep Neural Network",
+      "weightage_hours": 10,
+      "topics": [
+        "Training FeedforwardDNN Multi Layered Feed Forward Neural Network",
+        "Learning Factors",
+        "Activation functions: Tanh, Logistic, Linear, Softmax, ReLU, Leaky ReLU",
+        "Loss functions: Squared Error loss, Cross Entropy",
+        "Choosing output function and loss function",
+        "Optimization Learning with backpropagation",
+        "Learning Parameters: Gradient Descent (GD), Stochastic and Mini Batch GD, Momentum Based GD, Nesterov Accelerated GD, AdaGrad, Adam, RMSProp",
+        "Regularization Overview of Overfitting",
+        "Types of biases",
+        "Bias Variance Tradeoff",
+        "Regularization Methods: L1, L2 regularization, Parameter sharing, Dropout, Weight Decay, Batch normalization, Early stopping, Data Augmentation, Adding noise to input and output"
+      ]
+    },
+    {
+      "module_number": 3,
+      "module_name": "Autoencoders: Unsupervised Learning",
+      "weightage_hours": 6,
+      "topics": [
+        "Introduction",
+        "Linear Autoencoder",
+        "Undercomplete Autoencoder",
+        "Overcomplete Autoencoders",
+        "Regularization in Autoencoders",
+        "Denoising Autoencoders",
+        "Sparse Autoencoders",
+        "Contractive Autoencoders",
+        "Application of Autoencoders: Image Compression"
+      ]
+    },
+    {
+      "module_number": 4,
+      "module_name": "Convolutional Neural Networks (CNN): Supervised Learning",
+      "weightage_hours": 7,
+      "topics": [
+        "Convolution operation",
+        "Padding",
+        "Stride",
+        "Relation between input, output and filter size",
+        "CNN architecture: Convolution layer, Pooling Layer",
+        "Weight Sharing in CNN",
+        "Fully Connected NN vs CNN",
+        "Variants of basic Convolution function",
+        "Multichannel convolution operation",
+        "2D convolution",
+        "Modern Deep Learning Architectures: LeNET: Architecture, AlexNET: Architecture, ResNet : Architecture"
+      ]
+    },
+    {
+      "module_number": 5,
+      "module_name": "Recurrent Neural Networks (RNN)",
+      "weightage_hours": 8,
+      "topics": [
+        "Sequence Learning Problem",
+        "Unfolding Computational graphs",
+        "Recurrent Neural Network",
+        "Bidirectional RNN",
+        "Backpropagation Through Time (BTT)",
+        "Limitation of ' vanilla RNN' Vanishing and Exploding Gradients",
+        "Truncated BTT",
+        "Long Short Term Memory(LSTM): Selective Read, Selective write, Selective Forget",
+        "Gated Recurrent Unit (GRU)"
+      ]
+    },
+    {
+      "module_number": 6,
+      "module_name": "Recent Trends and Applications",
+      "weightage_hours": 4,
+      "topics": [
+        "Generative Adversarial Network (GAN): Architecture",
+        "Applications: Image Generation",
+        "DeepFake"
+      ]
     }
+  ]
 }
 
 SAMPLE_PYQ_ANALYSIS = {
     "total_pyqs": 45,
+    "year_range": [2019, 2024],
     "module_wise_count": {
-        "Module 1": {"total": 12, "quality": "high"},
-        "Module 2": {"total": 15, "quality": "high"},
-        "Module 3": {"total": 10, "quality": "medium"},
-        "Module 4": {"total": 8, "quality": "medium"}
+        "Module 1": {
+            "total": 12,
+            "quality": "high"
+        },
+        "Module 2": {
+            "total": 15,
+            "quality": "high"
+        },
+        "Module 3": {
+            "total": 10,
+            "quality": "medium"
+        },
+        "Module 4": {
+            "total": 8,
+            "quality": "medium"
+        }
+    },
+    "bloom_wise_count": {
+        "Remember": 8,
+        "Understand": 12,
+        "Apply": 15,
+        "Analyze": 7,
+        "Evaluate": 2,
+        "Create": 1
     }
 }
 
@@ -635,71 +799,158 @@ SAMPLE_BLOOM_COVERAGE = {
         "Analyze": 0.20,
         "Evaluate": 0.07,
         "Create": 0.03
-    }
+    },
+    "flexibility": "±5% deviation allowed"
 }
 
 SAMPLE_TEACHER_INPUT = {
-    "focus_modules": ["Module 3", "Module 4"],
-    "prefer_pyqs": True,
-    "difficulty_preference": "medium"
+    "input":"I want to focus more on Modules 2 and 3, and prefer using PYQs where possible. Please ensure we have a good mix of Bloom's levels, but I want at least 2 questions that test 'Apply' level.",
+    "pyq_percentage": 50
 }
 
 SAMPLE_PAPER_PATTERN = {
+    "university": "Mumbai University",
+    "exam_type": "Internal Assessment",
     "total_marks": 80,
     "total_questions": 8,
-    "module_weightage_range": {"min": 0.20, "max": 0.30},
+    "duration_minutes": 180,
+    "allowed_marks_per_question": [5, 10, 15, 20],
+    "module_weightage_range": {
+        "min": 0.20,
+        "max": 0.30
+    },
     "sections": [
-        {"section_name": "Section A", "marks_per_question": 5},
-        {"section_name": "Section B", "marks_per_question": 15}
+        {
+            "section_name": "Section A",
+            "description": "Short Answer Questions",
+            "question_count": 4,
+            "marks_per_question": 5,
+            "total_marks": 20
+        },
+        {
+            "section_name": "Section B",
+            "description": "Long Answer Questions",
+            "question_count": 4,
+            "marks_per_question": 15,
+            "total_marks": 60
+        }
     ]
 }
 
 # Sample Blueprint to Test (intentionally has some issues)
 SAMPLE_BLUEPRINT_GOOD = {
-    "blueprint_metadata": {
-        "total_marks": 80,
-        "total_questions": 8,
-        "bloom_distribution": {
-            "Remember": 0.125,
-            "Understand": 0.25,
-            "Apply": 0.35,
-            "Analyze": 0.20,
-            "Evaluate": 0.05,
-            "Create": 0.025
-        },
-        "module_distribution": {
-            "Module 1": 0.25,
-            "Module 2": 0.25,
-            "Module 3": 0.25,
-            "Module 4": 0.25
-        },
-        "pyq_usage": {
-            "actual_pyq_count": 5,
-            "new_question_count": 3,
-            "pyq_percentage": 0.625
-        }
+  "blueprint_metadata": {
+    "total_marks": 80,
+    "total_questions": 8,
+    "bloom_distribution": {
+      "Remember": 0.15,
+      "Understand": 0.25,
+      "Apply": 0.3,
+      "Analyze": 0.2,
+      "Evaluate": 0.07,
+      "Create": 0.03
     },
-    "sections": [
+    "module_distribution": {
+      "Module 1": 0.25,
+      "Module 2": 0.3,
+      "Module 3": 0.2,
+      "Module 4": 0.1,
+      "Module 5": 0.1,
+      "Module 6": 0.0
+    },
+    "pyq_usage": {
+      "actual_pyq_count": 5,
+      "new_question_count": 3,
+      "pyq_percentage": 62.5
+    }
+  },
+  "sections": [
+    {
+      "section_name": "Section A",
+      "section_description": "Short Answer Questions",
+      "questions": [
         {
-            "section_name": "Section A",
-            "questions": [
-                {"question_number": "1", "module": "Module 1", "topic": "DBMS Architecture", "marks": 5, "bloom_level": "Remember", "is_pyq": True},
-                {"question_number": "2", "module": "Module 2", "topic": "SQL Queries", "marks": 5, "bloom_level": "Understand", "is_pyq": True},
-                {"question_number": "3", "module": "Module 3", "topic": "Functional Dependencies", "marks": 5, "bloom_level": "Apply", "is_pyq": True},
-                {"question_number": "4", "module": "Module 4", "topic": "ACID Properties", "marks": 5, "bloom_level": "Understand", "is_pyq": True}
-            ]
+          "question_number": "1a",
+          "module": "Module 1",
+          "topic": "History of Deep Learning",
+          "marks": 5,
+          "bloom_level": "Remember",
+          "is_pyq": True,
+          "rationale": "High PYQ availability"
         },
         {
-            "section_name": "Section B",
-            "questions": [
-                {"question_number": "5", "module": "Module 1", "topic": "ER Diagrams", "marks": 15, "bloom_level": "Apply", "is_pyq": True},
-                {"question_number": "6", "module": "Module 2", "topic": "Relational Algebra", "marks": 15, "bloom_level": "Analyze", "is_pyq": False},
-                {"question_number": "7", "module": "Module 3", "topic": "Normalization", "marks": 15, "bloom_level": "Analyze", "is_pyq": False},
-                {"question_number": "8", "module": "Module 4", "topic": "Concurrency Control", "marks": 15, "bloom_level": "Evaluate", "is_pyq": False}
-            ]
+          "question_number": "1b",
+          "module": "Module 2",
+          "topic": "Activation functions",
+          "marks": 5,
+          "bloom_level": "Understand",
+          "is_pyq": True,
+          "rationale": "High PYQ availability"
+        },
+        {
+          "question_number": "1c",
+          "module": "Module 3",
+          "topic": "Denoising Autoencoders",
+          "marks": 5,
+          "bloom_level": "Remember",
+          "is_pyq": False,
+          "rationale": "New question generated"
+        },
+        {
+          "question_number": "1d",
+          "module": "Module 4",
+          "topic": "CNN architecture",
+          "marks": 5,
+          "bloom_level": "Understand",
+          "is_pyq": False,
+          "rationale": "New question generated"
         }
-    ],
-    "strategy_notes": "Balanced approach with good PYQ utilization and coverage"
+      ]
+    },
+    {
+      "section_name": "Section B",
+      "section_description": "Long Answer Questions",
+      "questions": [
+        {
+          "question_number": "2a",
+          "module": "Module 2",
+          "topic": "Regularization Methods",
+          "marks": 15,
+          "bloom_level": "Apply",
+          "is_pyq": True,
+          "rationale": "High PYQ availability"
+        },
+        {
+          "question_number": "2b",
+          "module": "Module 3",
+          "topic": "Applications of Autoencoders",
+          "marks": 15,
+          "bloom_level": "Analyze",
+          "is_pyq": False,
+          "rationale": "New question generated"
+        },
+        {
+          "question_number": "2c",
+          "module": "Module 5",
+          "topic": "Long Short Term Memory (LSTM)",
+          "marks": 20,
+          "bloom_level": "Evaluate",
+          "is_pyq": True,
+          "rationale": "High PYQ availability"
+        },
+        {
+          "question_number": "2d",
+          "module": "Module 2",
+          "topic": "Choosing output function and loss function",
+          "marks": 15,
+          "bloom_level": "Apply",
+          "is_pyq": True,
+          "rationale": "High PYQ availability"
+        }
+      ]
+    }
+  ],
+  "strategy_notes": "Balanced focus on Modules 2 and 3, with PYQs prioritized."
 }
 
 SAMPLE_BLUEPRINT_POOR = {
