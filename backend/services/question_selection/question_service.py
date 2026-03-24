@@ -1,14 +1,8 @@
 """
-Question Selector Agent - Algorithmic Version
-Selects questions based on blueprint using PYQ-first strategy with fallback generation.
-
-Logic Flow per blueprint question:
-1. If blueprint is_pyq=False → Generate directly (skip PYQ search)
-2. If blueprint is_pyq=True:
-   a. Try: topic + subtopic + marks + bloom_level  → use PYQ as-is
-   b. Try: topic + subtopic + bloom_level (drop marks) → rephrase PYQ for target marks
-   c. Try: topic + subtopic only (drop bloom)       → rephrase PYQ for target marks
-   d. Fallback: Generate new question with all params
+Question Selector Agent - Updated Version
+- Fuzzy/substring PYQ topic matching (fixes zero-match problem)
+- Few-shot examples in generate_new_question() and rephrase_pyq()
+- PYQ-absent safe handling (all is_pyq treated as False when bank is empty)
 """
 
 import json
@@ -20,64 +14,92 @@ from langchain_core.messages import HumanMessage
 
 
 # ============================================================================
-# CORE MATCHING HELPERS
+# CORE MATCHING HELPERS  (fuzzy substring — fixes zero-match problem)
 # ============================================================================
 
 def normalize(text: str) -> str:
-    """Lowercase and strip for comparison."""
-    return text.lower().strip()
+    """Lowercase, strip, collapse whitespace."""
+    return re.sub(r"\s+", " ", text.lower().strip())
+
+
+def _topic_match(pyq_field: str, blueprint_topic: str) -> bool:
+    """
+    Flexible matching between a PYQ topic/subtopic string and the blueprint
+    topic string.  Tries in order:
+      1. Exact normalized equality
+      2. Blueprint topic is a substring of PYQ field  (e.g. "Dropout" in "Regularization Methods: Dropout")
+      3. PYQ field is a substring of blueprint topic
+      4. Any significant word (≥5 chars) from blueprint topic appears in PYQ field
+    """
+    pt = normalize(pyq_field)
+    bt = normalize(blueprint_topic)
+
+    if not pt or not bt:
+        return False
+
+    # 1 — exact
+    if pt == bt:
+        return True
+
+    # 2 — blueprint topic is inside PYQ field
+    if bt in pt:
+        return True
+
+    # 3 — PYQ field is inside blueprint topic
+    if pt in bt:
+        return True
+
+    # 4 — significant word overlap
+    bt_words = {w for w in bt.split() if len(w) >= 5}
+    if bt_words and any(w in pt for w in bt_words):
+        return True
+
+    return False
+
+
+def _pyq_topic_match(pyq: Dict, blueprint_topic: str) -> bool:
+    """Check both topic and subtopic fields of a PYQ against blueprint topic."""
+    return (
+        _topic_match(pyq.get("topic", ""), blueprint_topic) or
+        _topic_match(pyq.get("subtopic", ""), blueprint_topic)
+    )
 
 
 def match_level_1(pyq: Dict, topic: str, marks: int, bloom_level: str) -> bool:
-    """Exact match: topic + marks + bloom_level (ignore subtopic)"""
-    # Match blueprint topic against PYQ subtopic (common case) or topic
-    topic_match = (
-        normalize(pyq.get("subtopic", "")) == normalize(topic) or
-        normalize(pyq.get("topic", "")) == normalize(topic)
-    )
+    """Fuzzy topic + exact marks + exact bloom_level."""
     return (
-        topic_match
+        _pyq_topic_match(pyq, topic)
         and pyq.get("marks") == marks
         and normalize(pyq.get("bloom_level", "")) == normalize(bloom_level)
     )
 
 
 def match_level_2(pyq: Dict, topic: str, bloom_level: str) -> bool:
-    """Drop marks: topic + bloom_level only (ignore subtopic)"""
-    topic_match = (
-        normalize(pyq.get("subtopic", "")) == normalize(topic) or
-        normalize(pyq.get("topic", "")) == normalize(topic)
-    )
+    """Fuzzy topic + exact bloom_level (drop marks)."""
     return (
-        topic_match
+        _pyq_topic_match(pyq, topic)
         and normalize(pyq.get("bloom_level", "")) == normalize(bloom_level)
     )
 
 
 def match_level_3(pyq: Dict, topic: str) -> bool:
-    """Drop marks + bloom: topic only (ignore subtopic)"""
-    return (
-        normalize(pyq.get("subtopic", "")) == normalize(topic) or
-        normalize(pyq.get("topic", "")) == normalize(topic)
-    )
+    """Fuzzy topic only (drop marks + bloom)."""
+    return _pyq_topic_match(pyq, topic)
 
 
 def find_match(pyq_bank: List[Dict], used_pyq_ids: set, **criteria) -> Optional[Dict]:
     """
     Search PYQ bank with given criteria, skipping already-used PYQs.
-    criteria keys: topic, subtopic, marks (optional), bloom_level (optional)
+    criteria keys: level, topic, marks (optional), bloom_level (optional)
     """
-    level = criteria.get("level", 1)
-    topic = criteria["topic"]
-    marks = criteria.get("marks")
+    level       = criteria.get("level", 1)
+    topic       = criteria["topic"]
+    marks       = criteria.get("marks")
     bloom_level = criteria.get("bloom_level")
 
     for pyq in pyq_bank:
-        # Safety check: skip if PYQ doesn't have an id
         pyq_id = pyq.get("id")
-        if not pyq_id:
-            continue
-        if pyq_id in used_pyq_ids:
+        if not pyq_id or pyq_id in used_pyq_ids:
             continue
         if level == 1 and match_level_1(pyq, topic, marks, bloom_level):
             return pyq
@@ -89,28 +111,142 @@ def find_match(pyq_bank: List[Dict], used_pyq_ids: set, **criteria) -> Optional[
 
 
 # ============================================================================
+# MARK RANGE HELPER
+# ============================================================================
+
+def _mark_range_label(marks: int) -> str:
+    if marks <= 3:
+        return "2-3"
+    elif marks <= 6:
+        return "4-6"
+    else:
+        return "8-10"
+
+
+# ============================================================================
+# FEW-SHOT EXAMPLES
+# ============================================================================
+
+# Used in rephrase_pyq()
+_REPHRASE_FEW_SHOTS = """
+EXAMPLES — how to scale a question to different mark ranges:
+
+Example 1 (ML — SVM):
+  Original question: "Explain Support Vector Machines and their working with kernel functions."
+  2–3 marks : What is a Support Vector Machine?
+  4–6 marks : Explain how Support Vector Machines work and the role of kernels.
+  8–10 marks: Explain Support Vector Machines in detail, including margin maximization, kernel trick, types of kernels, and real-world applications.
+
+Example 2 (DBMS — Transactions):
+  Original question: "Discuss ACID properties and their importance in transaction management systems."
+  2–3 marks : What are ACID properties?
+  4–6 marks : Explain the ACID properties in DBMS with brief examples.
+  8–10 marks: Explain ACID properties in detail and analyze their role in ensuring reliability and consistency in transaction management systems with examples.
+
+Example 3 (OS — Scheduling):
+  Original question: "Compare different CPU scheduling algorithms and evaluate their performance."
+  2–3 marks : What is CPU scheduling?
+  4–6 marks : Explain any two CPU scheduling algorithms.
+  8–10 marks: Compare CPU scheduling algorithms such as FCFS, SJF, and Round Robin. Analyze their performance based on waiting time and turnaround time.
+
+Example 4 (CN — Routing):
+  Original question: "Explain routing algorithms and compare distance vector and link state approaches."
+  2–3 marks : What is routing in computer networks?
+  4–6 marks : Explain distance vector and link state routing.
+  8–10 marks: Explain routing algorithms in detail and compare distance vector and link state approaches based on working, advantages, and limitations.
+
+Example 5 (SE — SDLC):
+  Original question: "Explain different SDLC models and evaluate their suitability for various projects."
+  2–3 marks : What is SDLC?
+  4–6 marks : Explain any two SDLC models.
+  8–10 marks: Explain different SDLC models such as Waterfall, Agile, and Spiral. Evaluate their suitability for different project types with examples.
+
+Example 6 (Deep Learning — Autoencoders):
+  Original question: "Explain the concept and architecture of denoising autoencoders with real-world applications."
+  2–3 marks : What is a denoising autoencoder? How does it work?
+  4–6 marks : Explain denoising autoencoders in detail.
+  8–10 marks: Explain the concept of denoising autoencoders, describe their architecture, and explain their applications in real-world unsupervised learning scenarios.
+"""
+
+# Used in generate_new_question()
+_GENERATE_FEW_SHOTS = """
+EXAMPLES — what good Mumbai University questions look like at each mark range:
+
+─── 2–3 marks (1 line, recall/definition) ───
+  Topic: Denoising Autoencoders    | Bloom: Remember   → What are denoising autoencoders?
+  Topic: Gradient Descent          | Bloom: Remember   → Define gradient descent. State its purpose.
+  Topic: Sequence Learning Problem | Bloom: Understand → Describe the sequence learning problem.
+  Topic: GAN Architecture          | Bloom: Understand → What is a Generative Adversarial Network?
+  Topic: Pooling Layer             | Bloom: Remember   → What is pooling in CNNs? List its types.
+
+─── 4–6 marks (2–4 lines, explanation with brief example) ───
+  Topic: Dropout                   | Bloom: Understand → Explain dropout. How does it solve overfitting?
+  Topic: LSTM                      | Bloom: Understand → Explain LSTM architecture.
+  Topic: CNN Architecture          | Bloom: Understand → Explain basic working of CNN.
+  Topic: Backpropagation           | Bloom: Understand → Explain Stochastic Gradient Descent and momentum-based gradient descent.
+  Topic: Regularization            | Bloom: Understand → Explain early stopping, batch normalization, and data augmentation.
+  Topic: Activation Functions      | Bloom: Understand → What is an activation function? Describe any four activation functions.
+
+─── 8–10 marks (3–5 lines, detailed explanation, diagrams expected) ───
+  Topic: CNN Architecture          | Bloom: Apply    → Explain CNN architecture in detail. Calculate parameters for a 32×32×3 input with ten 5×5 filters, stride 1, pad 2.
+  Topic: LSTM                      | Bloom: Analyze  → Differentiate between LSTM and GRU networks in detail.
+  Topic: Gradient Descent          | Bloom: Understand → What are the different types of Gradient Descent methods? Explain any three.
+  Topic: Autoencoders              | Bloom: Understand → Explain any three types of autoencoders with their working.
+  Topic: GAN                       | Bloom: Understand → Explain GAN architecture and its applications in detail.
+  Topic: AlexNet                   | Bloom: Analyze  → Explain and analyze the architectural components of AlexNet CNN.
+"""
+
+# Bloom verb guidance — concise, used inline
+_BLOOM_VERBS = {
+    "Remember":   "Use verbs: define / list / state / name / recall",
+    "Understand": "Use verbs: explain / describe / summarize / classify",
+    "Apply":      "Use verbs: solve / demonstrate / calculate / use",
+    "Analyze":    "Use verbs: compare / differentiate / examine / break down",
+    "Evaluate":   "Use verbs: justify / critique / assess / argue for/against",
+    "Create":     "Use verbs: design / formulate / construct / propose",
+}
+
+
+# ============================================================================
 # LLM CALLS
 # ============================================================================
 
 def rephrase_pyq(pyq_text: str, target_marks: int, topic: str, bloom_level: str) -> str:
     """
-    Rephrase a PYQ to fit target marks. Small, focused prompt.
+    Rephrase / scale an existing PYQ to the target marks and bloom level.
+    Uses few-shot examples so the model understands mark-range scaling.
     """
-    prompt = f"""Rephrase this exam question to suit {target_marks} marks ({bloom_level} level).
-Topic: {topic}
+    mark_range = _mark_range_label(target_marks)
+    bloom_verb = _BLOOM_VERBS.get(bloom_level, "Ask an appropriate question.")
 
-Original: {pyq_text}
+    prompt = f"""You are a Mumbai University question paper setter.
+Your job: rewrite the given question so it fits exactly {target_marks} marks at {bloom_level} level.
 
-Rules:
-- Keep the same concept
-- Adjust scope/depth for {target_marks} marks
-- Output ONLY the rephrased question, no explanation
+TOPIC: {topic}
+TARGET MARKS: {target_marks}  (range: {mark_range})
+BLOOM LEVEL: {bloom_level}  — {bloom_verb}
 
-Rephrased question:"""
+ORIGINAL QUESTION:
+{pyq_text}
 
+{_REPHRASE_FEW_SHOTS}
+
+SCALING RULES:
+  2–3 marks → 1 short line. Single concept. Definition or one-word-answer style.
+  4–6 marks → 1 line. Brief explanation with an example or one sub-parts.
+  8–10 marks → 1.5-2 lines. Detailed explanation. May include diagrams, comparisons, or sub-parts.
+
+BLOOM ADJUSTMENT:
+  - If bloom level is Remember/Understand: keep the question theoretical ("explain", "describe", "define").
+  - If bloom level is Apply: add a small practical task ("demonstrate", "calculate", "show with example").
+  - If bloom level is Analyze: add comparison or breakdown ("compare", "differentiate", "examine").
+  - Do NOT add numerical problems unless the original question already has them.
+
+OUTPUT: Write ONLY the rewritten question text. No preamble, no explanation.
+"""
     msg = HumanMessage(content=prompt)
     response = llm.invoke([msg])
-    return response.content.strip()
+    return str(getattr(response, "content", "") or "").strip()
 
 
 def generate_new_question(
@@ -119,42 +255,68 @@ def generate_new_question(
     module: str,
     marks: int,
     bloom_level: str,
-    question_number: str
+    question_number: str,
+    teacher_input: dict = None,
 ) -> str:
     """
-    Generate a brand-new question. Medium-sized, structured prompt.
+    Generate a brand-new Mumbai University style question.
+    Uses few-shot examples calibrated to mark ranges.
     """
-    bloom_guidance = {
-        "Remember": "Ask to define, list, state, name, or recall facts.",
-        "Understand": "Ask to explain, describe, summarize, or classify concepts.",
-        "Apply": "Ask to solve a problem, use a method, demonstrate, or compute.",
-        "Analyze": "Ask to compare, differentiate, break down, or examine relationships.",
-        "Evaluate": "Ask to critique, justify, assess, or argue for/against.",
-        "Create": "Ask to design, formulate, construct, or propose something new."
-    }
+    mark_range = _mark_range_label(marks)
+    bloom_verb = _BLOOM_VERBS.get(bloom_level, "Ask an appropriate question.")
 
-    guidance = bloom_guidance.get(bloom_level, "Ask an appropriate question.")
+    # Teacher context
+    teacher_context = ""
+    if teacher_input:
+        t_text = teacher_input.get("input", "")
+        if t_text:
+            teacher_context = f"\nTeacher instructions (FOLLOW STRICTLY): {t_text}"
+        t_lower = t_text.lower()
+        if any(w in t_lower for w in ["easy", "simple", "basic", "introductory"]):
+            teacher_context += "\nDifficulty: EASY — definitions and simple explanations only."
+        elif any(w in t_lower for w in ["hard", "difficult", "advanced", "challenging"]):
+            teacher_context += "\nDifficulty: HARD — multi-step reasoning or analysis required."
+        if any(w in t_lower for w in ["no numerical", "avoid numerical", "no calculation"]):
+            teacher_context += "\nIMPORTANT: Do NOT include numerical problems."
 
-    prompt = f"""Generate a university exam question for the following specifications:
+    prompt = f"""You are a Mumbai University question paper setter.
+Generate ONE exam question for the specification below.
 
-Module: {module}
-Topic: {topic}
-Subtopic: {subtopic}
-Marks: {marks}
-Bloom's Level: {bloom_level}
-Guidance: {guidance}
+SPECIFICATION:
+  Module      : {module}
+  Topic       : {topic}
+  Subtopic    : {subtopic if subtopic else topic}
+  Marks       : {marks}  (mark range: {mark_range})
+  Bloom Level : {bloom_level}  — {bloom_verb}
+{teacher_context}
 
-Requirements:
-- Question must be clear and unambiguous
-- Appropriate difficulty for {marks} marks at {bloom_level} level
-- Relevant to the subtopic
-- For numerical/application questions, include necessary data/context
+{_GENERATE_FEW_SHOTS}
 
-Output ONLY the question text, nothing else:"""
-
+STRICT RULES:
+  1. Match the LENGTH to the mark range exactly:
+       2–3 marks → 1 line maximum (short recall/definition/concept question)
+       4–6 marks → 1 line (explanation, may have 1 sub-parts)
+       8–10 marks → 1.5-2 lines (detailed)
+  2. Match the VERB to the bloom level ({bloom_level}): {bloom_verb}
+  3. Do NOT generate numerical/calculation problems unless teacher explicitly asked.
+  4. Do NOT invent sub-topics outside the given topic.
+  5. Keep language natural and direct — like the PYQ examples above.
+  6. The question must be solvable in exam conditions by a student.
+  
+OUTPUT: Write ONLY the question text. No preamble, no label, no explanation.
+"""
     msg = HumanMessage(content=prompt)
     response = llm.invoke([msg])
-    return response.content.strip()
+    return str(getattr(response, "content", "") or "").strip()
+
+
+# ============================================================================
+# PYQ BANK GUARD  (handles empty / missing PYQ bank)
+# ============================================================================
+
+def _pyq_bank_available(pyq_bank: List[Dict]) -> bool:
+    """Returns True only if the bank has at least one question with an id."""
+    return bool(pyq_bank) and any(q.get("id") for q in pyq_bank)
 
 
 # ============================================================================
@@ -163,41 +325,41 @@ Output ONLY the question text, nothing else:"""
 
 def select_questions(
     blueprint: Dict,
-    pyq_bank: List[Dict]
+    pyq_bank: List[Dict],
+    teacher_input: dict = None,
 ) -> Dict:
     """
     Main question selection function.
-    
-    Args:
-        blueprint: Generated blueprint with sections and questions
-        pyq_bank: List of available PYQs with fields:
-                  {id, text, topic, subtopic, marks, bloom_level, year, module}
-    
-    Returns:
-        Draft question paper with sections, questions, and selection metadata
+
+    If pyq_bank is empty / unavailable, all questions are treated as is_pyq=False
+    and generated directly — no PYQ matching is attempted.
     """
-    
-    used_pyq_ids = set()
+
+    pyq_available = _pyq_bank_available(pyq_bank)
+    if not pyq_available:
+        print("⚠️  PYQ bank is empty or unavailable — all questions will be generated fresh.")
+
+    used_pyq_ids   = set()
     draft_sections = []
-    selection_log = []
-    
+    selection_log  = []
+
     stats = {
-        "total_questions": 0,
-        "pyq_exact_match": 0,
-        "pyq_rephrased_marks": 0,
-        "pyq_rephrased_bloom": 0,
-        "generated_new": 0,
-        "direct_generated": 0   # is_pyq=False from blueprint
+        "total_questions":      0,
+        "pyq_exact_match":      0,
+        "pyq_rephrased_marks":  0,
+        "pyq_rephrased_bloom":  0,
+        "generated_new":        0,
+        "direct_generated":     0,
     }
 
-    print("\n" + "="*70)
-    print("🔍 QUESTION SELECTION - ALGORITHMIC PYQ-FIRST STRATEGY")
-    print("="*70)
+    print("\n" + "=" * 70)
+    print("🔍  QUESTION SELECTION — PYQ-FIRST STRATEGY")
+    print("=" * 70)
 
     for section in blueprint.get("sections", []):
         section_name = section["section_name"]
         section_desc = section.get("section_description", "")
-        print(f"\n📂 {section_name} - {section_desc}")
+        print(f"\n📂 {section_name}")
         print("-" * 50)
 
         draft_questions = []
@@ -211,632 +373,165 @@ def select_questions(
             module      = bp_q["module"]
             marks       = bp_q["marks"]
             bloom_level = bp_q["bloom_level"]
-            is_pyq      = bp_q.get("is_pyq", False)
+            # If PYQ bank is absent, override is_pyq to False regardless of blueprint
+            is_pyq      = bp_q.get("is_pyq", False) and pyq_available
 
-            print(f"\n  ▶ Q{q_num}: {topic}/{subtopic} | {marks}M | {bloom_level} | is_pyq={is_pyq}")
+            print(f"\n  ▶ Q{q_num}: {topic} | {marks}M | {bloom_level} | is_pyq={is_pyq}")
 
-            selected_text = None
+            selected_text    = None
             selection_method = None
-            source_pyq_id = None
+            source_pyq_id    = None
 
-            # ----------------------------------------------------------------
-            # CASE A: Blueprint says NOT a PYQ → Generate directly
-            # ----------------------------------------------------------------
+            # ────────────────────────────────────────────────────────────────
+            # CASE A: Generate directly (no PYQ needed)
+            # ────────────────────────────────────────────────────────────────
             if not is_pyq:
-                print(f"     → Blueprint is_pyq=False → Generating new question")
-                selected_text = generate_new_question(
-                    topic=topic, subtopic=subtopic, module=module,
-                    marks=marks, bloom_level=bloom_level, question_number=q_num
+                selected_text    = generate_new_question(
+                    topic, subtopic, module, marks, bloom_level, q_num, teacher_input
                 )
                 selection_method = "generated_direct"
                 stats["direct_generated"] += 1
+                print(f"     → Generated directly (is_pyq=False or no PYQ bank)")
 
-            # ----------------------------------------------------------------
-            # CASE B: Blueprint says IS a PYQ → Apply matching hierarchy
-            # ----------------------------------------------------------------
+            # ────────────────────────────────────────────────────────────────
+            # CASE B: PYQ-first matching hierarchy
+            # ────────────────────────────────────────────────────────────────
             else:
-                # Level 1: topic + marks + bloom_level (exact)
+                match = None
+
+                # Level 1 — fuzzy topic + exact marks + exact bloom
                 match = find_match(
                     pyq_bank, used_pyq_ids,
                     level=1, topic=topic, marks=marks, bloom_level=bloom_level
                 )
                 if match:
-                    match_id = match.get("id", "unknown")
-                    match_text = match.get("text", match.get("question", ""))
-                    print(f"     ✅ Level 1 match (exact) → PYQ #{match_id} used as-is")
-                    selected_text = match_text
+                    mid  = match.get("id", "unknown")
+                    text = match.get("text", match.get("question", ""))
+                    print(f"     ✅ L1 match (topic+marks+bloom) → PYQ #{mid} used as-is")
+                    selected_text    = text
                     selection_method = "pyq_exact"
-                    source_pyq_id = match_id
-                    if match_id != "unknown":
-                        used_pyq_ids.add(match_id)
+                    source_pyq_id    = mid
+                    if mid != "unknown": used_pyq_ids.add(mid)
                     stats["pyq_exact_match"] += 1
 
-                # Level 2: topic + bloom_level (drop marks)
+                # Level 2 — fuzzy topic + exact bloom (drop marks)
                 if not match:
                     match = find_match(
                         pyq_bank, used_pyq_ids,
                         level=2, topic=topic, bloom_level=bloom_level
                     )
                     if match:
-                        match_id = match.get("id", "unknown")
-                        orig_marks = match.get("marks", marks)
-                        match_text = match.get("text", match.get("question", ""))
-                        print(f"     🔄 Level 2 match (drop marks: {orig_marks}M→{marks}M) → Rephrasing PYQ #{match_id}")
-                        selected_text = rephrase_pyq(match_text, marks, topic, bloom_level)
+                        mid      = match.get("id", "unknown")
+                        orig_m   = match.get("marks", marks)
+                        text     = match.get("text", match.get("question", ""))
+                        print(f"     🔄 L2 match (topic+bloom, {orig_m}M→{marks}M) → rephrasing PYQ #{mid}")
+                        selected_text    = rephrase_pyq(text, marks, topic, bloom_level)
                         selection_method = "pyq_rephrased_marks"
-                        source_pyq_id = match_id
-                        if match_id != "unknown":
-                            used_pyq_ids.add(match_id)
+                        source_pyq_id    = mid
+                        if mid != "unknown": used_pyq_ids.add(mid)
                         stats["pyq_rephrased_marks"] += 1
 
-                # Level 3: topic only (drop marks + bloom)
+                # Level 3 — fuzzy topic only (drop marks + bloom)
                 if not match:
                     match = find_match(
                         pyq_bank, used_pyq_ids,
                         level=3, topic=topic
                     )
                     if match:
-                        match_id = match.get("id", "unknown")
-                        orig_bloom = match.get("bloom_level", bloom_level)
-                        match_text = match.get("text", match.get("question", ""))
-                        print(f"     🔄 Level 3 match (bloom: {orig_bloom}→{bloom_level}) → Rephrasing PYQ #{match_id}")
-                        selected_text = rephrase_pyq(match_text, marks, topic, bloom_level)
+                        mid      = match.get("id", "unknown")
+                        orig_bl  = match.get("bloom_level", bloom_level)
+                        text     = match.get("text", match.get("question", ""))
+                        print(f"     🔄 L3 match (topic only, bloom {orig_bl}→{bloom_level}) → rephrasing PYQ #{mid}")
+                        selected_text    = rephrase_pyq(text, marks, topic, bloom_level)
                         selection_method = "pyq_rephrased_bloom"
-                        source_pyq_id = match_id
-                        if match_id != "unknown":
-                            used_pyq_ids.add(match_id)
+                        source_pyq_id    = mid
+                        if mid != "unknown": used_pyq_ids.add(mid)
                         stats["pyq_rephrased_bloom"] += 1
 
-                # Fallback: Generate new question if no PYQ match
+                # Fallback — generate fresh
                 if not match:
-                    print(f"     ⚡ No PYQ match found → Generating new question")
-                    selected_text = generate_new_question(
-                        topic=topic, subtopic=subtopic, module=module,
-                        marks=marks, bloom_level=bloom_level, question_number=q_num
+                    print(f"     ⚡ No PYQ match → generating fresh question")
+                    selected_text    = generate_new_question(
+                        topic, subtopic, module, marks, bloom_level, q_num, teacher_input
                     )
                     selection_method = "generated_fallback"
                     stats["generated_new"] += 1
 
-            # Build draft question entry
             draft_q = {
-                "id": str(uuid.uuid4())[:8],
-                "question_number": q_num,
-                "module": module,
-                "topic": topic,
-                "subtopic": subtopic,
-                "marks": marks,
-                "bloom_level": bloom_level,
-                "question_text": selected_text,
+                "id":               str(uuid.uuid4())[:8],
+                "question_number":  q_num,
+                "module":           module,
+                "topic":            topic,
+                "subtopic":         subtopic,
+                "marks":            marks,
+                "bloom_level":      bloom_level,
+                "question_text":    selected_text,
                 "selection_method": selection_method,
-                "source_pyq_id": source_pyq_id,
-                "is_pyq_sourced": source_pyq_id is not None
+                "source_pyq_id":    source_pyq_id,
+                "is_pyq_sourced":   source_pyq_id is not None,
             }
             draft_questions.append(draft_q)
-
-            log_entry = {
+            selection_log.append({
                 "question_number": q_num,
-                "method": selection_method,
-                "pyq_id": source_pyq_id
-            }
-            selection_log.append(log_entry)
-
+                "method":          selection_method,
+                "pyq_id":          source_pyq_id,
+            })
             print(f"     📝 Method: {selection_method}")
 
         draft_sections.append({
-            "section_name": section_name,
+            "section_name":        section_name,
             "section_description": section_desc,
-            "questions": draft_questions
+            "questions":           draft_questions,
         })
 
-    # Build final draft paper
     draft_paper = {
-        "paper_id": str(uuid.uuid4())[:12],
+        "paper_id":           str(uuid.uuid4())[:12],
         "blueprint_metadata": blueprint.get("blueprint_metadata", {}),
-        "sections": draft_sections,
-        "selection_stats": stats,
-        "selection_log": selection_log,
-        "used_pyq_ids": list(used_pyq_ids)
+        "sections":           draft_sections,
+        "selection_stats":    stats,
+        "selection_log":      selection_log,
+        "used_pyq_ids":       list(used_pyq_ids),
     }
 
-    # Print summary
-    print("\n" + "="*70)
-    print("📊 SELECTION SUMMARY")
-    print("="*70)
-    print(f"  Total Questions       : {stats['total_questions']}")
+    # Summary
+    print("\n" + "=" * 70)
+    print("📊  SELECTION SUMMARY")
+    print("=" * 70)
+    total    = stats["total_questions"]
+    pyq_hits = stats["pyq_exact_match"] + stats["pyq_rephrased_marks"] + stats["pyq_rephrased_bloom"]
+    print(f"  Total Questions       : {total}")
     print(f"  PYQ Exact Match       : {stats['pyq_exact_match']}")
     print(f"  PYQ Rephrased (marks) : {stats['pyq_rephrased_marks']}")
     print(f"  PYQ Rephrased (bloom) : {stats['pyq_rephrased_bloom']}")
     print(f"  Generated (fallback)  : {stats['generated_new']}")
     print(f"  Generated (direct)    : {stats['direct_generated']}")
-    print(f"  PYQs Used             : {len(used_pyq_ids)}")
-    print("="*70)
+    print(f"  PYQ Utilization       : {pyq_hits}/{total} ({pyq_hits/total*100:.0f}%)" if total else "")
+    if not pyq_available:
+        print("  ⚠️  PYQ bank was empty — all questions generated fresh")
+    print("=" * 70)
 
     return draft_paper
 
 
 def print_draft_paper(draft_paper: Dict):
-    """Pretty print the drafted question paper."""
-    print("\n" + "="*80)
-    print("📄 DRAFTED QUESTION PAPER")
-    print("="*80)
-
     METHOD_LABELS = {
-        "pyq_exact":            "📌 PYQ (exact)",
-        "pyq_rephrased_marks":  "🔄 PYQ (rephrased for marks)",
-        "pyq_rephrased_bloom":  "🔄 PYQ (rephrased for bloom)",
-        "generated_fallback":   "✨ Generated (fallback)",
-        "generated_direct":     "✨ Generated (direct)"
+        "pyq_exact":           "📌 PYQ (exact)",
+        "pyq_rephrased_marks": "🔄 PYQ (rephrased — marks)",
+        "pyq_rephrased_bloom": "🔄 PYQ (rephrased — bloom)",
+        "generated_fallback":  "✨ Generated (fallback)",
+        "generated_direct":    "✨ Generated (direct)",
     }
-
+    print("\n" + "=" * 80)
+    print("📄  DRAFTED QUESTION PAPER")
+    print("=" * 80)
     for section in draft_paper["sections"]:
         print(f"\n{'─'*80}")
         print(f"  {section['section_name']} — {section['section_description']}")
         print(f"{'─'*80}")
         for q in section["questions"]:
-            method_label = METHOD_LABELS.get(q["selection_method"], q["selection_method"])
-            print(f"\n  Q{q['question_number']}  [{q['marks']} marks | {q['bloom_level']} | {q['module']}]")
-            print(f"  Topic: {q['topic']} → {q['subtopic']}")
-            print(f"  Source: {method_label}", end="")
-            if q["source_pyq_id"]:
-                print(f" (PYQ ID: {q['source_pyq_id']})", end="")
-            print()
+            label = METHOD_LABELS.get(q["selection_method"], q["selection_method"])
+            print(f"\n  Q{q['question_number']}  [{q['marks']}M | {q['bloom_level']} | {q['module']}]")
+            print(f"  Topic : {q['topic']}")
+            print(f"  Source: {label}" + (f" (PYQ #{q['source_pyq_id']})" if q["source_pyq_id"] else ""))
             print(f"\n  {q['question_text']}")
-
-    print("\n" + "="*80)
-    stats = draft_paper["selection_stats"]
-    total = stats["total_questions"]
-    pyq_total = stats["pyq_exact_match"] + stats["pyq_rephrased_marks"] + stats["pyq_rephrased_bloom"]
-    print(f"  PYQ utilization: {pyq_total}/{total} questions ({pyq_total/total*100:.0f}%)")
-    print("="*80)
-
-
-# ============================================================================
-# SAMPLE TEST DATA
-# ============================================================================
-
-SAMPLE_PYQ_BANK = [
-    {
-        "id": "pyq_001",
-        "question": "Design AND gate using Perceptron.",
-        "topic": "Fundamentals of Neural Network",
-        "subtopic": "Multilayer Perceptrons (MLPs)",
-        "marks": 2,
-        "bloom_level": "Apply"
-    },
-    {
-        "id": "pyq_002",
-        "question": "Suppose we have input-output pairs. Our goal is to find parameters that predict the output from the input according to. Calculate the sum-of-squared error function. Derive the gradient descent update rule.",
-        "topic": "Training, Optimization and Regularization of Deep Neural Network",
-        "subtopic": "Loss functions: Squared Error loss",
-        "marks": 10,
-        "bloom_level": "Apply"
-    },
-    {
-        "id": "pyq_003",
-        "question": "Explain dropout. How does it solve the problem of overfitting?",
-        "topic": "Training, Optimization and Regularization of Deep Neural Network",
-        "subtopic": "Regularization Methods: Dropout",
-        "marks": 5,
-        "bloom_level": "Understand"
-    },
-    {
-        "id": "pyq_004",
-        "question": "Explain denoising autoencoder model.",
-        "topic": "Autoencoders: Unsupervised Learning",
-        "subtopic": "Denoising Autoencoders",
-        "marks": 5,
-        "bloom_level": "Understand"
-    },
-    {
-        "id": "pyq_005",
-        "question": "Describe sequence learning problem.",
-        "topic": "Recurrent Neural Networks (RNN)",
-        "subtopic": "Sequence Learning Problem",
-        "marks": 2,
-        "bloom_level": "Understand"
-    },
-    {
-        "id": "pyq_006",
-        "question": "Explain Gated Recurrent Unit (GRU) in detail.",
-        "topic": "Recurrent Neural Networks (RNN)",
-        "subtopic": "Long Short Term Memory(LSTM): Gated Recurrent Unit (GRU)",
-        "marks": 5,
-        "bloom_level": "Understand"
-    },
-    {
-        "id": "pyq_007",
-        "question": "What is an activation function? Describe any four activation functions.",
-        "topic": "Fundamentals of Neural Network",
-        "subtopic": "Activation functions",
-        "marks": 5,
-        "bloom_level": "Understand"
-    },
-    {
-        "id": "pyq_008",
-        "question": "Explain CNN architecture in detail. Calculate parameters for a layer with input, ten filters, stride 1, and pad 2.",
-        "topic": "Convolutional Neural Networks (CNN)",
-        "subtopic": "CNN architecture",
-        "marks": 10,
-        "bloom_level": "Apply"
-    },
-    {
-        "id": "pyq_009",
-        "question": "Explain early stopping, batch normalization, and data augmentation.",
-        "topic": "Training, Optimization and Regularization of Deep Neural Network",
-        "subtopic": "Regularization Methods: Early stopping, Batch normalization",
-        "marks": 5,
-        "bloom_level": "Understand"
-    },
-    {
-        "id": "pyq_010",
-        "question": "Explain RNN architecture in detail.",
-        "topic": "Recurrent Neural Networks (RNN)",
-        "subtopic": "Recurrent Neural Network",
-        "marks": 5,
-        "bloom_level": "Understand"
-    },
-    {
-        "id": "pyq_011",
-        "question": "Explain the working of Generative Adversarial Network (GAN).",
-        "topic": "Recent Trends and Applications",
-        "subtopic": "Generative Adversarial Network (GAN): Architecture",
-        "marks": 5,
-        "bloom_level": "Understand"
-    },
-    {
-        "id": "pyq_012",
-        "question": "Explain Stochastic Gradient Descent and momentum-based gradient descent optimization techniques.",
-        "topic": "Training, Optimization and Regularization of Deep Neural Network",
-        "subtopic": "Optimization Learning with backpropagation",
-        "marks": 5,
-        "bloom_level": "Understand"
-    },
-    {
-        "id": "pyq_013",
-        "question": "Explain LSTM architecture.",
-        "topic": "Recurrent Neural Networks (RNN)",
-        "subtopic": "Long Short Term Memory(LSTM): Selective Read, Selective write, Selective Forget",
-        "marks": 5,
-        "bloom_level": "Understand"
-    },
-    {
-        "id": "pyq_014",
-        "question": "Describe LeNet architecture.",
-        "topic": "Convolutional Neural Networks (CNN)",
-        "subtopic": "Modern Deep Learning Architectures: LeNET: Architecture",
-        "marks": 5,
-        "bloom_level": "Understand"
-    },
-    {
-        "id": "pyq_015",
-        "question": "Explain vanishing and exploding gradient in RNNs.",
-        "topic": "Recurrent Neural Networks (RNN)",
-        "subtopic": "Limitation of 'vanilla RNN' Vanishing and Exploding Gradients",
-        "marks": 5,
-        "bloom_level": "Understand"
-    },
-    {
-        "id": "pyq_016",
-        "question": "Comment on the Representation Power of MLPs.",
-        "topic": "Fundamentals of Neural Network",
-        "subtopic": "Representation Power of MLPs",
-        "marks": 5,
-        "bloom_level": "Understand"
-    },
-    {
-        "id": "pyq_017",
-        "question": "Explain Gradient Descent in Deep Learning.",
-        "topic": "Training, Optimization and Regularization of Deep Neural Network",
-        "subtopic": "Learning Parameters: Gradient Descent (GD)",
-        "marks": 5,
-        "bloom_level": "Understand"
-    },
-    {
-        "id": "pyq_018",
-        "question": "Explain the dropout method and its advantages.",
-        "topic": "Training, Optimization and Regularization of Deep Neural Network",
-        "subtopic": "Regularization Methods: Dropout",
-        "marks": 5,
-        "bloom_level": "Understand"
-    },
-    {
-        "id": "pyq_019",
-        "question": "What are Denoising Autoencoders?",
-        "topic": "Autoencoders: Unsupervised Learning",
-        "subtopic": "Denoising Autoencoders",
-        "marks": 2,
-        "bloom_level": "Remember"
-    },
-    {
-        "id": "pyq_020",
-        "question": "Explain Pooling operation in CNN.",
-        "topic": "Convolutional Neural Networks (CNN)",
-        "subtopic": "Pooling Layer",
-        "marks": 5,
-        "bloom_level": "Understand"
-    },
-    {
-        "id": "pyq_021",
-        "question": "What are the Three Classes of Deep Learning? Explain each.",
-        "topic": "Fundamentals of Neural Network",
-        "subtopic": "Deep Networks: Three Classes of Deep Learning",
-        "marks": 10,
-        "bloom_level": "Understand"
-    },
-    {
-        "id": "pyq_022",
-        "question": "Explain and analyze the architectural components of AlexNet CNN.",
-        "topic": "Convolutional Neural Networks (CNN)",
-        "subtopic": "Modern Deep Learning Architectures: AlexNET: Architecture",
-        "marks": 10,
-        "bloom_level": "Analyze"
-    },
-    {
-        "id": "pyq_023",
-        "question": "What are the different types of Gradient Descent methods? Explain any three.",
-        "topic": "Training, Optimization and Regularization of Deep Neural Network",
-        "subtopic": "Learning Parameters: Gradient Descent (GD)",
-        "marks": 10,
-        "bloom_level": "Understand"
-    },
-    {
-        "id": "pyq_024",
-        "question": "Differentiate between the architecture of LSTM and GRU networks.",
-        "topic": "Recurrent Neural Networks (RNN)",
-        "subtopic": "Long Short Term Memory(LSTM): Selective Read, Selective write, Selective Forget, Gated Recurrent Unit (GRU)",
-        "marks": 5,
-        "bloom_level": "Analyze"
-    },
-    {
-        "id": "pyq_025",
-        "question": "Explain the key components of an RNN.",
-        "topic": "Recurrent Neural Networks (RNN)",
-        "subtopic": "Recurrent Neural Network",
-        "marks": 5,
-        "bloom_level": "Understand"
-    },
-    {
-        "id": "pyq_026",
-        "question": "Calculate the total number of parameters in a CNN layer: Input 32 channels, 64 filters, stride 1, no padding.",
-        "topic": "Convolutional Neural Networks (CNN)",
-        "subtopic": "CNN architecture",
-        "marks": 10,
-        "bloom_level": "Apply"
-    },
-    {
-        "id": "pyq_027",
-        "question": "Comment on the significance of Loss functions and explain different types.",
-        "topic": "Training, Optimization and Regularization of Deep Neural Network",
-        "subtopic": "Loss functions",
-        "marks": 10,
-        "bloom_level": "Understand"
-    },
-    {
-        "id": "pyq_028",
-        "question": "Explain any three types of Autoencoders.",
-        "topic": "Autoencoders: Unsupervised Learning",
-        "subtopic": "Application of Autoencoders",
-        "marks": 10,
-        "bloom_level": "Understand"
-    },
-    {
-        "id": "pyq_029",
-        "question": "What is the significance of Activation Functions? Explain types used in NN.",
-        "topic": "Fundamentals of Neural Network",
-        "subtopic": "Activation functions",
-        "marks": 10,
-        "bloom_level": "Understand"
-    },
-    {
-        "id": "pyq_030",
-        "question": "Explain GAN architecture and its applications.",
-        "topic": "Recent Trends and Applications",
-        "subtopic": "Generative Adversarial Network (GAN): Architecture, Applications",
-        "marks": 10,
-        "bloom_level": "Understand"
-    },
-    {
-        "id": "pyq_031",
-        "question": "Explain basic architecture of feedforward neural network.",
-        "topic": "Fundamentals of Neural Network",
-        "subtopic": "Feedforward Neural Networks",
-        "marks": 5,
-        "bloom_level": "Understand"
-    },
-    {
-        "id": "pyq_032",
-        "question": "Explain regularization in neural network.",
-        "topic": "Training, Optimization and Regularization of Deep Neural Network",
-        "subtopic": "Regularization Overview of Overfitting",
-        "marks": 5,
-        "bloom_level": "Understand"
-    },
-    {
-        "id": "pyq_033",
-        "question": "Explain types of neural network.",
-        "topic": "Fundamentals of Neural Network",
-        "subtopic": "Types of Neural Networks",
-        "marks": 5,
-        "bloom_level": "Understand"
-    },
-    {
-        "id": "pyq_034",
-        "question": "Explain the concept of overfitting and under fitting.",
-        "topic": "Training, Optimization and Regularization of Deep Neural Network",
-        "subtopic": "Overview of Overfitting",
-        "marks": 5,
-        "bloom_level": "Understand"
-    },
-    {
-        "id": "pyq_035",
-        "question": "Explain basic working of CNN.",
-        "topic": "Convolutional Neural Networks (CNN)",
-        "subtopic": "CNN architecture",
-        "marks": 5,
-        "bloom_level": "Understand"
-    },
-    {
-        "id": "pyq_036",
-        "question": "Explain the gradient descent algorithm and discuss types in detail.",
-        "topic": "Training, Optimization and Regularization of Deep Neural Network",
-        "subtopic": "Learning Parameters: Gradient Descent (GD)",
-        "marks": 10,
-        "bloom_level": "Understand"
-    },
-    {
-        "id": "pyq_037",
-        "question": "Explain the working and types of autoencoders in detail.",
-        "topic": "Autoencoders: Unsupervised Learning",
-        "subtopic": "Application of Autoencoders",
-        "marks": 10,
-        "bloom_level": "Understand"
-    }
-]
-
-
-SAMPLE_BLUEPRINT = {
-  "blueprint_metadata": {
-    "total_marks": 80,
-    "total_questions": 8,
-    "bloom_distribution": {
-      "Remember": 0.15,
-      "Understand": 0.25,
-      "Apply": 0.3,
-      "Analyze": 0.2,
-      "Evaluate": 0.07,
-      "Create": 0.03
-    },
-    "module_distribution": {
-      "Module 1": 0.25,
-      "Module 2": 0.3,
-      "Module 3": 0.2,
-      "Module 4": 0.1,
-      "Module 5": 0.1,
-      "Module 6": 0.0
-    },
-    "pyq_usage": {
-      "actual_pyq_count": 5,
-      "new_question_count": 3,
-      "pyq_percentage": 62.5
-    }
-  },
-  "sections": [
-    {
-      "section_name": "Section A",
-      "section_description": "Short Answer Questions",
-      "questions": [
-        {
-          "question_number": "1a",
-          "module": "Module 1",
-          "topic": "History of Deep Learning",
-          "marks": 5,
-          "bloom_level": "Remember",
-          "is_pyq": True,
-          "rationale": "High PYQ availability"
-        },
-        {
-          "question_number": "1b",
-          "module": "Module 2",
-          "topic": "Fundamentals of Neural Network",
-          "marks": 5,
-          "bloom_level": "Understand",
-          "is_pyq": True,
-          "rationale": "High PYQ availability"
-        },
-        {
-          "question_number": "1c",
-          "module": "Module 3",
-          "topic": "Denoising Autoencoders",
-          "marks": 5,
-          "bloom_level": "Remember",
-          "is_pyq": True,
-          "rationale": "New question generated"
-        },
-        {
-          "question_number": "1d",
-          "module": "Module 4",
-          "topic": "CNN architecture",
-          "marks": 5,
-          "bloom_level": "Understand",
-          "is_pyq": False,
-          "rationale": "New question generated"
-        }
-      ]
-    },
-    {
-      "section_name": "Section B",
-      "section_description": "Long Answer Questions",
-      "questions": [
-        {
-          "question_number": "2a",
-          "module": "Module 2",
-          "topic": "Regularization Methods",
-          "marks": 15,
-          "bloom_level": "Apply",
-          "is_pyq": True,
-          "rationale": "High PYQ availability"
-        },
-        {
-          "question_number": "2b",
-          "module": "Module 3",
-          "topic": "Applications of Autoencoders",
-          "marks": 15,
-          "bloom_level": "Analyze",
-          "is_pyq": False,
-          "rationale": "New question generated"
-        },
-        {
-          "question_number": "2c",
-          "module": "Module 5",
-          "topic": "Long Short Term Memory (LSTM)",
-          "marks": 20,
-          "bloom_level": "Evaluate",
-          "is_pyq": True,
-          "rationale": "High PYQ availability"
-        },
-        {
-          "question_number": "2d",
-          "module": "Module 2",
-          "topic": "Choosing output function and loss function",
-          "marks": 15,
-          "bloom_level": "Apply",
-          "is_pyq": True,
-          "rationale": "High PYQ availability"
-        }
-      ]
-    }
-  ],
-  "strategy_notes": "Balanced focus on Modules 2 and 3, with PYQs prioritized."
-}
-
-# ============================================================================
-# TEST EXECUTION
-# ============================================================================
-
-# if __name__ == "__main__":
-#     print("🚀 QUESTION SELECTOR AGENT — TEST RUN")
-#     print("="*70)
-#     print(f"PYQ Bank size  : {len(SAMPLE_PYQ_BANK)} questions")
-#     print(f"Blueprint qs   : {sum(len(s['questions']) for s in SAMPLE_BLUEPRINT['sections'])}")
-#     print(f"Total marks    : {SAMPLE_BLUEPRINT['blueprint_metadata']['total_marks']}")
-#     print("="*70)
-
-#     try:
-#         draft_paper = select_questions(
-#             blueprint=SAMPLE_BLUEPRINT,
-#             pyq_bank=SAMPLE_PYQ_BANK
-#         )
-
-#         # Pretty-print results
-#         print_draft_paper(draft_paper)
-
-#         # Save to file
-#         output_file = "drafted_question_paper.json"
-#         with open(output_file, "w") as f:
-#             json.dump(draft_paper, f, indent=2)
-#         print(f"\n✅ Draft paper saved to: {output_file}")
-
-#     except Exception as e:
-#         print(f"\n❌ ERROR: {e}")
-#         import traceback
-#         traceback.print_exc()
+    print("\n" + "=" * 80)

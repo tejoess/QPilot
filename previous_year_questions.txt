@@ -1,0 +1,265 @@
+Based on the document provided, here are the Previous Year Questions (PYQs) arranged by each specific question paper. Each paper is worth a maximum of **80 marks**.
+
+---
+
+## **Paper 1: 26-Dec-2023**
+
+Subject: Deep Learning (Sem VII) | QP Code: 10043892 
+
+### Q1. 
+
+Attempt Any Four (5 Marks each) 
+
+* 
+**a)** Design AND gate using Perceptron. 
+
+
+* **b)** Suppose we have $N$ input-output pairs. Find parameters to predict output $y$ from input $x$ where $y=x^w$. Calculate sum-of-squared error $E$ and derive the gradient descent update rule $w \leftarrow w - \alpha \frac{dE}{dw}$. 
+
+
+* **c)** Explain dropout. How does it solve the problem of overfitting? 
+
+
+* 
+**d)** Explain denoising auto encoder model. 
+
+
+* 
+**e)** Describe sequence learning problem. 
+
+
+
+### **Detailed Questions (10 Marks each)**
+
+* 
+**Q2. a)** Explain Gated Recurrent Unit in detail. 
+
+
+* **Q2. b)** What is an activation function? Describe any four activation functions. 
+
+
+* **Q3. a)** Explain CNN architecture in detail. Calculate parameters for a $32 \times 32 \times 3$ input with ten $5 \times 5$ filters, stride 1, and pad 2. 
+
+
+* 
+**Q3. b)** Explain early stopping, batch normalization, and data augmentation. 
+
+
+* 
+**Q4. a)** Explain RNN architecture in detail. 
+
+
+* 
+**Q4. b)** Explain the working of Generative Adversarial Network. 
+
+
+* 
+**Q5. a)** Explain Stochastic Gradient Descent and momentum based gradient descent optimization techniques. 
+
+
+* 
+**Q5. b)** Explain LSTM architecture. 
+
+
+* 
+**Q6. a)** Describe LeNet architecture. 
+
+
+* 
+**Q6. b)** Explain vanishing and exploding gradient in RNNs. 
+
+
+
+---
+
+## **Paper 2: 12-Nov-2024**
+
+Subject: Deep Learning (Sem VII) | QP Code: 10065146 
+
+### Q1. 
+
+Attempt Any Four (5 Marks each) 
+
+* 
+**a)** Comment on the Representation Power of MLPs. 
+
+
+* 
+**b)** Explain Gradient Descent in Deep Learning. 
+
+
+* 
+**c)** Explain the dropout method and its advantages. 
+
+
+* 
+**d)** What are Denoising Autoencoders? 
+
+
+* 
+**e)** Explain Pooling operation in CNN. 
+
+
+
+### **Detailed Questions (10 Marks each)**
+
+* 
+**Q2. a)** What are the Three Classes of Deep Learning, explain each? 
+
+
+* 
+**Q2. b)** Explain and analyze the architectural components of AlexNet Convolutional Neural Network. 
+
+
+* 
+**Q3. a)** What are the different types of Gradient Descent methods, explain any three of them. 
+
+
+* 
+**Q3. b)** Differentiate between the architecture of LSTM and GRU network. 
+
+
+* 
+**Q4. a)** Explain the key components of an RNN. 
+
+
+* **Q4. b)** Calculate the total number of parameters in a CNN layer: Input 32 channels, $64 \times 64$ size; 64 filters of $3 \times 3$, stride 1, no padding. 
+
+
+* 
+**Q5. a)** Comment on the significance of Loss functions and explain different types of Loss functions. 
+
+
+* 
+**Q5. b)** Explain any three types of Autoencoders. 
+
+
+* 
+**Q6. a)** What is the significance of Activation Functions in Neural Networks, explain different types. 
+
+
+* 
+**Q6. b)** Explain Generative Adversarial Networks Architecture and its applications. 
+
+
+
+---
+
+## **Paper 3: Undated (Page 3)**
+
+Subject: Deep Learning | Marks: 80 
+
+### Q1. 
+
+Attempt Any Four (5 Marks each) 
+
+* 
+**a)** What are Feed Forward Neural Networks? 
+
+
+* 
+**b)** Explain Gradient Descent in Deep Learning. 
+
+
+* 
+**c)** Explain the dropout method and its advantages. 
+
+
+* 
+**d)** What are Undercomplete Autoencoders? 
+
+
+* 
+**e)** Explain Pooling operation in CNN. 
+
+
+
+**Detailed Questions (10 Marks each)** 
+
+* **Q2. a)** What are the Three Classes of Deep Learning, explain each?
+* **Q2. b)** Explain the architecture of CNN with the help of a diagram.
+* **Q3. a)** What are the different types of Gradient Descent methods, explain any three.
+* **Q3. b)** Explain main components of an Autoencoder and its architecture.
+* **Q4. a)** Explain LSTM model, how it overcomes the limitation of RNN.
+* **Q4. b)** What are the issues faced by Vanilla GAN models?
+* **Q5. a)** What are L1 and L2 regularization methods?
+* **Q5. b)** Explain any three types of Autoencoders.
+* **Q6. a)** Significance and types of Activation Functions in Neural Networks.
+* **Q6. b)** What are Generative Adversarial Networks, comment on its applications.
+
+---
+
+## **Paper 4: 02-Jun-2025**
+
+Subject: Deep Learning (Sem VII) | QP Code: 10082863 
+
+### Q1. 
+
+Attempt Any Four (5 Marks each) 
+
+* 
+**a)** Explain basic architecture of feedforward neural network. 
+
+
+* 
+**b)** Explain regularization in neural network. 
+
+
+* 
+**c)** Explain types of neural network. 
+
+
+* 
+**d)** Explain the concept of overfitting and underfitting in neural network. 
+
+
+* 
+**e)** Explain basic working of CNN. 
+
+
+
+### **Detailed Questions (10 Marks each)**
+
+* 
+**Q2. a)** Explain gradient descent algorithm and discuss types in detail. 
+
+
+* 
+**Q2. b)** Explain the working of auto encoders and discuss types in detail. 
+
+
+* 
+**Q3. a)** Draw and explain any two modern deep learning architectures. 
+
+
+* 
+**Q3. b)** Differentiate between the LSTM and GRU network. 
+
+
+* 
+**Q4. a)** Explain RNN working with a diagram and why they suit sequential data. 
+
+
+* 
+**Q4. b)** Compare standard RNN with LSTM for long-term dependencies; provide a real-world application example. 
+
+
+* **Q5. a)** Discuss the role of loss functions. Compare MSE and Cross-Entropy Loss. 
+
+
+* 
+**Q5. b)** Explain architecture of GAN in detail and its applications. 
+
+
+* 
+**Q6. a)** Significance and types of Activation Functions in Neural Networks. 
+
+
+* 
+**Q6. b)** Explain the learning process (forward prop, loss, backprop, optimization). 
+
+
+
+---
+
+Would you like me to help you create a study plan or summarize the most frequently asked topics from these papers?

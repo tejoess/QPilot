@@ -27,9 +27,15 @@ openai_llm = ChatOpenAI(
     model="gpt-4o-mini",
     openai_api_key=OPENAI_API_KEY,
     temperature=0.1,
-    max_tokens=2048,  # Reduced from 4096 for faster responses
+    max_tokens=4096,
 )
 
+openai4o_llm = ChatOpenAI(
+    model="gpt-4o",
+    openai_api_key=OPENAI_API_KEY,
+    temperature=0.1,
+    max_tokens=4096,
+)
 
 # --- Gemini LLM ---
 gemini_llm = ChatGoogleGenerativeAI(

@@ -7,9 +7,55 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..',
 import json
 from dotenv import load_dotenv
 from openai import OpenAI
-from backend.services.llm_service import openrouter_llm as llm
+from backend.services.llm_service import openai_llm as llm
 from langchain_core.messages import HumanMessage
 from langchain_core.output_parsers import PydanticOutputParser
+
+
+def _extract_first_json_object(text: str) -> str:
+    """
+    Extract the first complete JSON object found in a text blob.
+    This is robust to LLM responses that include surrounding prose.
+    """
+    start = text.find("{")
+    if start == -1:
+        return text
+
+    # Find a plausible end by scanning for the last matching closing brace.
+    # This assumes the first object is the one we want.
+    end = text.rfind("}")
+    if end == -1 or end <= start:
+        return text[start:]
+    return text[start : end + 1]
+
+
+def _parse_structured_tree_content(content: str) -> dict:
+    """
+    Parse the structured knowledge graph content returned by `generate_structured_tree`.
+    Expected format is JSON like:
+      { "Subject": "...", "Modules": [ { "Module_Name": "...", "Topics": [ ... ] } ] }
+    """
+    try:
+        raw = _extract_first_json_object(content)
+        parsed = json.loads(raw)
+        if isinstance(parsed, dict):
+            return parsed
+        return {"error": "Knowledge graph output was not a JSON object.", "raw": content}
+    except Exception as e:
+        return {"error": f"Failed to parse knowledge graph JSON: {e}", "raw": content}
+
+
+def build_knowledge_graph_from_minimal_syllabus(syllabus_subset: dict, llm_client) -> dict:
+    """
+    Build and return a parsed knowledge graph JSON dict from a minimal syllabus subset.
+    The subset should include:
+      - course_name
+      - modules[module_name].topics[]
+    """
+    structured_tree_content = generate_structured_tree(syllabus_subset, llm_client)
+    if not structured_tree_content:
+        return {"error": "Knowledge graph LLM returned empty content."}
+    return _parse_structured_tree_content(structured_tree_content)
 
 
 
@@ -40,8 +86,10 @@ Now each unit topic is child node of each module.
 Subtopic is based on revenace and hierary of the topic. 
 Return this in structured knowledge graph in the JSON format. 
 Ensure the subtopic is part of the topic and topic is part of the module.
+Do not output general subtopics only architecture types. always output the topic name with it. for e.g "GAN architecture" can be a subtoptic, but not only "Types".
+Ensure types, variants are subtopic not topic. 
 
-Example output: 
+Example output:
 
 {{
   "Subject": "Artificial Intelligence",
