@@ -368,7 +368,7 @@ export default function QPilotPage() {
                                         value={syllabusText}
                                         disabled={isRunning}
                                         onChange={(e) => setSyllabusText(e.target.value)}
-                                        className="min-h-[120px] text-xs resize-y"
+                                        className="h-[120px] text-xs resize-none overflow-y-auto"
                                     />
                                 )}
                             </section>
@@ -387,7 +387,7 @@ export default function QPilotPage() {
                                         value={pyqsText}
                                         disabled={isRunning}
                                         onChange={(e) => setPyqsText(e.target.value)}
-                                        className="min-h-[120px] text-xs resize-y"
+                                        className="h-[120px] text-xs resize-none overflow-y-auto"
                                     />
                                 )}
                             </section>
@@ -421,6 +421,7 @@ export default function QPilotPage() {
                                                     type="range"
                                                     min={0}
                                                     max={100}
+                                                    step={5}
                                                     value={bloomLevels[key]}
                                                     disabled={isRunning}
                                                     onChange={(e) => setLevel(key, parseInt(e.target.value))}

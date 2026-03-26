@@ -3,6 +3,7 @@ import React from "react";
 import { FloatingNav } from "@/components/ui/floating-navbar";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { Home, Zap, DollarSign, BookOpen, Mail } from "lucide-react";
+import Link from "next/link";
 
 export function Navbar() {
     const navItems = [
@@ -15,11 +16,6 @@ export function Navbar() {
             name: "Features",
             link: "#features",
             icon: <Zap className="h-4 w-4" />,
-        },
-        {
-            name: "Pricing",
-            link: "#pricing",
-            icon: <DollarSign className="h-4 w-4" />,
         },
         {
             name: "Blog",
@@ -48,14 +44,13 @@ export function Navbar() {
 
                     <nav className="hidden lg:flex items-center gap-8">
                         <a href="#features" className="text-sm font-medium hover:text-primary transition-colors">Features</a>
-                        <a href="#pricing" className="text-sm font-medium hover:text-primary transition-colors">Pricing</a>
                         <a href="#blog" className="text-sm font-medium hover:text-primary transition-colors">Blog</a>
                     </nav>
 
                     <div className="flex items-center gap-4">
                         <ThemeToggle />
-                        <button className="text-sm font-bold text-foreground px-4 py-2 hover:bg-muted rounded-full transition-all">Sign In</button>
-                        <button className="bg-primary text-primary-foreground text-sm font-bold px-6 py-2 rounded-full shadow-lg shadow-primary/20 hover:scale-105 transition-all">Get Started</button>
+                        <Link href="/sign-in"><button className="text-sm font-bold text-foreground px-4 py-2 hover:bg-muted rounded-full transition-all">Sign In</button></Link>
+                        <Link href="/sign-up"><button className="bg-primary text-primary-foreground text-sm font-bold px-6 py-2 rounded-full shadow-lg shadow-primary/20 hover:scale-105 transition-all">Get Started</button></Link>
                     </div>
                 </div>
             </header>

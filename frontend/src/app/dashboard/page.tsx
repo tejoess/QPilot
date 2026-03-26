@@ -13,15 +13,10 @@ import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import { QPilotSidebar } from "@/components/qpilot/QPilotSidebar";
 import { QuickActionCard } from "@/components/dashboard/QuickActionCard";
 import { SystemStatusPanel } from "@/components/dashboard/SystemStatusPanel";
-import { RecentPapersTable } from "@/components/dashboard/RecentPapersTable";
-import { FloatingOrchestrator } from "@/components/dashboard/FloatingOrchestrator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import {
     PlusCircle,
-    Upload,
-    BarChart3,
-    Clock,
     LayoutDashboard
 } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -93,27 +88,6 @@ export default function DashboardPage() {
                                     variant="primary"
                                     onClick={() => router.push("/qpilot")}
                                 />
-                                <QuickActionCard
-                                    title="Upload PYQs"
-                                    description="Add new PYQs to strengthen generation quality."
-                                    icon={Upload}
-                                    buttonText="Upload"
-                                    onClick={() => router.push("/history")}
-                                />
-                                <QuickActionCard
-                                    title="View Analytics"
-                                    description="Track performance, generation trends, and usage."
-                                    icon={BarChart3}
-                                    buttonText="View"
-                                    onClick={() => router.push("/analytics")}
-                                />
-                                <QuickActionCard
-                                    title="Recent Paper"
-                                    description="Continue working on your latest draft."
-                                    icon={Clock}
-                                    buttonText="Open"
-                                    onClick={() => lastProjectId ? router.push(`/qpilot/${lastProjectId}`) : router.push("/qpilot")}
-                                />
                             </div>
 
                             {/* 🔷 SECTION B — SYSTEM STATUS PANEL */}
@@ -125,25 +99,11 @@ export default function DashboardPage() {
                                 <SystemStatusPanel stats={systemStats} isLoading={isLoading} />
                             </div>
 
-                            <Separator className="opacity-40" />
 
-                            {/* 🔷 SECTION C — RECENT PAPERS TABLE */}
-                            <div className="space-y-6">
-                                <div className="flex items-center justify-between">
-                                    <div className="space-y-1">
-                                        <h3 className="text-xl font-black tracking-tight text-foreground">Recent Projects</h3>
-                                        <p className="text-xs text-muted-foreground font-medium">Detailed overview of your latest question paper activity.</p>
-                                    </div>
-                                </div>
-                                <RecentPapersTable papers={recentPapers} isLoading={isLoading} />
-                            </div>
 
                         </main>
                     </ScrollArea>
                 </SidebarInset>
-
-                {/* 🤖 FLOATING ORCHESTRATOR */}
-                <FloatingOrchestrator />
             </div>
         </SidebarProvider>
     );

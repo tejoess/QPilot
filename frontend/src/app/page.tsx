@@ -2,7 +2,6 @@ import { currentUser } from "@clerk/nextjs/server";
 import { Hero } from "@/components/landing/Hero";
 import { Features } from "@/components/landing/Features";
 import { HowItWorks } from "@/components/landing/HowItWorks";
-import { Pricing } from "@/components/landing/Pricing";
 import { Navbar } from "@/components/landing/Navbar";
 import { Footer } from "@/components/landing/Footer";
 
@@ -17,7 +16,6 @@ export default async function Home() {
 
         <Features />
         <HowItWorks />
-        <Pricing />
 
         {/* Blog Preview Placeholder */}
         <section id="blog" className="py-24 bg-background">

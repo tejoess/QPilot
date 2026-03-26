@@ -122,14 +122,17 @@ export default function QPilotConfigPage() {
                                     <h1 className="text-3xl font-bold tracking-tight text-foreground">Prepare New Exam</h1>
                                 </div>
 
-                                <Button
-                                    variant="outline"
-                                    onClick={handleAutoFill}
-                                    disabled={isSubmitting}
-                                    className="border-dashed border-primary/40 bg-primary/5 hover:bg-primary/10 text-primary font-bold text-xs"
-                                >
-                                    AutoFill Demo
-                                </Button>
+                                <div className="flex flex-col items-end gap-1">
+                                    <Button
+                                        variant="outline"
+                                        onClick={handleAutoFill}
+                                        disabled={isSubmitting}
+                                        className="border-dashed border-primary/40 bg-primary/5 hover:bg-primary/10 text-primary font-bold text-xs"
+                                    >
+                                        Load Sample Template
+                                    </Button>
+                                    <span className="text-[10px] text-muted-foreground italic mr-2">* DOCX Template Upload Coming Soon</span>
+                                </div>
                             </div>
 
                             <div className="flex items-center justify-between">
