@@ -35,18 +35,215 @@ import {
     Award,
     Zap,
     Loader2,
-    CheckCircle2,
     XCircle,
     Info,
     ChevronRight,
+    BookOpen,
+    Network,
+    BrainCircuit,
+    CheckCircle2,
     AlertTriangle,
+    Settings2
 } from "lucide-react";
 import { toast } from "sonner";
 import { useBloomStore, type BloomKey } from "@/store/bloomStore";
 import { usePatternStore, type PatternSection } from "@/store/patternStore";
 import { useGenerationFlow, type GenerationConfig } from "@/hooks/useGenerationFlow";
 
+function Typewriter({ text, delay = 10 }: { text: string; delay?: number }) {
+    const [currentText, setCurrentText] = useState("");
+    const [currentIndex, setCurrentIndex] = useState(0);
+
+    useEffect(() => {
+        if (currentIndex < text.length) {
+            const timeout = setTimeout(() => {
+                setCurrentText(prevText => prevText + text[currentIndex]);
+                setCurrentIndex(prevIndex => prevIndex + 1);
+            }, delay);
+            return () => clearTimeout(timeout);
+        }
+    }, [currentIndex, delay, text]);
+
+    return (
+        <span>
+            {currentText}
+            {currentIndex < text.length && <span className="animate-pulse font-black text-primary ml-[2px]">|</span>}
+        </span>
+    );
+}
+
 // ─── Constants ────────────────────────────────────────────────────────────────
+
+const Bubble = ({ icon: Icon, title, content, color, children, isWorking = false }: any) => (
+    <div className={`border rounded-xl p-3 w-full animate-in fade-in slide-in-from-bottom-2 duration-500 shadow-sm ${color} relative overflow-hidden group`}>
+        {isWorking && (
+            <div className="absolute top-0 left-0 w-full h-[2px] bg-gradient-to-r from-transparent via-current to-transparent opacity-20 skeleton-slide" />
+        )}
+        <div className="flex items-start gap-2.5">
+            <div className={`p-1.5 rounded-full bg-background/50 border shadow-sm ${isWorking ? 'animate-pulse' : ''}`}>
+               {isWorking ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Icon className="w-3.5 h-3.5" />}
+            </div>
+            <div className="flex-1 space-y-1">
+                <div className="text-[11px] font-bold flex items-center gap-2">
+                    {title}
+                    {isWorking && (
+                        <span className="flex items-center gap-0.5 ml-1">
+                            <span className="w-1 h-1 rounded-full bg-current animate-bounce" style={{animationDelay: "0ms"}}/>
+                            <span className="w-1 h-1 rounded-full bg-current animate-bounce" style={{animationDelay: "150ms"}}/>
+                            <span className="w-1 h-1 rounded-full bg-current animate-bounce" style={{animationDelay: "300ms"}}/>
+                        </span>
+                    )}
+                </div>
+                <div className="text-[10px] text-muted-foreground leading-snug">
+                    {content}
+                </div>
+                {children && <div className="pt-1.5">{children}</div>}
+            </div>
+        </div>
+    </div>
+);
+
+function RenderAgentTemplate({ file, content }: { file: string; content: any }) {
+    if (file === "syllabus.json") {
+        const modules = content?.modules || [];
+        return (
+            <Bubble
+                icon={BookOpen}
+                title="Syllabus Agent: Extracted Successfully"
+                color="bg-primary/5 border-primary/20 text-primary"
+                content={<Typewriter text={`I have successfully extracted ${modules.length} modules from your provided syllabus. Wait a moment while I proceed to build the Knowledge Graph.`} />}
+            >
+                <div className="flex flex-wrap gap-1">
+                    {modules.slice(0, 3).map((m: any, idx: number) => (
+                        <span key={idx} className="bg-background border border-border/50 px-1.5 py-0.5 rounded text-[9px] truncate max-w-[120px] shadow-sm">
+                            {m.module_name || `Module ${m.module_number}`}
+                        </span>
+                    ))}
+                    {modules.length > 3 && <span className="text-[9px] text-muted-foreground px-1 py-0.5">+{modules.length - 3} more</span>}
+                </div>
+            </Bubble>
+        );
+    }
+    if (file === "knowledge_graph.json") {
+        const keys = Object.keys(content || {});
+        return (
+            <Bubble
+                icon={Network}
+                title="Data Agent: Knowledge Graph Built"
+                color="bg-blue-500/5 border-blue-500/20 text-blue-500"
+                content={<Typewriter text={`I just finished drawing the topic relationships into a structured graph! (${keys.length} core concepts mapped).`} />}
+            >
+                <div className="pl-2 border-l-2 border-blue-500/20 space-y-1">
+                    {keys.slice(0, 3).map((k: string, i: number) => (
+                        <div key={i} className="text-[9.5px] text-muted-foreground truncate font-medium">{k}</div>
+                    ))}
+                    {keys.length > 3 && <div className="text-[9px] text-blue-500/50 italic font-mono">...and {keys.length - 3} more sub-trees</div>}
+                </div>
+            </Bubble>
+        );
+    }
+    if (file === "pyqs_analysis.json") {
+        const qCount = content?.total_pyqs || 0;
+        if (qCount === 0) {
+            return (
+                <Bubble
+                    icon={AlertTriangle}
+                    title="Data Agent: Skipping PYQ Matching"
+                    color="bg-amber-500/5 border-amber-500/20 text-amber-600"
+                    content={<Typewriter text="No usable questions were found in the provided PYQ data (empty / insufficient length). I will be generating 100% fresh questions directly from the syllabus!" />}
+                />
+            );
+        }
+        return (
+            <Bubble
+                icon={FileText}
+                title="Data Agent: Past Questions Analyzed"
+                color="bg-rose-500/5 border-rose-500/20 text-rose-600"
+                content={<Typewriter text={`I successfully extracted and analyzed ${qCount} unique questions from your past papers. Patterns have been loaded to shape the final blueprint.`} />}
+            />
+        );
+    }
+    if (file === "blueprint.json") {
+        const sections = content?.sections || [];
+        return (
+            <Bubble
+                icon={FileText}
+                title="Blueprint Agent: Drafting Exam Matrix"
+                color="bg-emerald-500/5 border-emerald-500/20 text-emerald-600"
+                content={<Typewriter text="I am analyzing your course outcomes and constraints. Producing the mathematical distribution matrix! Here is a glimpse:" />}
+            >
+                <div className="grid grid-cols-2 gap-2 mt-1">
+                    {sections.slice(0, 4).map((s: any, idx: number) => (
+                        <div key={idx} className="bg-background p-1.5 rounded-md border border-emerald-500/20 text-[9px] text-center shadow-sm">
+                            <span className="font-bold text-emerald-600">{s.section_name}</span><br />
+                            <span className="text-muted-foreground">{s.questions?.length || 0} Questions</span>
+                        </div>
+                    ))}
+                </div>
+            </Bubble>
+        );
+    }
+    if (file === "blueprint_verification.json" || file === "paper_verification.json") {
+        const isBlueprint = file.includes("blueprint");
+        const verdict = content?.verdict || "UNKNOWN";
+        const isOk = verdict === "ACCEPTED" || verdict === "APPROVED";
+        
+        if (isOk) {
+            return (
+                <Bubble
+                    icon={CheckCircle2}
+                    title={`Verifier Agent: ${isBlueprint ? "Blueprint" : "Exam Paper"} Approved!`}
+                    color="bg-green-500/5 border-green-500/20 text-green-600"
+                    content={<Typewriter text={`I meticulously reviewed the draft and it perfectly matches the parameters and constraints. Validation successful!`} />}
+                />
+            );
+        } else {
+            return (
+                <Bubble
+                    icon={Settings2}
+                    title={`Repair Agent: Analyzing and Fixing Draft...`}
+                    color="bg-violet-500/5 border-violet-500/20 text-violet-600"
+                    isWorking={true}
+                    content={<Typewriter text={`I detected some minor imbalances during validation. No problem! I am stepping in to actively reconstruct and repair the draft to perfectly align with your exact constraints right now. Please wait...`} />}
+                />
+            );
+        }
+    }
+    if (file === "draft_paper.json") {
+        return (
+            <Bubble
+                icon={BrainCircuit}
+                title="Generation Agent: Synthesizing Final Questions"
+                color="bg-indigo-500/5 border-indigo-500/20 text-indigo-600"
+                content={<Typewriter text="I am actively fetching relevant context, cross-referencing your PYQs, and translating Bloom's Taxonomy into varied natural language questions for each section!" />}
+            />
+        );
+    }
+    if (file === "final_paper.json") {
+        return (
+            <Bubble
+                icon={CheckCircle2}
+                title="SUCCESS: Generation Complete Payload Verified!"
+                color="bg-primary/10 border-primary/30 text-primary"
+                content={<Typewriter text="Your paper has been officially compiled! Please wait a moment while I prepare the 3D-interactive preview dashboard..." />}
+            />
+        );
+    }
+    if (file === "pyqs.json" || file === "blueprint_repair_summary.json" || file === "paper_repair_summary.json" || file === "session_summary.json") {
+        return null;
+    }
+    
+    // Default fallback
+    const str = JSON.stringify(content, null, 2);
+    const truncated = str.length > 500 ? str.slice(0, 500) + "\n... [view truncated]" : str;
+    return (
+        <pre className="mt-1.5 p-2 rounded-md bg-background border border-border/60 text-[9px] text-muted-foreground overflow-auto max-h-[150px] w-full shadow-sm animate-in fade-in">
+            {truncated}
+        </pre>
+    );
+}
+
+
 
 const BLOOM_LABELS: { key: BloomKey; label: string; color: string }[] = [
     { key: "remember",   label: "Remember",   color: "bg-rose-400" },
@@ -61,6 +258,7 @@ const QUESTION_TYPES = [
     { value: "mcq",          label: "MCQ" },
     { value: "short_answer", label: "Short Answer" },
     { value: "long_answer",  label: "Long Answer" },
+    { value: "short_notes",  label: "Short Notes" },
     { value: "case_study",   label: "Case Study" },
 ];
 
@@ -536,7 +734,7 @@ export default function QPilotPage() {
                         </div>
 
                         {/* ════ RIGHT: Log panel ════ */}
-                        <div className="w-[340px] border-l border-border/50 bg-card/20 flex flex-col overflow-hidden">
+                        <div className="w-[440px] border-l border-border/50 bg-card/20 flex flex-col overflow-hidden">
                             {/* Panel header */}
                             <div className="px-4 py-3 border-b border-border/40 flex items-center justify-between">
                                 <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
@@ -552,21 +750,31 @@ export default function QPilotPage() {
                                         Logs will appear here once generation starts.
                                     </p>
                                 ) : (
-                                    logs.map((log, i) => (
-                                        <div key={i} className="flex gap-1.5 items-start">
-                                            <LogIcon level={log.level} />
-                                            <span
-                                                className={cn(
-                                                    "leading-relaxed",
-                                                    log.level === "error" && "text-destructive",
-                                                    log.level === "warning" && "text-amber-600",
-                                                    log.level === "info" && "text-foreground/80"
-                                                )}
-                                            >
-                                                {log.message}
-                                            </span>
-                                        </div>
-                                    ))
+                                    logs.map((log, i) => {
+                                        const isJson = log.message.startsWith("JSON_DATA:");
+                                        if (!isJson) {
+                                            // Hide completely per user request so plain strings don't ruin the animated chat UX
+                                            return null;
+                                        }
+
+                                        try {
+                                            const payload = JSON.parse(log.message.replace("JSON_DATA:", ""));
+                                            const displayContent = <RenderAgentTemplate file={payload.file} content={payload.content} />;
+                                            
+                                            // Don't render empty shells if RenderAgentTemplate returns null (e.g. for silent JSONs)
+                                            if (!displayContent) return null;
+
+                                            return (
+                                                <div key={i} className="flex gap-2 items-start mb-1.5 w-full">
+                                                    <div className="flex-1 w-full relative">
+                                                        {displayContent}
+                                                    </div>
+                                                </div>
+                                            );
+                                        } catch {
+                                            return null;
+                                        }
+                                    })
                                 )}
                                 <div ref={logEndRef} />
                             </div>

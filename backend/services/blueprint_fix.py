@@ -23,6 +23,23 @@ from langchain_core.messages import HumanMessage
 # HELPERS
 # ─────────────────────────────────────────────────────────────
 
+def _flatten_kg(kg: Dict) -> Dict[str, List[str]]:
+    flat = {}
+    modules = kg.get("Modules", [])
+    if isinstance(modules, list):
+        for m in modules:
+            m_name = m.get("Module_Name", "Unknown Module")
+            topics = []
+            for t in m.get("Topics", []):
+                if isinstance(t, dict):
+                    topics.append(t.get("Topic_Name", ""))
+                elif isinstance(t, str):
+                    topics.append(t)
+            flat[m_name] = [t for t in topics if t]
+    else:
+        flat = kg
+    return flat
+
 def _decide_repair_mode(critique: Dict) -> str:
     """
     LOCAL  → issues cite specific question numbers AND at least one
@@ -143,7 +160,7 @@ CONSTRAINTS:
 - Module range: {paper_pattern['module_weightage_range']['min']*100:.0f}%–{paper_pattern['module_weightage_range']['max']*100:.0f}% per module
 - Bloom target: {json.dumps({k: f"{v*100:.0f}%" for k, v in bloom_req.items()})}
 - Teacher instructions: {json.dumps(teacher_input)}
-- topic must exactly match a name from knowledge graph: {json.dumps(list(knowledge_graph.keys()) if isinstance(knowledge_graph, dict) else knowledge_graph)}
+- topic must exactly match a name from knowledge graph: {json.dumps(_flatten_kg(knowledge_graph))}
 
 RULES:
 1. Change ONLY the flagged questions
@@ -200,7 +217,7 @@ CONSTRAINTS (must all be satisfied after fix):
 - Bloom target: {json.dumps({k: f"{v*100:.0f}%" for k, v in bloom_req.items()})}
 - Sections: {json.dumps([{s['section_name']: {'count': s['question_count'], 'marks_each': s['marks_per_question']}} for s in paper_pattern.get('sections', [])])}
 - Teacher instructions: {json.dumps(teacher_input)}
-- topic must be copied exactly from knowledge graph: {json.dumps(knowledge_graph, indent=2)}
+- topic must be copied exactly from knowledge graph: {json.dumps(_flatten_kg(knowledge_graph), indent=2)}
 
 RULES:
 1. Do NOT change question_number values — only change module/topic/marks/bloom_level/is_pyq

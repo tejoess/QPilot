@@ -65,6 +65,25 @@ def _pyq_available(pyq_analysis: Dict) -> bool:
             return True
     return False
 
+def _flatten_kg(kg: Dict) -> Dict[str, List[str]]:
+    """Converts the raw nested Knowledge Graph into { 'Module_Name': ['Topic1', 'Topic2'] }"""
+    flat = {}
+    modules = kg.get("Modules", [])
+    if isinstance(modules, list):
+        for m in modules:
+            m_name = m.get("Module_Name", "Unknown Module")
+            topics = []
+            for t in m.get("Topics", []):
+                if isinstance(t, dict):
+                    topics.append(t.get("Topic_Name", ""))
+                elif isinstance(t, str):
+                    topics.append(t)
+            flat[m_name] = [t for t in topics if t]
+    else:
+        # Fallback if already flattened or unexpected format
+        flat = kg
+    return flat
+
 def parse_teacher_constraints(teacher_input: Dict, knowledge_graph: Dict) -> Dict:
     """
     Calls LLM once to extract hard constraints from teacher input.
@@ -117,12 +136,16 @@ def generate_blueprint(
         "course_outcomes":   syllabus.get("course_outcomes", []),
     }
 
-    constraints = parse_teacher_constraints(teacher_input, knowledge_graph)
+    # Flatten the graph so the keys are actually Module Names
+    flat_kg = _flatten_kg(knowledge_graph)
+
+    constraints = parse_teacher_constraints(teacher_input, flat_kg)
 
     # FILTER knowledge graph — LLM won't even see forbidden modules
     if constraints.get("allowed_modules"):
-        knowledge_graph = {k: v for k, v in knowledge_graph.items() 
+        flat_kg = {k: v for k, v in flat_kg.items() 
                         if k in constraints["allowed_modules"]}
+
     if has_pyqs:
         pyq_instructions = f"""PYQ USAGE (PYQs are available):
 - Topic PYQ count > 5  → is_pyq: true
@@ -149,7 +172,7 @@ Your ONLY job: produce a list of questions. Do NOT compute totals, percentages, 
 {json.dumps(syllabus_metadata, indent=2)}
 
 **KNOWLEDGE GRAPH (VALID topic/subtopic labels — copy names exactly):**
-{json.dumps(knowledge_graph, indent=2)}
+{json.dumps(flat_kg, indent=2)}
 
 **{pyq_instructions}**
 
@@ -162,7 +185,7 @@ TEACHER PREFERENCES:
 HARD CONSTRAINTS (already enforced — do not violate):
 {json.dumps(constraints, indent=2)}
 
-ALLOWED MODULES ONLY: {list(knowledge_graph.keys())}
+ALLOWED MODULES ONLY: {list(flat_kg.keys())}
 Every question must come from these modules exclusively.
 
 
@@ -220,7 +243,7 @@ IMPORTANT INSTRUCTIONS:
       "questions": [
         {{
           "question_number": "1a",
-          "module": "Module 1",
+          "module": "<exact name of the module from knowledge graph>",
           "topic": "<exact name from knowledge graph>",
           "marks": 5,
           "bloom_level": "Remember",

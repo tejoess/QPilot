@@ -28,11 +28,12 @@ import {
 } from "@/components/ui/select";
 import { Layers, Plus, Pencil, Trash2, AlertCircle } from "lucide-react";
 
-const QUESTION_TYPES: { value: QuestionType; label: string }[] = [
+const QUESTION_TYPES = [
     { value: "mcq", label: "MCQ" },
     { value: "short_answer", label: "Short Answer" },
     { value: "long_answer", label: "Long Answer" },
-    { value: "fill_in_the_blank", label: "Fill Blank" },
+    { value: "short_notes", label: "Short Notes" },
+    { value: "fill_in_the_blank", label: "Fill in Blank" },
     { value: "true_false", label: "True / False" },
 ];
 

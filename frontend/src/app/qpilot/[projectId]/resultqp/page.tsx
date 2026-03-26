@@ -7,6 +7,7 @@ import {
     Copy,
     Save,
     RefreshCw,
+    RotateCcw,
     FileText,
     ChevronDown,
     LayoutDashboard,
@@ -26,7 +27,7 @@ import { cn } from "@/lib/utils";
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import { QPilotSidebar } from "@/components/qpilot/QPilotSidebar";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useOrchestrationStore } from "@/store/orchestrationStore";
 import { useQPilotStore } from "@/store/qpilotStore";
 
@@ -93,7 +94,8 @@ const EXAM_DATA: ExamPaper = {
 
 export default function ResultQPPage() {
     const { projectId } = useParams<{ projectId: string }>();
-    const { paperData } = useOrchestrationStore();
+    const router = useRouter();
+    const { paperData, reset } = useOrchestrationStore();
     const { currentMetadata } = useQPilotStore();
 
     // Build exam paper from real backend data, fall back to sample data
@@ -123,6 +125,12 @@ export default function ResultQPPage() {
         }
         return EXAM_DATA;
     }, [paperData, currentMetadata]);
+
+    const handleStartOver = () => {
+        reset();
+        router.push(`/qpilot/${projectId}`);
+        toast.info("Process reset. Ready for a new paper.");
+    };
 
     const handlePrint = () => {
         window.print();
@@ -158,12 +166,14 @@ export default function ResultQPPage() {
             "--sidebar-width": "240px",
             "--sidebar-width-icon": "70px"
         } as React.CSSProperties}>
-            <div className="flex h-screen w-full bg-background overflow-hidden selection:bg-primary/10">
+            <div className="flex h-screen w-full bg-background overflow-hidden selection:bg-primary/10 print:h-auto print:overflow-visible">
                 {/* 1. SIDEBAR */}
-                <QPilotSidebar />
+                <div className="print:hidden">
+                    <QPilotSidebar />
+                </div>
 
-                <SidebarInset className="flex-1 overflow-hidden bg-zinc-50 dark:bg-zinc-950">
-                    <div className="flex h-full overflow-hidden">
+                <SidebarInset className="flex-1 overflow-hidden bg-zinc-50 dark:bg-zinc-950 print:overflow-visible print:h-auto print:bg-white">
+                    <div className="flex h-full overflow-hidden print:h-auto print:overflow-visible">
 
                         {/* 2. LEFT ACTION PANEL (Replaces Top Navbar) */}
                         <div className="w-[360px] border-r border-border/50 bg-white dark:bg-zinc-900/50 overflow-hidden flex flex-col print:hidden">
@@ -225,6 +235,17 @@ export default function ResultQPPage() {
                                         <Save className="h-4 w-4" />
                                         Save to Projects
                                     </Button>
+
+                                    <div className="pt-4">
+                                        <Button 
+                                            variant="outline" 
+                                            onClick={handleStartOver} 
+                                            className="w-full justify-start h-11 px-4 font-bold gap-3 uppercase tracking-widest border-2 hover:bg-destructive/10 hover:text-destructive hover:border-destructive transition-all"
+                                        >
+                                            <RotateCcw className="h-4 w-4" />
+                                            Start Over
+                                        </Button>
+                                    </div>
                                 </div>
 
                                 {/* DOC INFO */}
@@ -247,7 +268,7 @@ export default function ResultQPPage() {
                         </div>
 
                         {/* 3. MAIN PREVIEW AREA */}
-                        <main className="flex-1 overflow-y-auto bg-zinc-100/50 dark:bg-zinc-950/50 p-8 md:p-12 print:p-0 print:bg-white custom-scrollbar-thin">
+                        <main className="flex-1 overflow-y-auto bg-zinc-100/50 dark:bg-zinc-950/50 p-8 md:p-12 print:p-0 print:bg-white custom-scrollbar-thin print:overflow-visible">
                             <motion.div
                                 initial={{ opacity: 0, y: 20 }}
                                 animate={{ opacity: 1, y: 0 }}
@@ -259,23 +280,27 @@ export default function ResultQPPage() {
                             >
                                 {/* Paper Header */}
                                 <header className="text-center mb-12">
-                                    <h1 className="text-2xl md:text-3xl font-black uppercase tracking-tight mb-2 text-zinc-900 dark:text-zinc-100 print:text-black">
+                                    <h1 
+                                        className="text-2xl md:text-3xl font-black uppercase tracking-tight mb-2 text-zinc-900 dark:text-zinc-100 print:text-black outline-none focus:ring-2 focus:ring-primary/20 rounded px-2"
+                                        contentEditable
+                                        suppressContentEditableWarning
+                                    >
                                         {examPaper.examTitle}
                                     </h1>
                                     <div className="h-1.5 w-24 bg-zinc-900 dark:bg-white mx-auto mb-8 rounded-full print:bg-black" />
 
                                     <div className="grid grid-cols-2 gap-y-4 text-[13px] font-bold uppercase tracking-widest text-zinc-600 dark:text-zinc-400 print:text-black">
                                         <div className="text-left border-b border-zinc-100 dark:border-zinc-800 pb-2 inline-block">
-                                            Subject: <span className="text-zinc-950 dark:text-zinc-200 print:text-black">{examPaper.subject}</span>
+                                            Subject: <span className="text-zinc-950 dark:text-zinc-200 print:text-black outline-none" contentEditable suppressContentEditableWarning>{examPaper.subject}</span>
                                         </div>
                                         <div className="text-right border-b border-zinc-100 dark:border-zinc-800 pb-2 inline-block">
-                                            Grade/Year: <span className="text-zinc-950 dark:text-zinc-200 print:text-black">{examPaper.grade}</span>
+                                            Grade/Year: <span className="text-zinc-950 dark:text-zinc-200 print:text-black outline-none" contentEditable suppressContentEditableWarning>{examPaper.grade}</span>
                                         </div>
                                         <div className="text-left border-b border-zinc-100 dark:border-zinc-800 pb-2 inline-block">
-                                            Duration: <span className="text-zinc-950 dark:text-zinc-200 print:text-black">{examPaper.duration}</span>
+                                            Duration: <span className="text-zinc-950 dark:text-zinc-200 print:text-black outline-none" contentEditable suppressContentEditableWarning>{examPaper.duration}</span>
                                         </div>
                                         <div className="text-right border-b border-zinc-100 dark:border-zinc-800 pb-2 inline-block">
-                                            Total Marks: <span className="text-zinc-950 dark:text-zinc-200 print:text-black">{examPaper.totalMarks}</span>
+                                            Total Marks: <span className="text-zinc-950 dark:text-zinc-200 print:text-black outline-none" contentEditable suppressContentEditableWarning>{examPaper.totalMarks}</span>
                                         </div>
                                     </div>
                                 </header>
@@ -287,12 +312,20 @@ export default function ResultQPPage() {
                                     {examPaper.sections.map((section, sIdx) => (
                                         <div key={sIdx} className="space-y-6">
                                             <div className="flex items-center gap-4">
-                                                <h2 className="text-lg font-black uppercase tracking-widest border-l-[6px] border-primary pl-4 print:border-black text-zinc-900 dark:text-zinc-100">
+                                                <h2 
+                                                    className="text-lg font-black uppercase tracking-widest border-l-[6px] border-primary pl-4 print:border-black text-zinc-900 dark:text-zinc-100 outline-none focus:ring-2 focus:ring-primary/20 rounded"
+                                                    contentEditable
+                                                    suppressContentEditableWarning
+                                                >
                                                     {section.title}
                                                 </h2>
                                             </div>
 
-                                            <p className="text-sm italic font-medium text-zinc-500 dark:text-zinc-400 bg-zinc-50 dark:bg-zinc-800/40 p-4 rounded-xl border-l-2 border-zinc-200 dark:border-zinc-700 print:bg-white print:text-black print:border-zinc-200">
+                                            <p 
+                                                className="text-sm italic font-medium text-zinc-500 dark:text-zinc-400 bg-zinc-50 dark:bg-zinc-800/40 p-4 rounded-xl border-l-2 border-zinc-200 dark:border-zinc-700 print:bg-white print:text-black print:border-zinc-200 outline-none focus:ring-2 focus:ring-primary/20"
+                                                contentEditable
+                                                suppressContentEditableWarning
+                                            >
                                                 {section.instructions}
                                             </p>
 
@@ -300,7 +333,11 @@ export default function ResultQPPage() {
                                                 {section.questions.map((question, qIdx) => (
                                                     <li key={qIdx} className="flex gap-4 group">
                                                         <span className="font-bold tabular-nums text-zinc-400 print:text-black text-sm">{qIdx + 1}.</span>
-                                                        <p className="text-[17px] leading-relaxed font-medium flex-1 text-zinc-800 dark:text-zinc-200 print:text-black">
+                                                        <p 
+                                                            className="text-[17px] leading-relaxed font-medium flex-1 text-zinc-800 dark:text-zinc-200 print:text-black outline-none focus:ring-2 focus:ring-primary/20 rounded p-1 -m-1"
+                                                            contentEditable
+                                                            suppressContentEditableWarning
+                                                        >
                                                             {question.text}
                                                         </p>
                                                         {question.marks > 0 && (

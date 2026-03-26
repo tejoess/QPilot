@@ -1,4 +1,4 @@
-﻿/**
+/**
  * store/orchestrationStore.ts
  * Manages session IDs, step statuses, WebSocket, logs, and paper data.
  */
@@ -115,33 +115,52 @@ export const useOrchestrationStore = create<OrchestrationState>((set, get) => ({
         const { ws } = get();
         if (ws) ws.close();
 
-        const socket = new WebSocket(`ws://127.0.0.1:8000/ws/${sessionId}`);
+        const connect = () => {
+            const socket = new WebSocket(`ws://127.0.0.1:8000/ws/${sessionId}`);
 
-        socket.onopen = () => set({ ws: socket, isConnected: true });
+            socket.onopen = () => set({ ws: socket, isConnected: true });
 
-        socket.onmessage = (event) => {
-            try {
-                const msg: WebSocketMessage = JSON.parse(event.data);
-                if (msg.type === "log") {
-                    get().addLog(msg as LogMessage);
-                } else if (msg.type === "progress") {
-                    get().addProgress(msg as ProgressMessage);
-                    set({ currentProgress: (msg as ProgressMessage).progress });
+            socket.onmessage = (event) => {
+                try {
+                    const msg: WebSocketMessage = JSON.parse(event.data);
+                    if (msg.type === "log") {
+                        get().addLog(msg as LogMessage);
+                    } else if (msg.type === "progress") {
+                        get().addProgress(msg as ProgressMessage);
+                        set({ currentProgress: (msg as ProgressMessage).progress });
+                    }
+                } catch {
+                    // ignore malformed messages
                 }
-            } catch {
-                // ignore malformed messages
-            }
+            };
+
+            socket.onerror = () => set({ isConnected: false });
+            socket.onclose = () => {
+                set({ ws: null, isConnected: false });
+                
+                // If we aren't done, try to auto-reconnect
+                const state = get();
+                if (state.paperStatus === "running" || state.pyqsStatus === "running" || state.syllabusStatus === "running") {
+                    setTimeout(() => {
+                        if (get().paperStatus !== "idle" && get().paperStatus !== "completed") {
+                            connect();
+                        }
+                    }, 2000);
+                }
+            };
+
+            set({ ws: socket });
         };
 
-        socket.onerror = () => set({ isConnected: false });
-        socket.onclose = () => set({ ws: null, isConnected: false });
-
-        set({ ws: socket });
+        connect();
     },
 
     disconnectWebSocket: () => {
         const { ws } = get();
-        if (ws) ws.close();
+        if (ws) {
+            ws.onclose = null; // Prevent reconnect logic from firing
+            ws.close();
+        }
         set({ ws: null, isConnected: false });
     },
 

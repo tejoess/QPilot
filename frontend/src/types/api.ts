@@ -99,6 +99,7 @@ export type SectionType =
     | "mcq"
     | "short_answer"
     | "long_answer"
+    | "short_notes"
     | "fill_in_the_blank"
     | "true_false";
 

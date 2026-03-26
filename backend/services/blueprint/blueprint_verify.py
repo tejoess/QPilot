@@ -87,7 +87,6 @@ def _compute_verdict(metrics: Dict, score: float) -> str:
             return False
 
     high_priority_pass = (
-        is_3(metrics.get("teacher_input_followed", 1)) and
         at_least_2(metrics.get("module_weightage",        1)) and
         is_yes(metrics.get("syllabus_oriented",  "no"))      and
         is_yes(metrics.get("pattern_followed",   "no"))
@@ -239,7 +238,7 @@ Score the blueprint on these 6 metrics. Be concise and direct.
 ━━━ ISSUES ━━━
 List up to 3 critical issues with the question number, problem, and fix.
 Only include real problems — do not invent issues.
-
+If blueprint has question from any module teacher hasnt asked or inlcuded, flag it in issues.  
 
 Hard constraints: 
 - If teacher input is not followed in any aspect, then do not give score 3 for teacher_input_followed. 

@@ -1,0 +1,106 @@
+{
+  "sections": [
+    {
+      "section_name": "Section A",
+      "section_description": "Short Answer Questions",
+      "questions": [
+        {
+          "question_number": "1a",
+          "module": "Module 1",
+          "topic": "Probabilistic Models: Gaussian Mixture Models (GMMs)",
+          "marks": 4,
+          "bloom_level": "Remember",
+          "is_pyq": false,
+          "rationale": "Define basic concepts of probabilistic models."
+        },
+        {
+          "question_number": "2a",
+          "module": "Module 2",
+          "topic": "Generative Adversarial Network",
+          "marks": 4,
+          "bloom_level": "Understand",
+          "is_pyq": false,
+          "rationale": "Explain the scope of generative networks."
+        },
+        {
+          "question_number": "3a",
+          "module": "Module 1",
+          "topic": "Probabilistic Models: Gaussian Mixture Models (GMMs)",
+          "marks": 4,
+          "bloom_level": "Apply",
+          "is_pyq": false,
+          "rationale": "Apply probabilistic models to a scenario."
+        },
+        {
+          "question_number": "4a",
+          "module": "Module 2",
+          "topic": "Generative Adversarial Network",
+          "marks": 4,
+          "bloom_level": "Analyze",
+          "is_pyq": false,
+          "rationale": "Analyze architecture of generative networks."
+        },
+        {
+          "question_number": "5a",
+          "module": "Module 3",
+          "topic": "Vanilla GAN Architecture",
+          "marks": 4,
+          "bloom_level": "Remember",
+          "is_pyq": false,
+          "rationale": "List components of autoencoder architecture."
+        },
+        {
+          "question_number": "6a",
+          "module": "Module 3",
+          "topic": "Vanilla GAN Architecture",
+          "marks": 4,
+          "bloom_level": "Understand",
+          "is_pyq": false,
+          "rationale": "Describe the training process of autoencoders."
+        }
+      ]
+    },
+    {
+      "section_name": "Section B",
+      "section_description": "Short Answer Questions",
+      "questions": [
+        {
+          "question_number": "1b",
+          "module": "Module 1",
+          "topic": "Probabilistic Models: Gaussian Mixture Models (GMMs)",
+          "marks": 5,
+          "bloom_level": "Apply",
+          "is_pyq": false,
+          "rationale": "Demonstrate application of probabilistic models."
+        },
+        {
+          "question_number": "2b",
+          "module": "Module 2",
+          "topic": "Generative Adversarial Network",
+          "marks": 5,
+          "bloom_level": "Analyze",
+          "is_pyq": false,
+          "rationale": "Evaluate generative networks' effectiveness."
+        },
+        {
+          "question_number": "3b",
+          "module": "Module 3",
+          "topic": "Introduction to transfer learning",
+          "marks": 5,
+          "bloom_level": "Understand",
+          "is_pyq": false,
+          "rationale": "Explain transfer learning fundamentals."
+        },
+        {
+          "question_number": "4b",
+          "module": "Module 1",
+          "topic": "Probabilistic Models: Gaussian Mixture Models (GMMs)",
+          "marks": 5,
+          "bloom_level": "Analyze",
+          "is_pyq": false,
+          "rationale": "Analyze a case study using probabilistic models."
+        }
+      ]
+    }
+  ]
+}

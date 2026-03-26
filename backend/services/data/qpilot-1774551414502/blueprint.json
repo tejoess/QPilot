@@ -1,0 +1,106 @@
+{
+  "sections": [
+    {
+      "section_name": "Section A",
+      "section_description": "Short Answer Questions",
+      "questions": [
+        {
+          "question_number": "1a",
+          "module": "Module 1",
+          "topic": "Probabilistic Models: Gaussian Mixture Models (GMMs)",
+          "marks": 2,
+          "bloom_level": "Remember",
+          "is_pyq": false,
+          "rationale": "Define basic probabilistic concepts."
+        },
+        {
+          "question_number": "1b",
+          "module": "Module 2",
+          "topic": "Generative Adversarial Network",
+          "marks": 2,
+          "bloom_level": "Understand",
+          "is_pyq": false,
+          "rationale": "Explain generative networks' purpose."
+        },
+        {
+          "question_number": "1c",
+          "module": "Module 1",
+          "topic": "Probabilistic Models: Gaussian Mixture Models (GMMs)",
+          "marks": 2,
+          "bloom_level": "Apply",
+          "is_pyq": false,
+          "rationale": "Apply a probabilistic model example."
+        },
+        {
+          "question_number": "1d",
+          "module": "Module 3",
+          "topic": "Introduction to transfer learning",
+          "marks": 2,
+          "bloom_level": "Understand",
+          "is_pyq": false,
+          "rationale": "Describe transfer learning concepts."
+        },
+        {
+          "question_number": "1e",
+          "module": "Module 2",
+          "topic": "Generative Adversarial Network",
+          "marks": 2,
+          "bloom_level": "Analyze",
+          "is_pyq": false,
+          "rationale": "Analyze generative network architectures."
+        },
+        {
+          "question_number": "1f",
+          "module": "Module 3",
+          "topic": "Introduction to transfer learning",
+          "marks": 2,
+          "bloom_level": "Remember",
+          "is_pyq": false,
+          "rationale": "List transfer learning applications."
+        }
+      ]
+    },
+    {
+      "section_name": "Section B",
+      "section_description": "Short Answer Questions",
+      "questions": [
+        {
+          "question_number": "2a",
+          "module": "Module 1",
+          "topic": "Probabilistic Models: Gaussian Mixture Models (GMMs)",
+          "marks": 5,
+          "bloom_level": "Apply",
+          "is_pyq": false,
+          "rationale": "Demonstrate a probabilistic model."
+        },
+        {
+          "question_number": "2b",
+          "module": "Module 2",
+          "topic": "Generative Adversarial Network",
+          "marks": 5,
+          "bloom_level": "Analyze",
+          "is_pyq": false,
+          "rationale": "Evaluate generative network performance."
+        },
+        {
+          "question_number": "2c",
+          "module": "Module 3",
+          "topic": "Introduction to transfer learning",
+          "marks": 5,
+          "bloom_level": "Apply",
+          "is_pyq": false,
+          "rationale": "Apply transfer learning techniques."
+        },
+        {
+          "question_number": "2d",
+          "module": "Module 1",
+          "topic": "Probabilistic Models: Gaussian Mixture Models (GMMs)",
+          "marks": 5,
+          "bloom_level": "Understand",
+          "is_pyq": false,
+          "rationale": "Explain probabilistic model applications."
+        }
+      ]
+    }
+  ]
+}

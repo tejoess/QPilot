@@ -30,6 +30,7 @@ const SECTION_TYPES: { value: SectionType; label: string }[] = [
     { value: "mcq", label: "Multiple Choice (MCQ)" },
     { value: "short_answer", label: "Short Answer" },
     { value: "long_answer", label: "Long Answer" },
+    { value: "short_notes", label: "Short Notes" },
     { value: "fill_in_the_blank", label: "Fill in the Blank" },
     { value: "true_false", label: "True / False" },
 ];

@@ -1,0 +1,209 @@
+{
+  "paper_id": "bd256898-417",
+  "blueprint_metadata": {},
+  "sections": [
+    {
+      "section_name": "Section A",
+      "section_description": "mcq",
+      "questions": [
+        {
+          "id": "1de99c7f",
+          "question_number": "1",
+          "module": "Generative and Probabilistic Models",
+          "topic": "Introduction: Overview of generative models and their importance in AI",
+          "subtopic": "",
+          "marks": 2,
+          "bloom_level": "Remember",
+          "question_text": "Which of the following best defines generative models in the context of artificial intelligence?  \nA) Models that predict future outcomes based on past data  \nB) Models that generate new data instances that resemble the training data  \nC) Models that classify data into predefined categories  \nD) Models that optimize decision-making processes based on rewards",
+          "selection_method": "generated_direct",
+          "source_pyq_id": null,
+          "is_pyq_sourced": false
+        },
+        {
+          "id": "ffd48ee0",
+          "question_number": "2",
+          "module": "Variational Autoencoders",
+          "topic": "Introduction: Basic components of Variational Autoencoders (VAEs)",
+          "subtopic": "",
+          "marks": 2,
+          "bloom_level": "Remember",
+          "question_text": "Which of the following is NOT a basic component of Variational Autoencoders (VAEs)?  \nA) Encoder  \nB) Decoder  \nC) Discriminator  \nD) Latent Space",
+          "selection_method": "generated_direct",
+          "source_pyq_id": null,
+          "is_pyq_sourced": false
+        },
+        {
+          "id": "a455a396",
+          "question_number": "3",
+          "module": "Transfer Learning",
+          "topic": "Introduction to transfer learning",
+          "subtopic": "",
+          "marks": 2,
+          "bloom_level": "Remember",
+          "question_text": "What is transfer learning?  \nA) A method to train models from scratch  \nB) A technique to leverage pre-trained models for new tasks  \nC) A process of data augmentation  \nD) A strategy for hyperparameter tuning",
+          "selection_method": "generated_direct",
+          "source_pyq_id": null,
+          "is_pyq_sourced": false
+        },
+        {
+          "id": "e3d5ab60",
+          "question_number": "4",
+          "module": "Ensemble learning",
+          "topic": "Ensemble Classifiers: Introduction to Ensemble Methods",
+          "subtopic": "",
+          "marks": 2,
+          "bloom_level": "Remember",
+          "question_text": "Which of the following best defines ensemble methods in machine learning?  \nA) A technique that combines multiple models to improve performance  \nB) A method that uses a single model for prediction  \nC) A process of selecting the best model from a set of models  \nD) A technique that focuses on feature selection only",
+          "selection_method": "generated_direct",
+          "source_pyq_id": null,
+          "is_pyq_sourced": false
+        },
+        {
+          "id": "5b3ffb93",
+          "question_number": "5",
+          "module": "Nascent Technologies in AI",
+          "topic": "Definition and concept of the Metaverse",
+          "subtopic": "",
+          "marks": 2,
+          "bloom_level": "Remember",
+          "question_text": "What is the Metaverse?  \nA) A virtual reality space where users can interact with a computer-generated environment and other users  \nB) A type of artificial intelligence that mimics human behavior  \nC) A blockchain technology used for cryptocurrency transactions  \nD) A social media platform for sharing multimedia content",
+          "selection_method": "generated_direct",
+          "source_pyq_id": null,
+          "is_pyq_sourced": false
+        }
+      ]
+    },
+    {
+      "section_name": "Section B",
+      "section_description": "mcq",
+      "questions": [
+        {
+          "id": "893d2275",
+          "question_number": "6",
+          "module": "Generative and Probabilistic Models",
+          "topic": "Probabilistic Models: Gaussian Mixture Models (GMMs)",
+          "subtopic": "",
+          "marks": 2,
+          "bloom_level": "Understand",
+          "question_text": "Which of the following statements best describes a Gaussian Mixture Model (GMM)?  \nA) A GMM is a type of neural network used for classification tasks.  \nB) A GMM represents a distribution as a weighted sum of multiple Gaussian distributions.  \nC) A GMM is solely used for clustering data points into distinct categories.  \nD) A GMM assumes that all data points are generated from a single Gaussian distribution.",
+          "selection_method": "generated_direct",
+          "source_pyq_id": null,
+          "is_pyq_sourced": false
+        },
+        {
+          "id": "bcc555c7",
+          "question_number": "7",
+          "module": "Variational Autoencoders",
+          "topic": "Architecture and training of VAEs",
+          "subtopic": "",
+          "marks": 2,
+          "bloom_level": "Understand",
+          "question_text": "Which of the following statements best describes the architecture of Variational Autoencoders (VAEs)?\n\nA) VAEs consist of an encoder that maps input data to a discrete latent space and a decoder that reconstructs the input from this space.  \nB) VAEs utilize a deterministic encoder and a stochastic decoder to generate new data samples.  \nC) VAEs employ a probabilistic encoder to learn a distribution over the latent space and a decoder to sample from this distribution for data generation.  \nD) VAEs are structured with multiple layers of convolutional operations only, without any latent space representation.",
+          "selection_method": "generated_direct",
+          "source_pyq_id": null,
+          "is_pyq_sourced": false
+        },
+        {
+          "id": "045def22",
+          "question_number": "8",
+          "module": "Transfer Learning",
+          "topic": "Feature extraction and fine tune transfer learning",
+          "subtopic": "",
+          "marks": 2,
+          "bloom_level": "Apply",
+          "question_text": "Which of the following statements best describes the process of fine-tuning in transfer learning?  \nA) It involves training a model from scratch using a large dataset.  \nB) It requires freezing all layers of a pre-trained model and only training the last layer.  \nC) It adjusts the weights of a pre-trained model on a new dataset to improve performance.  \nD) It eliminates the need for any data preprocessing before model training.",
+          "selection_method": "generated_direct",
+          "source_pyq_id": null,
+          "is_pyq_sourced": false
+        },
+        {
+          "id": "8d2494ec",
+          "question_number": "9",
+          "module": "Ensemble learning",
+          "topic": "Boosting algorithms",
+          "subtopic": "",
+          "marks": 2,
+          "bloom_level": "Apply",
+          "question_text": "Which of the following statements best describes the main idea behind boosting algorithms in ensemble learning?  \nA) Boosting combines multiple weak learners to create a strong learner by focusing on the errors of previous models.  \nB) Boosting uses a single strong learner to achieve high accuracy on the training data.  \nC) Boosting randomly selects subsets of data to train multiple models independently.  \nD) Boosting averages the predictions of several models to improve overall performance.",
+          "selection_method": "generated_direct",
+          "source_pyq_id": null,
+          "is_pyq_sourced": false
+        },
+        {
+          "id": "f3992b7d",
+          "question_number": "10",
+          "module": "Nascent Technologies in AI",
+          "topic": "Challenges and opportunities in the Metaverse ecosystem",
+          "subtopic": "",
+          "marks": 2,
+          "bloom_level": "Analyze",
+          "question_text": "Examine the key challenges and opportunities presented by the Metaverse ecosystem. Which of the following pairs correctly identifies a challenge and an opportunity?  \nA) Data privacy concerns - Enhanced social interaction  \nB) High development costs - Increased economic growth  \nC) Limited accessibility - Innovative business models  \nD) Regulatory uncertainty - Improved user engagement",
+          "selection_method": "generated_direct",
+          "source_pyq_id": null,
+          "is_pyq_sourced": false
+        }
+      ]
+    }
+  ],
+  "selection_stats": {
+    "total_questions": 10,
+    "pyq_exact_match": 0,
+    "pyq_rephrased_marks": 0,
+    "pyq_rephrased_bloom": 0,
+    "generated_new": 0,
+    "direct_generated": 10
+  },
+  "selection_log": [
+    {
+      "question_number": "1",
+      "method": "generated_direct",
+      "pyq_id": null
+    },
+    {
+      "question_number": "2",
+      "method": "generated_direct",
+      "pyq_id": null
+    },
+    {
+      "question_number": "3",
+      "method": "generated_direct",
+      "pyq_id": null
+    },
+    {
+      "question_number": "4",
+      "method": "generated_direct",
+      "pyq_id": null
+    },
+    {
+      "question_number": "5",
+      "method": "generated_direct",
+      "pyq_id": null
+    },
+    {
+      "question_number": "6",
+      "method": "generated_direct",
+      "pyq_id": null
+    },
+    {
+      "question_number": "7",
+      "method": "generated_direct",
+      "pyq_id": null
+    },
+    {
+      "question_number": "8",
+      "method": "generated_direct",
+      "pyq_id": null
+    },
+    {
+      "question_number": "9",
+      "method": "generated_direct",
+      "pyq_id": null
+    },
+    {
+      "question_number": "10",
+      "method": "generated_direct",
+      "pyq_id": null
+    }
+  ],
+  "used_pyq_ids": []
+}

@@ -1,0 +1,198 @@
+{
+  "Subject": "Advanced Artificial Intelligence",
+  "Modules": [
+    {
+      "Module_Name": "Generative and Probabilistic Models",
+      "Topics": [
+        {
+          "Topic_Name": "Introduction: Overview of generative models and their importance in AI",
+          "Subtopics": []
+        },
+        {
+          "Topic_Name": "Fundamentals of Probability theory and generative modeling",
+          "Subtopics": []
+        },
+        {
+          "Topic_Name": "Introduction to GANs",
+          "Subtopics": []
+        },
+        {
+          "Topic_Name": "VAEs and other generative models",
+          "Subtopics": []
+        },
+        {
+          "Topic_Name": "Significance of generative models",
+          "Subtopics": []
+        },
+        {
+          "Topic_Name": "Challenges with generative models",
+          "Subtopics": []
+        },
+        {
+          "Topic_Name": "Probabilistic Models: Gaussian Mixture Models (GMMs)",
+          "Subtopics": []
+        },
+        {
+          "Topic_Name": "Hidden Markov Models (HMMs)",
+          "Subtopics": []
+        },
+        {
+          "Topic_Name": "Bayesian Networks",
+          "Subtopics": []
+        },
+        {
+          "Topic_Name": "Markov Random Field (MRFs)",
+          "Subtopics": []
+        },
+        {
+          "Topic_Name": "Probabilistic Graphical Model",
+          "Subtopics": []
+        },
+        {
+          "Topic_Name": "Generative Adversarial Network",
+          "Subtopics": [
+            "Basics of GAN",
+            "Generative Adversarial Networks (GANs) architecture",
+            "The discriminator model and generator model",
+            "Architecture and Training of GANs",
+            "Vanilla GAN Architecture",
+            "GAN variants and improvements (DCGAN, WGAN, Conditional GAN, CycleGAN)",
+            "Challenges- Training instability and model collapse",
+            "GAN applications in image synthesis and style transfer"
+          ]
+        }
+      ]
+    },
+    {
+      "Module_Name": "Variational Autoencoders",
+      "Topics": [
+        {
+          "Topic_Name": "Introduction: Basic components of Variational Autoencoders (VAEs)",
+          "Subtopics": []
+        },
+        {
+          "Topic_Name": "Architecture and training of VAEs",
+          "Subtopics": []
+        },
+        {
+          "Topic_Name": "The loss function",
+          "Subtopics": []
+        },
+        {
+          "Topic_Name": "Latent space representation and inference",
+          "Subtopics": []
+        },
+        {
+          "Topic_Name": "Applications of VAEs in image generation",
+          "Subtopics": []
+        },
+        {
+          "Topic_Name": "Types of Autoencoders",
+          "Subtopics": [
+            "Undercomplete autoencoders",
+            "Sparse autoencoders",
+            "Contractive autoencoders",
+            "Denoising autoencoders"
+          ]
+        },
+        {
+          "Topic_Name": "Variational Autoencoders for generative modelling",
+          "Subtopics": []
+        }
+      ]
+    },
+    {
+      "Module_Name": "Transfer Learning",
+      "Topics": [
+        {
+          "Topic_Name": "Introduction to transfer learning",
+          "Subtopics": []
+        },
+        {
+          "Topic_Name": "Basic terminologies",
+          "Subtopics": []
+        },
+        {
+          "Topic_Name": "Pre-trained model and data sets",
+          "Subtopics": []
+        },
+        {
+          "Topic_Name": "Feature extraction and fine tune transfer learning",
+          "Subtopics": []
+        },
+        {
+          "Topic_Name": "Recent advancement in transfer learning",
+          "Subtopics": []
+        },
+        {
+          "Topic_Name": "Self-supervised learning and meta learning",
+          "Subtopics": []
+        }
+      ]
+    },
+    {
+      "Module_Name": "Ensemble learning",
+      "Topics": [
+        {
+          "Topic_Name": "Ensemble Classifiers: Introduction to Ensemble Methods",
+          "Subtopics": []
+        },
+        {
+          "Topic_Name": "Bagging and random forests",
+          "Subtopics": []
+        },
+        {
+          "Topic_Name": "Boosting algorithms",
+          "Subtopics": [
+            "AdaBoost"
+          ]
+        },
+        {
+          "Topic_Name": "Stacking and Blending Models",
+          "Subtopics": []
+        },
+        {
+          "Topic_Name": "Extreme Gradient Boosting (XGBoost)",
+          "Subtopics": []
+        },
+        {
+          "Topic_Name": "XGBoost Regression and classification",
+          "Subtopics": []
+        }
+      ]
+    },
+    {
+      "Module_Name": "Nascent Technologies in AI",
+      "Topics": [
+        {
+          "Topic_Name": "Limitations of 2D Learning Environments",
+          "Subtopics": []
+        },
+        {
+          "Topic_Name": "Evolution of virtual worlds and immersive technologies",
+          "Subtopics": []
+        },
+        {
+          "Topic_Name": "Definition and concepts of Augmented Reality",
+          "Subtopics": []
+        },
+        {
+          "Topic_Name": "Definition and concept of the Metaverse",
+          "Subtopics": []
+        },
+        {
+          "Topic_Name": "Characteristics and components of the Metaverse",
+          "Subtopics": []
+        },
+        {
+          "Topic_Name": "Challenges and opportunities in the Metaverse ecosystem",
+          "Subtopics": []
+        },
+        {
+          "Topic_Name": "AI in the realm of emerging quantum paradigms",
+          "Subtopics": []
+        }
+      ]
+    }
+  ]
+}

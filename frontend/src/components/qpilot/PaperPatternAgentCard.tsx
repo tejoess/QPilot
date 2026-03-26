@@ -50,6 +50,7 @@ const QUESTION_TYPES = [
     { value: "mcq", label: "MCQ" },
     { value: "short_answer", label: "Short Answer" },
     { value: "long_answer", label: "Long Answer" },
+    { value: "short_notes", label: "Short Notes" },
     { value: "case_study", label: "Case Study" },
 ];
 

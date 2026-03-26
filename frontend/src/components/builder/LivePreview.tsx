@@ -15,6 +15,7 @@ const TYPE_ICONS: Record<string, string> = {
     mcq: "①",
     short_answer: "✏️",
     long_answer: "📝",
+    short_notes: "📑",
     fill_in_the_blank: "___",
     true_false: "T/F",
 };

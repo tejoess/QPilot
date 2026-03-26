@@ -1,0 +1,20 @@
+{
+  "metrics": {
+    "teacher_input_followed": 3,
+    "pyq_utilized": "no",
+    "syllabus_oriented": "yes",
+    "module_weightage": 3,
+    "bloom_balanced": 2,
+    "pattern_followed": "yes"
+  },
+  "score": 8.25,
+  "verdict": "ACCEPTED",
+  "issues": [
+    {
+      "question": "overall",
+      "problem": "No PYQs utilized despite availability.",
+      "fix": "Incorporate PYQs where applicable."
+    }
+  ],
+  "summary": "The blueprint is well-structured and aligns with the syllabus. However, it lacks the utilization of previous year questions."
+}

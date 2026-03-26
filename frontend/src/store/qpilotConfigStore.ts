@@ -8,7 +8,7 @@
 
 import { create } from "zustand";
 
-export type QuestionType = "mcq" | "short_answer" | "long_answer" | "fill_in_the_blank" | "true_false";
+export type QuestionType = "mcq" | "short_answer" | "long_answer" | "short_notes" | "fill_in_the_blank" | "true_false";
 export type Difficulty = "easy" | "medium" | "hard";
 
 export interface QPilotSection {

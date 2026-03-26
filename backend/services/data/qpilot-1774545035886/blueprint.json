@@ -1,0 +1,106 @@
+{
+  "sections": [
+    {
+      "section_name": "Section A",
+      "section_description": "mcq",
+      "questions": [
+        {
+          "question_number": "1",
+          "module": "Generative and Probabilistic Models",
+          "topic": "Introduction: Overview of generative models and their importance in AI",
+          "marks": 2,
+          "bloom_level": "Remember",
+          "is_pyq": false,
+          "rationale": "Basic concept of generative models"
+        },
+        {
+          "question_number": "2",
+          "module": "Variational Autoencoders",
+          "topic": "Introduction: Basic components of Variational Autoencoders (VAEs)",
+          "marks": 2,
+          "bloom_level": "Remember",
+          "is_pyq": false,
+          "rationale": "Identify VAE components"
+        },
+        {
+          "question_number": "3",
+          "module": "Transfer Learning",
+          "topic": "Introduction to transfer learning",
+          "marks": 2,
+          "bloom_level": "Remember",
+          "is_pyq": false,
+          "rationale": "Define transfer learning"
+        },
+        {
+          "question_number": "4",
+          "module": "Ensemble learning",
+          "topic": "Ensemble Classifiers: Introduction to Ensemble Methods",
+          "marks": 2,
+          "bloom_level": "Remember",
+          "is_pyq": false,
+          "rationale": "Basic concept of ensemble methods"
+        },
+        {
+          "question_number": "5",
+          "module": "Nascent Technologies in AI",
+          "topic": "Definition and concept of the Metaverse",
+          "marks": 2,
+          "bloom_level": "Remember",
+          "is_pyq": false,
+          "rationale": "Understand the Metaverse concept"
+        }
+      ]
+    },
+    {
+      "section_name": "Section B",
+      "section_description": "mcq",
+      "questions": [
+        {
+          "question_number": "6",
+          "module": "Generative and Probabilistic Models",
+          "topic": "Probabilistic Models: Gaussian Mixture Models (GMMs)",
+          "marks": 2,
+          "bloom_level": "Understand",
+          "is_pyq": false,
+          "rationale": "Explain GMMs functionality"
+        },
+        {
+          "question_number": "7",
+          "module": "Variational Autoencoders",
+          "topic": "Architecture and training of VAEs",
+          "marks": 2,
+          "bloom_level": "Understand",
+          "is_pyq": false,
+          "rationale": "Describe VAE architecture"
+        },
+        {
+          "question_number": "8",
+          "module": "Transfer Learning",
+          "topic": "Feature extraction and fine tune transfer learning",
+          "marks": 2,
+          "bloom_level": "Apply",
+          "is_pyq": false,
+          "rationale": "Apply feature extraction techniques"
+        },
+        {
+          "question_number": "9",
+          "module": "Ensemble learning",
+          "topic": "Boosting algorithms",
+          "marks": 2,
+          "bloom_level": "Apply",
+          "is_pyq": false,
+          "rationale": "Implement boosting techniques"
+        },
+        {
+          "question_number": "10",
+          "module": "Nascent Technologies in AI",
+          "topic": "Challenges and opportunities in the Metaverse ecosystem",
+          "marks": 2,
+          "bloom_level": "Analyze",
+          "is_pyq": false,
+          "rationale": "Analyze Metaverse challenges"
+        }
+      ]
+    }
+  ]
+}

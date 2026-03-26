@@ -77,10 +77,12 @@ export function useGenerationFlow() {
             store.reset();
 
             // ── Step 1: Analyze Syllabus ──────────────────────────────────────
-            const syllabusSessionId = `syllabus-${Date.now()}`;
-            store.setSyllabusSession(syllabusSessionId);
+            const sessionId = `qpilot-${Date.now()}`;
+            store.setSyllabusSession(sessionId);
+            store.setPyqsSession(sessionId);
+            store.setPaperSession(sessionId);
             store.setSyllabusStatus("running");
-            store.connectWebSocket(syllabusSessionId);
+            store.connectWebSocket(sessionId);
 
             // Give WebSocket time to connect
             await new Promise((r) => setTimeout(r, 400));
@@ -90,7 +92,7 @@ export function useGenerationFlow() {
                 const syllabusRes = await analyzeSyllabus({
                     file: config.syllabusFile,
                     text: config.syllabusText,
-                    sessionId: syllabusSessionId,
+                    sessionId: sessionId,
                 });
                 syllabusId = syllabusRes.session_id;
                 store.setSyllabusData(syllabusRes.syllabus);
@@ -103,13 +105,7 @@ export function useGenerationFlow() {
             }
 
             // ── Step 2: Analyze PYQs ─────────────────────────────────────────
-            const pyqsSessionId = `pyqs-${Date.now()}`;
-            store.setPyqsSession(pyqsSessionId);
             store.setPyqsStatus("running");
-            store.disconnectWebSocket();
-            await new Promise((r) => setTimeout(r, 200));
-            store.connectWebSocket(pyqsSessionId);
-            await new Promise((r) => setTimeout(r, 400));
 
             let pyqsId: string;
             try {
@@ -117,7 +113,7 @@ export function useGenerationFlow() {
                     syllabusSessionId: syllabusId,
                     file: config.pyqsFile,
                     text: config.pyqsText,
-                    sessionId: pyqsSessionId,
+                    sessionId: sessionId,
                 });
                 pyqsId = pyqsRes.session_id;
                 store.setPyqsData(pyqsRes.pyqs);
@@ -130,13 +126,7 @@ export function useGenerationFlow() {
             }
 
             // ── Step 3: Generate Paper ────────────────────────────────────────
-            const paperSessionId = `paper-${Date.now()}`;
-            store.setPaperSession(paperSessionId);
             store.setPaperStatus("running");
-            store.disconnectWebSocket();
-            await new Promise((r) => setTimeout(r, 200));
-            store.connectWebSocket(paperSessionId);
-            await new Promise((r) => setTimeout(r, 400));
 
             try {
                 const paperPattern =
@@ -154,7 +144,7 @@ export function useGenerationFlow() {
                 const paperRes = await generateQuestionPaper({
                     syllabusSessionId: syllabusId,
                     pyqsSessionId: pyqsId,
-                    sessionId: paperSessionId,
+                    sessionId: sessionId,
                     totalMarks: config.totalMarks,
                     totalQuestions: config.totalQuestions,
                     bloomLevels: config.bloomLevels,

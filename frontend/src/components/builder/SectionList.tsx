@@ -37,6 +37,7 @@ const TYPE_LABELS: Record<string, string> = {
     mcq: "MCQ",
     short_answer: "Short",
     long_answer: "Long",
+    short_notes: "Notes",
     fill_in_the_blank: "Fill Blank",
     true_false: "T/F",
 };

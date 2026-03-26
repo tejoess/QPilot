@@ -1,0 +1,13 @@
+{
+  "metrics": {
+    "pattern_followed": "yes",
+    "constraints_followed": 3,
+    "syllabus_oriented": "yes",
+    "balanced_coverage": 3,
+    "student_accessibility": 3
+  },
+  "score": 10.0,
+  "verdict": "ACCEPTED",
+  "issues": [],
+  "summary": "The question paper adheres to all constraints and covers the syllabus effectively. It provides a balanced mix of recall and application questions suitable for all student levels."
+}

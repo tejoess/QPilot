@@ -179,7 +179,7 @@ EXAMPLES — what good Mumbai University questions look like at each mark range:
   Topic: GAN Architecture          | Bloom: Understand → What is a Generative Adversarial Network?
   Topic: Pooling Layer             | Bloom: Remember   → What is pooling in CNNs? List its types.
 
-─── 4–6 marks (2–4 lines, explanation with brief example) ───
+─── 4–6 marks (1 line, short but deep) ───
   Topic: Dropout                   | Bloom: Understand → Explain dropout. How does it solve overfitting?
   Topic: LSTM                      | Bloom: Understand → Explain LSTM architecture.
   Topic: CNN Architecture          | Bloom: Understand → Explain basic working of CNN.
@@ -187,8 +187,8 @@ EXAMPLES — what good Mumbai University questions look like at each mark range:
   Topic: Regularization            | Bloom: Understand → Explain early stopping, batch normalization, and data augmentation.
   Topic: Activation Functions      | Bloom: Understand → What is an activation function? Describe any four activation functions.
 
-─── 8–10 marks (3–5 lines, detailed explanation, diagrams expected) ───
-  Topic: CNN Architecture          | Bloom: Apply    → Explain CNN architecture in detail. Calculate parameters for a 32×32×3 input with ten 5×5 filters, stride 1, pad 2.
+─── 8–10 marks (1.5-2 lines maximum, detailed explanation or comparison) ───
+  Topic: CNN Architecture          | Bloom: Apply    → Explain CNN architecture. Calculate parameters for a 32×32×3 input with ten 5×5 filters, stride 1, pad 2.
   Topic: LSTM                      | Bloom: Analyze  → Differentiate between LSTM and GRU networks in detail.
   Topic: Gradient Descent          | Bloom: Understand → What are the different types of Gradient Descent methods? Explain any three.
   Topic: Autoencoders              | Bloom: Understand → Explain any three types of autoencoders with their working.
@@ -211,7 +211,7 @@ _BLOOM_VERBS = {
 # LLM CALLS
 # ============================================================================
 
-def rephrase_pyq(pyq_text: str, target_marks: int, topic: str, bloom_level: str) -> str:
+def rephrase_pyq(pyq_text: str, target_marks: int, topic: str, bloom_level: str, question_type: str = "short_answer", history_texts: list = None) -> str:
     """
     Rephrase / scale an existing PYQ to the target marks and bloom level.
     Uses few-shot examples so the model understands mark-range scaling.
@@ -219,12 +219,31 @@ def rephrase_pyq(pyq_text: str, target_marks: int, topic: str, bloom_level: str)
     mark_range = _mark_range_label(target_marks)
     bloom_verb = _BLOOM_VERBS.get(bloom_level, "Ask an appropriate question.")
 
+    type_instructions = ""
+    if question_type == "mcq":
+        type_instructions = "\nQUESTION FORMAT REQUIREMENT: Convert the question into a Multiple Choice Question (MCQ). Provide 4 clear options labeled A), B), C), D)."
+    elif question_type == "true_false":
+        type_instructions = "\nQUESTION FORMAT REQUIREMENT: Convert the question into a True/False question."
+    elif question_type == "fill_in_the_blank":
+        type_instructions = "\nQUESTION FORMAT REQUIREMENT: Convert the question into a Fill-in-the-Blanks question."
+    elif question_type == "short_notes":
+        type_instructions = "\nQUESTION FORMAT REQUIREMENT: Convert the question into a 'Write a short note on...' style question."
+
+    history_context = ""
+    if history_texts:
+        recent = history_texts[-15:] # keep token usage small
+        history_context = "\nPREVIOUSLY GENERATED QUESTIONS IN THIS PAPER (Do NOT repeat their grammatical layout or introductory verbs):\n"
+        for text in recent:
+            history_context += f"- {text}\n"
+
     prompt = f"""You are a Mumbai University question paper setter.
 Your job: rewrite the given question so it fits exactly {target_marks} marks at {bloom_level} level.
 
 TOPIC: {topic}
 TARGET MARKS: {target_marks}  (range: {mark_range})
 BLOOM LEVEL: {bloom_level}  — {bloom_verb}
+{type_instructions}
+{history_context}
 
 ORIGINAL QUESTION:
 {pyq_text}
@@ -233,8 +252,8 @@ ORIGINAL QUESTION:
 
 SCALING RULES:
   2–3 marks → 1 short line. Single concept. Definition or one-word-answer style.
-  4–6 marks → 1 line. Brief explanation with an example or one sub-parts.
-  8–10 marks → 1.5-2 lines. Detailed explanation. May include diagrams, comparisons, or sub-parts.
+  4–6 marks → 1 line (short but deep).
+  8–10 marks → 1.5-2 lines maximum. May include a brief comparison or 1 sub-part.
 
 BLOOM ADJUSTMENT:
   - If bloom level is Remember/Understand: keep the question theoretical ("explain", "describe", "define").
@@ -257,6 +276,8 @@ def generate_new_question(
     bloom_level: str,
     question_number: str,
     teacher_input: dict = None,
+    question_type: str = "short_answer",
+    history_texts: list = None,
 ) -> str:
     """
     Generate a brand-new Mumbai University style question.
@@ -279,6 +300,23 @@ def generate_new_question(
         if any(w in t_lower for w in ["no numerical", "avoid numerical", "no calculation"]):
             teacher_context += "\nIMPORTANT: Do NOT include numerical problems."
 
+    type_instructions = ""
+    if question_type == "mcq":
+        type_instructions = "\nQUESTION FORMAT REQUIREMENT: You MUST generate a Multiple Choice Question (MCQ). Provide 4 clear options labeled A), B), C), D)."
+    elif question_type == "true_false":
+        type_instructions = "\nQUESTION FORMAT REQUIREMENT: You MUST generate a True/False question."
+    elif question_type == "fill_in_the_blank":
+        type_instructions = "\nQUESTION FORMAT REQUIREMENT: You MUST generate a Fill-in-the-Blanks question."
+    elif question_type == "short_notes":
+        type_instructions = "\nQUESTION FORMAT REQUIREMENT: You MUST generate a 'Write a short note on...' style question."
+
+    history_context = ""
+    if history_texts:
+        recent = history_texts[-15:]
+        history_context = "\nPREVIOUSLY GENERATED QUESTIONS IN THIS PAPER (Do NOT repeat their grammatical start or phrasing structure):\n"
+        for text in recent:
+            history_context += f"- {text}\n"
+
     prompt = f"""You are a Mumbai University question paper setter.
 Generate ONE exam question for the specification below.
 
@@ -289,20 +327,23 @@ SPECIFICATION:
   Marks       : {marks}  (mark range: {mark_range})
   Bloom Level : {bloom_level}  — {bloom_verb}
 {teacher_context}
+{type_instructions}
+{history_context}
 
 {_GENERATE_FEW_SHOTS}
 
 STRICT RULES:
   1. Match the LENGTH to the mark range exactly:
        2–3 marks → 1 line maximum (short recall/definition/concept question)
-       4–6 marks → 1 line (explanation, may have 1 sub-parts)
-       8–10 marks → 1.5-2 lines (detailed)
+       4–6 marks → 1 line (short but deep)
+       8–10 marks → 1.5-2 lines only but should cover 1-2 subparts. 
   2. Match the VERB to the bloom level ({bloom_level}): {bloom_verb}
   3. Do NOT generate numerical/calculation problems unless teacher explicitly asked.
   4. Do NOT invent sub-topics outside the given topic.
   5. Keep language natural and direct — like the PYQ examples above.
   6. The question must be solvable in exam conditions by a student.
-  
+  7. CRITICAL (VARIETY): Heavily vary your wording and grammatical structure! Do NOT start every question with the same word (e.g. avoid repeating "Define..." or "Explain..."). Use alternative phrasing (e.g. "What is...", "Identify the...", "Describe how...", "Outline the...", "Discuss the role of...").
+
 OUTPUT: Write ONLY the question text. No preamble, no label, no explanation.
 """
     msg = HumanMessage(content=prompt)
@@ -327,6 +368,7 @@ def select_questions(
     blueprint: Dict,
     pyq_bank: List[Dict],
     teacher_input: dict = None,
+    qp_pattern: dict = None,
 ) -> Dict:
     """
     Main question selection function.
@@ -342,6 +384,7 @@ def select_questions(
     used_pyq_ids   = set()
     draft_sections = []
     selection_log  = []
+    history_texts  = []
 
     stats = {
         "total_questions":      0,
@@ -359,6 +402,16 @@ def select_questions(
     for section in blueprint.get("sections", []):
         section_name = section["section_name"]
         section_desc = section.get("section_description", "")
+        
+        # Determine question type from qp_pattern
+        section_type = "short_answer"
+        if qp_pattern:
+            for s in qp_pattern.get("sections", []):
+                if s.get("section_name") == section_name:
+                    # The frontend maps 'type' to 'section_description'
+                    section_type = s.get("section_description") or s.get("type") or "short_answer"
+                    break
+
         print(f"\n📂 {section_name}")
         print("-" * 50)
 
@@ -387,7 +440,7 @@ def select_questions(
             # ────────────────────────────────────────────────────────────────
             if not is_pyq:
                 selected_text    = generate_new_question(
-                    topic, subtopic, module, marks, bloom_level, q_num, teacher_input
+                    topic, subtopic, module, marks, bloom_level, q_num, teacher_input, section_type, history_texts
                 )
                 selection_method = "generated_direct"
                 stats["direct_generated"] += 1
@@ -425,7 +478,7 @@ def select_questions(
                         orig_m   = match.get("marks", marks)
                         text     = match.get("text", match.get("question", ""))
                         print(f"     🔄 L2 match (topic+bloom, {orig_m}M→{marks}M) → rephrasing PYQ #{mid}")
-                        selected_text    = rephrase_pyq(text, marks, topic, bloom_level)
+                        selected_text    = rephrase_pyq(text, marks, topic, bloom_level, section_type, history_texts)
                         selection_method = "pyq_rephrased_marks"
                         source_pyq_id    = mid
                         if mid != "unknown": used_pyq_ids.add(mid)
@@ -442,7 +495,7 @@ def select_questions(
                         orig_bl  = match.get("bloom_level", bloom_level)
                         text     = match.get("text", match.get("question", ""))
                         print(f"     🔄 L3 match (topic only, bloom {orig_bl}→{bloom_level}) → rephrasing PYQ #{mid}")
-                        selected_text    = rephrase_pyq(text, marks, topic, bloom_level)
+                        selected_text    = rephrase_pyq(text, marks, topic, bloom_level, section_type, history_texts)
                         selection_method = "pyq_rephrased_bloom"
                         source_pyq_id    = mid
                         if mid != "unknown": used_pyq_ids.add(mid)
@@ -452,10 +505,13 @@ def select_questions(
                 if not match:
                     print(f"     ⚡ No PYQ match → generating fresh question")
                     selected_text    = generate_new_question(
-                        topic, subtopic, module, marks, bloom_level, q_num, teacher_input
+                        topic, subtopic, module, marks, bloom_level, q_num, teacher_input, section_type, history_texts
                     )
                     selection_method = "generated_fallback"
                     stats["generated_new"] += 1
+
+            if selected_text:
+                history_texts.append(selected_text)
 
             draft_q = {
                 "id":               str(uuid.uuid4())[:8],

@@ -1,0 +1,36 @@
+{
+  "session_id": "qpilot-1774545035886",
+  "timestamp": "2026-03-26T22:42:33.604910",
+  "status": "completed",
+  "total_marks": 20,
+  "total_questions": 10,
+  "verdict": "ACCEPTED",
+  "rating": 0,
+  "blueprint_repair": {
+    "iterations": 0,
+    "converged": true,
+    "final_verdict": "ACCEPTED",
+    "score_history": [
+      7.0
+    ]
+  },
+  "paper_repair": {
+    "iterations": 0,
+    "converged": true,
+    "final_verdict": "ACCEPTED",
+    "rating_history": [
+      0
+    ]
+  },
+  "files_generated": {
+    "syllabus": "syllabus.json",
+    "pyqs": "pyqs.json",
+    "blueprint": "blueprint.json",
+    "blueprint_verification": "blueprint_verification.json",
+    "blueprint_repair_summary": "blueprint_repair_summary.json",
+    "draft_paper": "draft_paper.json",
+    "paper_verification": "paper_verification.json",
+    "paper_repair_summary": "paper_repair_summary.json",
+    "final_paper": "final_paper.json"
+  }
+}

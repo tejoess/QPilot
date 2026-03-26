@@ -71,14 +71,23 @@ async def send(session_id: str, message: str):
     await manager.send(session_id, message)
 
 
-def save_json_data(session_id: str, filename: str, data: dict) -> str:
+async def save_json_data(session_id: str, filename: str, data: dict, silent: bool = False) -> str:
     session_folder = os.path.join("backend", "services", "data", session_id)
     os.makedirs(session_folder, exist_ok=True)
     file_path = os.path.join(session_folder, filename)
     with open(file_path, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2, ensure_ascii=False)
-    print(f"💾 Saved: {file_path}")
+    
+    if not silent:
+        try:
+            dump_str = json.dumps({'file': filename, 'content': data}, default=str)
+            if len(dump_str) > 8000:
+                dump_str = dump_str[:8000] + "\n... [view truncated in backend]"
+            await manager.send_log(session_id, "info", f"JSON_DATA:{dump_str}")
+        except Exception as e:
+            pass
     return file_path
+
 
 def compute_dynamic_module_weights(
     total_marks: int,
@@ -271,12 +280,13 @@ async def syllabus_fetch(state: PipelineState):
 async def syllabus_format(state: PipelineState):
     session_id = state["session_id"]
     await manager.send_progress(session_id, "syllabus_format", "running", 0, "Starting syllabus parsing")
+    await asyncio.sleep(1.5)
 
     syllabus_json = get_syllabus_json(SYLLABUS_PROMPT, state.get("syllabus_text") or "")
     if not syllabus_json or not isinstance(syllabus_json, dict):
         syllabus_json = {"modules": [], "error": "Failed to parse syllabus"}
 
-    save_json_data(state["session_id"], "syllabus.json", syllabus_json)
+    await save_json_data(state["session_id"], "syllabus.json", syllabus_json)
     await manager.send_progress(session_id, "syllabus_format", "completed", 100, "Syllabus formatted successfully")
     await manager.send_completion(session_id, True, {"modules": len(syllabus_json.get("modules", []))})
     return {"syllabus": syllabus_json}
@@ -357,7 +367,7 @@ async def knowledge_graph_build_node(state: PipelineState):
             openai_llm,
         )
 
-    save_json_data(session_id, "knowledge_graph.json", knowledge_graph)
+    await save_json_data(session_id, "knowledge_graph.json", knowledge_graph)
     await manager.send_progress(session_id, "knowledge_graph_build", "completed", 100, "Knowledge graph built successfully")
     await manager.send_completion(session_id, True, {"modules": len(module_topics_map)})
 
@@ -403,11 +413,11 @@ async def pyqs_format_node(state: PipelineState):
 
     # Persist both the raw structured PYQs and the aggregated analysis so that
     # later workflows (like generate_paper_workflow) can load pyqs.json.
-    save_json_data(state["session_id"], "pyqs.json", pyqs_dict)
+    await save_json_data(state["session_id"], "pyqs.json", pyqs_dict)
 
     from backend.services.input_analysis.pyq_service import analyse_pyqs
     pyqs_analysis = analyse_pyqs(pyqs_dict)
-    save_json_data(state["session_id"], "pyqs_analysis.json", pyqs_analysis)
+    await save_json_data(state["session_id"], "pyqs_analysis.json", pyqs_analysis)
 
     await manager.send_log(session_id, "info", f"PYQ analysis: {pyqs_analysis.get('total_pyqs', 0)} questions across {len(pyqs_analysis.get('module_wise_count', {}))} modules")
     await manager.send_progress(session_id, "pyqs_format", "completed", 100, "PYQs formatted successfully")
@@ -418,6 +428,7 @@ async def pyqs_format_node(state: PipelineState):
 async def blueprint_build_node(state: PipelineState):
     session_id = state["session_id"]
     await manager.send_progress(session_id, "blueprint_build", "running", 0, "Starting blueprint generation")
+    await asyncio.sleep(2)
 
     syllabus      = state.get("syllabus") or {}
     knowledge_graph = state.get("knowledge_graph") or {}
@@ -432,7 +443,7 @@ async def blueprint_build_node(state: PipelineState):
     if not isinstance(blueprint, dict):
         blueprint = {"sections": [], "error": "Failed to generate blueprint"}
 
-    save_json_data(state["session_id"], "blueprint.json", blueprint)
+    await save_json_data(state["session_id"], "blueprint.json", blueprint)
     await manager.send_progress(session_id, "blueprint_build", "completed", 100, "Blueprint generated successfully")
     return {"blueprint": blueprint}
 
@@ -444,6 +455,7 @@ async def blueprint_build_node(state: PipelineState):
 async def blueprint_verify_node(state: PipelineState):
     session_id = state["session_id"]
     await manager.send_progress(session_id, "blueprint_verify", "running", 0, "Starting blueprint verification")
+    await asyncio.sleep(1)
 
     blueprint     = state.get("blueprint") or {}
     syllabus      = state.get("syllabus") or {}
@@ -461,11 +473,11 @@ async def blueprint_verify_node(state: PipelineState):
         blueprint, syllabus, knowledge_graph, pyqs_analysis, bloom_levels, teacher_inputs, qp_pattern
     )
 
-    initial_verdict = initial_critique.get("overall_rating", {}).get("verdict", "UNKNOWN")
+    initial_verdict = initial_critique.get("verdict", "UNKNOWN")
     await manager.send_log(session_id, "info", f"Initial verdict: {initial_verdict}")
 
     # ── Step 2: Repair loop if needed ───────────────────────────────────────
-    ACCEPT = {"APPROVED"}
+    ACCEPT = {"ACCEPTED", "APPROVED"}
 
     if initial_verdict not in ACCEPT:
         await manager.send_progress(session_id, "blueprint_verify", "running", 50,
@@ -513,9 +525,9 @@ async def blueprint_verify_node(state: PipelineState):
     )
 
     # ── Step 4: Persist ──────────────────────────────────────────────────────
-    save_json_data(state["session_id"], "blueprint.json",              final_blueprint)
-    save_json_data(state["session_id"], "blueprint_verification.json", final_critique)
-    save_json_data(state["session_id"], "blueprint_repair_summary.json", repair_summary)
+    await save_json_data(state["session_id"], "blueprint.json",              final_blueprint, silent=True)
+    await save_json_data(state["session_id"], "blueprint_verification.json", final_critique)
+    await save_json_data(state["session_id"], "blueprint_repair_summary.json", repair_summary, silent=True)
 
     await manager.send_log(session_id, "info", "💾 Saved: blueprint.json (repaired)")
     await manager.send_log(session_id, "info", "💾 Saved: blueprint_verification.json")
@@ -536,6 +548,7 @@ async def blueprint_verify_node(state: PipelineState):
 async def question_select_node(state: PipelineState):
     session_id = state["session_id"]
     await manager.send_progress(session_id, "question_select", "running", 0, "Starting question selection")
+    await asyncio.sleep(2)
 
     blueprint = state.get("blueprint") or {}
     pyqs      = state.get("pyqs", {})
@@ -544,12 +557,12 @@ async def question_select_node(state: PipelineState):
     await manager.send_log(session_id, "info", f"Available PYQ pool: {len(pyq_list)} questions")
     await manager.send_progress(session_id, "question_select", "running", 40, "Selecting questions...")
 
-    draft_paper = select_questions(cast(dict, blueprint), pyq_list, teacher_input=state.get("teacher_inputs") or {})
+    draft_paper = select_questions(cast(dict, blueprint), pyq_list, teacher_input=state.get("teacher_inputs") or {}, qp_pattern=state.get("qp_pattern") or {})
 
     if not isinstance(draft_paper, dict):
         draft_paper = {"sections": [], "error": "Failed to select questions"}
 
-    save_json_data(state["session_id"], "draft_paper.json", draft_paper)
+    await save_json_data(state["session_id"], "draft_paper.json", draft_paper)
     await manager.send_progress(session_id, "question_select", "completed", 100, "Questions selected successfully")
     return {"draft_paper": draft_paper}
 
@@ -561,6 +574,7 @@ async def question_select_node(state: PipelineState):
 async def paper_verify_node(state: PipelineState):
     session_id = state["session_id"]
     await manager.send_progress(session_id, "paper_verify", "running", 0, "Starting paper verification")
+    await asyncio.sleep(2)
 
     draft_paper   = state.get("draft_paper") or {}
     syllabus      = state.get("syllabus") or {}
@@ -631,7 +645,7 @@ async def paper_verify_node(state: PipelineState):
         }
 
     # ── Step 3: Final verification on the (possibly repaired) paper ──────────
-    if initial_label != "ACCEPTED" and repair_summary.get("iterations_run", 0) > 0:
+    if initial_label != "ACCEPTED" and int(repair_summary.get("iterations_run", 0)) > 0:
         # Paper was repaired — need a fresh verdict on the new paper
         await manager.send_progress(session_id, "paper_verify", "running", 85,
                                     "Re-verifying repaired paper...")
@@ -657,9 +671,9 @@ async def paper_verify_node(state: PipelineState):
                            f"Final paper verdict: {final_label} (rating: {final_rating}/10)")
 
     # ── Step 4: Persist ──────────────────────────────────────────────────────
-    save_json_data(state["session_id"], "draft_paper.json",          final_paper)
-    save_json_data(state["session_id"], "paper_verification.json",   final_verdict)
-    save_json_data(state["session_id"], "paper_repair_summary.json", repair_summary)
+    await save_json_data(state["session_id"], "draft_paper.json",          final_paper, silent=True)
+    await save_json_data(state["session_id"], "paper_verification.json",   final_verdict)
+    await save_json_data(state["session_id"], "paper_repair_summary.json", repair_summary, silent=True)
 
     await manager.send_log(session_id, "info", "💾 Saved: draft_paper.json (repaired)")
     await manager.send_log(session_id, "info", "💾 Saved: paper_verification.json")
@@ -685,7 +699,7 @@ async def final_generate_node(state: PipelineState):
     draft_paper    = state.get("draft_paper") or {}
     draft_paper_dict = cast(dict, draft_paper)
 
-    save_json_data(session_id, "final_paper.json", draft_paper_dict)
+    await save_json_data(session_id, "final_paper.json", draft_paper_dict)
 
     bp_repair  = state.get("blueprint_repair_summary") or {}
     pap_repair = state.get("paper_repair_summary") or {}
@@ -724,7 +738,7 @@ async def final_generate_node(state: PipelineState):
             "final_paper":               "final_paper.json",
         },
     }
-    save_json_data(session_id, "session_summary.json", summary)
+    await save_json_data(session_id, "session_summary.json", summary)
 
     final_path = os.path.join(session_folder, "final_question_paper.pdf")
     await manager.send_progress(session_id, "final_generate", "completed", 100,
