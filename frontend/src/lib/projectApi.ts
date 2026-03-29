@@ -367,7 +367,7 @@ export async function triggerFinalGeneration(data: FinalGenerationRequest): Prom
 // ✨ NEW: Backend Integration APIs (Real Implementation)
 // ─────────────────────────────────────────────────────────────────────────────
 /** backend baseURL */
-export const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
+export const BACKEND_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
 
 /**
  * API 1: Analyze Syllabus
