@@ -50,6 +50,11 @@ jobs:
       # 3. Deploy/Update Backend ACA
       - name: Deploy Backend to ACA
         run: |
+          az containerapp registry set \
+            --name qpilot-backend-${{ env.ENV_NAME }} \
+            --resource-group ${{ secrets.RG }} \
+            --server ${{ secrets.ACR_NAME }}.azurecr.io \
+            --identity system
           az containerapp update \
             --name qpilot-backend-${{ env.ENV_NAME }} \
             --resource-group ${{ secrets.RG }} \
@@ -59,6 +64,11 @@ jobs:
       # 4. Deploy/Update Frontend ACA
       - name: Deploy Frontend to ACA
         run: |
+          az containerapp registry set \
+            --name qpilot-frontend-${{ env.ENV_NAME }} \
+            --resource-group ${{ secrets.RG }} \
+            --server ${{ secrets.ACR_NAME }}.azurecr.io \
+            --identity system
           az containerapp update \
             --name qpilot-frontend-${{ env.ENV_NAME }} \
             --resource-group ${{ secrets.RG }} \
