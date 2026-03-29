@@ -3,7 +3,8 @@ name: Build and Deploy to Azure Container Apps
 on:
   push:
     branches:
-      - main
+      - dev-qpilot
+      - prod-qpilot
   workflow_dispatch:
 
 jobs:
@@ -12,6 +13,16 @@ jobs:
     steps:
       - name: Checkout Source
         uses: actions/checkout@v4
+
+      - name: Set Environment Variables
+        run: |
+          if [[ "${{ github.ref_name }}" == "prod-qpilot" ]]; then
+            echo "ENV_NAME=prod" >> $GITHUB_ENV
+            echo "BACKEND_URL=${{ secrets.BACKEND_URL_PROD }}" >> $GITHUB_ENV
+          else
+            echo "ENV_NAME=dev" >> $GITHUB_ENV
+            echo "BACKEND_URL=${{ secrets.BACKEND_URL_DEV }}" >> $GITHUB_ENV
+          fi
 
       - name: Azure Login
         uses: azure/login@v2
@@ -24,32 +35,32 @@ jobs:
       # 1. Build and Push Backend
       - name: Build Backend Image
         run: |
-          docker build -t ${{ secrets.ACR_NAME }}.azurecr.io/qpilot-backend:${{ github.sha }} ./backend
-          docker push ${{ secrets.ACR_NAME }}.azurecr.io/qpilot-backend:${{ github.sha }}
+          docker build -t ${{ secrets.ACR_NAME }}.azurecr.io/qpilot-backend-${{ env.ENV_NAME }}:${{ github.sha }} ./backend
+          docker push ${{ secrets.ACR_NAME }}.azurecr.io/qpilot-backend-${{ env.ENV_NAME }}:${{ github.sha }}
 
       # 2. Build and Push Frontend
       - name: Build Frontend Image
         run: |
           docker build \
             --build-arg NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }} \
-            --build-arg NEXT_PUBLIC_API_BASE_URL=${{ secrets.BACKEND_URL }} \
-            -t ${{ secrets.ACR_NAME }}.azurecr.io/qpilot-frontend:${{ github.sha }} ./frontend
-          docker push ${{ secrets.ACR_NAME }}.azurecr.io/qpilot-frontend:${{ github.sha }}
+            --build-arg NEXT_PUBLIC_API_BASE_URL=${{ env.BACKEND_URL }} \
+            -t ${{ secrets.ACR_NAME }}.azurecr.io/qpilot-frontend-${{ env.ENV_NAME }}:${{ github.sha }} ./frontend
+          docker push ${{ secrets.ACR_NAME }}.azurecr.io/qpilot-frontend-${{ env.ENV_NAME }}:${{ github.sha }}
 
       # 3. Deploy/Update Backend ACA
       - name: Deploy Backend to ACA
         run: |
           az containerapp update \
-            --name qpilot-backend \
+            --name qpilot-backend-${{ env.ENV_NAME }} \
             --resource-group ${{ secrets.RG }} \
-            --image ${{ secrets.ACR_NAME }}.azurecr.io/qpilot-backend:${{ github.sha }} \
+            --image ${{ secrets.ACR_NAME }}.azurecr.io/qpilot-backend-${{ env.ENV_NAME }}:${{ github.sha }} \
             --set-env-vars DATABASE_URL=${{ secrets.DATABASE_URL }} OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }} AZURE_STORAGE_CONNECTION_STRING=${{ secrets.AZURE_STORAGE_CONNECTION_STRING }}
 
       # 4. Deploy/Update Frontend ACA
       - name: Deploy Frontend to ACA
         run: |
           az containerapp update \
-            --name qpilot-frontend \
+            --name qpilot-frontend-${{ env.ENV_NAME }} \
             --resource-group ${{ secrets.RG }} \
-            --image ${{ secrets.ACR_NAME }}.azurecr.io/qpilot-frontend:${{ github.sha }} \
+            --image ${{ secrets.ACR_NAME }}.azurecr.io/qpilot-frontend-${{ env.ENV_NAME }}:${{ github.sha }} \
             --set-env-vars CLERK_SECRET_KEY=${{ secrets.CLERK_SECRET_KEY }}
