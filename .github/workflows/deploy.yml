@@ -73,4 +73,4 @@ jobs:
             --name qpilot-frontend-${{ env.ENV_NAME }} \
             --resource-group ${{ secrets.RG }} \
             --image ${{ secrets.ACR_NAME }}.azurecr.io/qpilot-frontend-${{ env.ENV_NAME }}:${{ github.sha }} \
-            --set-env-vars CLERK_SECRET_KEY=${{ secrets.CLERK_SECRET_KEY }}
+            --set-env-vars CLERK_SECRET_KEY=${{ secrets.CLERK_SECRET_KEY }} DATABASE_URL=${{ secrets.DATABASE_URL }}
