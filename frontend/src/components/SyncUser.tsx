@@ -25,8 +25,8 @@ export default async function SyncUser() {
             });
             console.log(`Synced new user: ${user.id}`);
         }
-    } catch (error) {
-        console.error("Error syncing user to database:", error);
+    } catch {
+        // DB unreachable on this network — skip sync silently
     }
 
     return null;

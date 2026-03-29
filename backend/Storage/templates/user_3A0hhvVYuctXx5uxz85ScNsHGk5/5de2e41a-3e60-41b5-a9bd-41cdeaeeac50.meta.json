@@ -1,0 +1,55 @@
+{
+  "template_id": "5de2e41a-3e60-41b5-a9bd-41cdeaeeac50",
+  "name": "ACPCE_IA_Template.docx",
+  "docx_path": "backend\\Storage\\templates\\user_3A0hhvVYuctXx5uxz85ScNsHGk5\\5de2e41a-3e60-41b5-a9bd-41cdeaeeac50_ACPCE_IA_Template.docx",
+  "pattern": [
+    {
+      "question_num": 1,
+      "parts": [
+        "a",
+        "b",
+        "c",
+        "d",
+        "e",
+        "f"
+      ],
+      "num_parts": 6,
+      "marks_per_part": 2
+    },
+    {
+      "question_num": 2,
+      "parts": [
+        "a",
+        "b"
+      ],
+      "num_parts": 2,
+      "marks_per_part": 5
+    },
+    {
+      "question_num": 3,
+      "parts": [
+        "a",
+        "b"
+      ],
+      "num_parts": 2,
+      "marks_per_part": 5
+    }
+  ],
+  "placeholders": [
+    "[1a]",
+    "[1b]",
+    "[1c]",
+    "[1d]",
+    "[1e]",
+    "[1f]",
+    "[2]",
+    "[2a]",
+    "[2b]",
+    "[3a]",
+    "[3b]",
+    "[5]",
+    "[CL]",
+    "[CO]"
+  ],
+  "azure_url": "https://qpilotstorage1.blob.core.windows.net/qpilot-templates/templates/user_3A0hhvVYuctXx5uxz85ScNsHGk5/5de2e41a-3e60-41b5-a9bd-41cdeaeeac50/ACPCE_IA_Template.docx"
+}

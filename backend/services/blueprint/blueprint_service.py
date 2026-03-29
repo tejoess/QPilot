@@ -99,12 +99,14 @@ Return ONLY valid JSON, no markdown:
   "allowed_modules": ["Module 1", "Module 2"],  // null if no restriction
   "excluded_topics": ["topic name"],             // [] if none
   "forced_topics": ["topic name"],               // [] if none
+  "pyq_weightage": 50,                           // extraction of % or weightage mentioned for PYQs, null if not mentioned
   "other_hard_rules": ["rule text"]              // [] if none
 }}
 
 Rules:
 - allowed_modules must be null if teacher did NOT restrict modules
 - If teacher says "first 3 modules", resolve to actual module names from the available list
+- For pyq_weightage, if teacher says "50% PYQs" or "half from previous papers", return 50. If they specify a different percentage, return that number. If they don't mention PYQ weightage at all, return null.
 - Only extract things the teacher explicitly stated
 """
     response = llm.invoke([HumanMessage(content=prompt)])
@@ -146,14 +148,22 @@ def generate_blueprint(
         flat_kg = {k: v for k, v in flat_kg.items() 
                         if k in constraints["allowed_modules"]}
 
+    # Compute target PYQ count
+    pyq_wt = constraints.get("pyq_weightage")
+    if pyq_wt is None:
+        pyq_wt = 50 # Default 50% if not mentioned
+    
+    total_qs = paper_pattern.get('total_questions', 0)
+    target_pyq_count = round((pyq_wt / 100) * total_qs) if has_pyqs else 0
+
     if has_pyqs:
         pyq_instructions = f"""PYQ USAGE (PYQs are available):
-- Topic PYQ count > 5  → is_pyq: true
-- Topic PYQ count 2–5  → mix true/false
-- Topic PYQ count < 2  → is_pyq: false
-- No PYQs for topic    → is_pyq: false
+- You MUST set exactly {target_pyq_count} questions to is_pyq: true. 
+- The remaining {total_qs - target_pyq_count} questions MUST have is_pyq: false.
+- Do NOT use individual topic PYQ counts to decide this flag; follow the counts above strictly.
+- Spread the {target_pyq_count} PYQ questions across different modules naturally.
 
-PYQ AVAILABILITY:
+PYQ AVAILABILITY (Reference for topic selection):
 {json.dumps(pyq_analysis, indent=2)}"""
     else:
         pyq_instructions = """PYQ USAGE:
@@ -195,8 +205,6 @@ Every question must come from these modules exclusively.
   If modules are NOT restricted, every module in the knowledge graph must appear at least once.
 - No two consecutive questions may share the same module
 - Never repeat the same topic twice
-- If no Input from Teacher: 
-        Consider 50% weightage for PYQs 
 
 **RULES:**
 
@@ -215,11 +223,6 @@ BLOOM'S — assign levels to match target distribution within ±5%:
 - Use given bloom_coverage distribution as target. For example, if target is 20% Analyze, then 2 out of 10 questions should be Analyze. You can deviate by ±5% (i.e. 1-3 Analyze questions would be acceptable in this case).
 - If multiple section, Distribute accordingly but ensure overall distribution matches target.
 
-PYQ USAGE:
-- Topic PYQ count > 5 → is_pyq: true
-- Topic PYQ count 2–5 → mix true/false
-- Topic PYQ count < 2 → is_pyq: false
-- No PYQs for topic → always is_pyq: false
 
 TOPIC FIELD:
 - Must exactly match a topic or subtopic name from the knowledge graph above

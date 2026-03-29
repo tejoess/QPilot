@@ -29,6 +29,7 @@ import {
 } from '@clerk/nextjs'
 
 import SyncUser from "@/components/SyncUser";
+import SyncUserClient from "@/components/SyncUserClient";
 
 export default function RootLayout({
   children,
@@ -49,6 +50,7 @@ export default function RootLayout({
             themes={["light", "dark", "ocean", "royal"]}
           >
             <SyncUser />
+            <SyncUserClient />
             <main>
               {children}
             </main>

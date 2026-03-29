@@ -40,6 +40,7 @@ import {
 import { usePatternStore } from "@/store/patternStore";
 import { useQPilotStore } from "@/store/qpilotStore";
 import { applyPaperPattern } from "@/lib/projectApi";
+import { TemplateSelector } from "@/components/qpilot/TemplateSelector";
 import { cn } from "@/lib/utils";
 
 interface PaperPatternAgentCardProps {
@@ -185,6 +186,10 @@ export function PaperPatternAgentCard({ projectId }: PaperPatternAgentCardProps)
 
             <CardContent className="px-3 pb-4 space-y-4">
                 <div className="space-y-4 animate-in fade-in duration-300">
+
+                    {/* Template Selector — autofills pattern */}
+                    <TemplateSelector disabled={status === "running" || status === "completed"} />
+
                     {sections.length === 0 ? (
                         <div className="py-6 text-center border-2 border-dashed border-muted rounded-xl bg-muted/20">
                             <p className="text-[11px] text-muted-foreground font-semibold">No sections added yet.</p>

@@ -1,0 +1,55 @@
+name: Build and Deploy to Azure Container Apps
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Source
+        uses: actions/checkout@v4
+
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Login to ACR
+        run: az acr login --name ${{ secrets.ACR_NAME }}
+
+      # 1. Build and Push Backend
+      - name: Build Backend Image
+        run: |
+          docker build -t ${{ secrets.ACR_NAME }}.azurecr.io/qpilot-backend:${{ github.sha }} ./backend
+          docker push ${{ secrets.ACR_NAME }}.azurecr.io/qpilot-backend:${{ github.sha }}
+
+      # 2. Build and Push Frontend
+      - name: Build Frontend Image
+        run: |
+          docker build \
+            --build-arg NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }} \
+            --build-arg NEXT_PUBLIC_API_BASE_URL=${{ secrets.BACKEND_URL }} \
+            -t ${{ secrets.ACR_NAME }}.azurecr.io/qpilot-frontend:${{ github.sha }} ./frontend
+          docker push ${{ secrets.ACR_NAME }}.azurecr.io/qpilot-frontend:${{ github.sha }}
+
+      # 3. Deploy/Update Backend ACA
+      - name: Deploy Backend to ACA
+        run: |
+          az containerapp update \
+            --name qpilot-backend \
+            --resource-group ${{ secrets.RG }} \
+            --image ${{ secrets.ACR_NAME }}.azurecr.io/qpilot-backend:${{ github.sha }} \
+            --set-env-vars DATABASE_URL=${{ secrets.DATABASE_URL }} OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }} AZURE_STORAGE_CONNECTION_STRING=${{ secrets.AZURE_STORAGE_CONNECTION_STRING }}
+
+      # 4. Deploy/Update Frontend ACA
+      - name: Deploy Frontend to ACA
+        run: |
+          az containerapp update \
+            --name qpilot-frontend \
+            --resource-group ${{ secrets.RG }} \
+            --image ${{ secrets.ACR_NAME }}.azurecr.io/qpilot-frontend:${{ github.sha }} \
+            --set-env-vars CLERK_SECRET_KEY=${{ secrets.CLERK_SECRET_KEY }}

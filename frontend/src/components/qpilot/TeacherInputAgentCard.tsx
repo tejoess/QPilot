@@ -37,6 +37,7 @@ import { useBloomStore } from "@/store/bloomStore";
 import { useQPilotStore } from "@/store/qpilotStore";
 import { useWorkflowOrchestrator } from "@/hooks/useWorkflowOrchestrator";
 import { generateQuestionPaper } from "@/lib/projectApi";
+import { TemplateRenderButton } from "@/components/qpilot/TemplateRenderButton";
 import { cn } from "@/lib/utils";
 
 interface TeacherInputAgentCardProps {
@@ -313,6 +314,14 @@ export function TeacherInputAgentCard({ projectId }: TeacherInputAgentCardProps)
                             )}
                             {status === "running" ? "Initiating AI Synthesis..." : status === "completed" ? "Paper Generated" : "Generate Question Paper"}
                         </Button>
+
+                        {/* TemplateRenderButton — shown after generation if template selected */}
+                        {status === "completed" && (
+                            <TemplateRenderButton
+                                paperJson={orchestrator.paperData ?? null}
+                                examDate={new Date().toLocaleDateString("en-IN")}
+                            />
+                        )}
                     </div>
                 </div>
             </CardContent>

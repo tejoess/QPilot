@@ -1,4 +1,5 @@
 import { currentUser } from "@clerk/nextjs/server";
+import { redirect } from "next/navigation";
 import { Hero } from "@/components/landing/Hero";
 import { Features } from "@/components/landing/Features";
 import { HowItWorks } from "@/components/landing/HowItWorks";
@@ -7,6 +8,10 @@ import { Footer } from "@/components/landing/Footer";
 
 export default async function Home() {
   const user = await currentUser();
+
+  if (user) {
+    redirect("/dashboard");
+  }
 
   return (
     <div className="flex min-h-screen flex-col bg-background font-body antialiased">

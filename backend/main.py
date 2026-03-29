@@ -1,9 +1,10 @@
 # backend/main.py
 import uuid
 import os
+import json as json_lib
 from fastapi import FastAPI, WebSocket, File, UploadFile, Form, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
 from starlette.websockets import WebSocketDisconnect
 from typing import Optional
 from backend.websocket.manager import manager
@@ -12,14 +13,87 @@ from backend.services.pipeline import (
     analyze_pyqs_workflow,
     generate_paper_workflow
 )
+from backend.services.template_service.extractor import extract_placeholders, extract_pattern
+from backend.services.template_service.storage import save_template, list_templates, get_template_meta, get_template_path
+from backend.services.template_service.renderer import render_template
+from backend.services.Answer_Key_Generator.answer_key import generate_answer_key, generate_pdf
+from backend.Storage.Blob_Storage.blob_upload import upload_to_azure
+from backend.services.paper_pdf_gen import format_paper_to_pdf
+from backend.database import get_db, engine
+from backend.models import Base, User, Project, PipelineData, Document
+from sqlalchemy.orm import Session
 
+# Create DB tables
+Base.metadata.create_all(bind=engine)
 
 backend = FastAPI()
+
+def ensure_db_user_project(db_session: Session, user_id: str, project_id: Optional[str] = None, 
+                           name: Optional[str] = None, subject: Optional[str] = None, 
+                           grade: Optional[str] = None, total_marks: Optional[int] = None, 
+                           duration: Optional[str] = None):
+    # Check/Create User
+    if user_id:
+        user = db_session.query(User).filter_by(clerk_id=user_id).first()
+        if not user:
+            user = User(clerk_id=user_id, name="User", email="no-email")
+            db_session.add(user)
+            db_session.flush()
+    
+    # Check/Create Project
+    if project_id and user_id:
+        proj = db_session.query(Project).filter_by(id=project_id).first()
+        if not proj:
+            proj = Project(
+                id=project_id,
+                user_id=user_id,
+                name=name or f"Generated Project",
+                subject=subject or "Unknown",
+                grade=grade or "Unknown",
+                total_marks=total_marks or 80,
+                duration=duration or "3 Hours",
+                status="draft"
+            )
+            db_session.add(proj)
+        else:
+            # Update metadata if provided
+            if name: proj.name = name
+            if subject: proj.subject = subject
+            if grade: proj.grade = grade
+            if total_marks: proj.total_marks = total_marks
+            if duration: proj.duration = duration
+        
+        db_session.commit()
+
+@backend.post("/init-project")
+async def init_project(
+    user_id: str = Form(...),
+    project_id: str = Form(...),
+    name: Optional[str] = Form(None),
+    subject: Optional[str] = Form(None),
+    grade: Optional[str] = Form(None),
+    total_marks: Optional[int] = Form(None),
+    duration: Optional[str] = Form(None),
+):
+    """
+    Called by frontend to pre-warm the project in the DB with metadata.
+    """
+    try:
+        db_session = next(get_db())
+        ensure_db_user_project(
+            db_session, user_id, project_id,
+            name=name, subject=subject, grade=grade,
+            total_marks=total_marks, duration=duration
+        )
+        return JSONResponse(content={"status": "success", "message": "Project initialized"})
+    except Exception as e:
+        print(f"Init Project Err: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 # ✅ Enable CORS for frontend access
 backend.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -42,25 +116,20 @@ async def websocket_logs(websocket: WebSocket, session_id: str):
 @backend.post("/analyze-syllabus")
 async def analyze_syllabus(
     file: Optional[UploadFile] = File(None),
-    text: Optional[str] = Form(None),
-    session_id: Optional[str] = Form(None)
+    text_content: Optional[str] = Form(None),
+    session_id: Optional[str] = Form(None),
+    user_id: Optional[str] = Form(None),
+    project_id: Optional[str] = Form(None),
+    title: Optional[str] = Form(None),
+    subject: Optional[str] = Form(None),
+    grade: Optional[str] = Form(None),
+    total_marks: Optional[int] = Form(None),
+    duration: Optional[str] = Form(None)
 ):
-    """
-    Accepts either:
-    - file: PDF upload (multipart/form-data)
-    - text: Plain text syllabus content
-    - session_id: (Optional) Custom session ID for WebSocket tracking
-    
-    Returns: session_id and parsed syllabus data
-    """
-    # Clean up empty strings to None
-    text_content = None
-    if text and text.strip():
-        text_content = text.strip()
-    
+    """Analyze syllabus from file or text."""
     if not file and not text_content:
-        raise HTTPException(status_code=400, detail="Either 'file' or 'text' must be provided")
-    
+        raise HTTPException(status_code=400, detail="Either 'file' or 'text_content' must be provided")
+
     # Use provided session_id or generate new one
     if not session_id or not session_id.strip():
         session_id = str(uuid.uuid4())
@@ -92,10 +161,52 @@ async def analyze_syllabus(
             text_content=text_content
         )
         
+        # ☁️ Azure Upload: Syllabus PDF
+        azure_url = None
+        if pdf_path:
+            blob_name = f"syllabus/{session_id}/syllabus.pdf"
+            azure_url = upload_to_azure(pdf_path, "qpilot-uploads", blob_name)
+            print(f"☁️ Syllabus uploaded to Azure: {azure_url}")
+
+        # ☁️ If text was provided instead of file, upload text if no PDF was uploaded
+        if not azure_url and text_content:
+            blob_name = f"user_{user_id}/syllabus/syllabus_text_{session_id}.txt"
+            azure_url = upload_to_azure(text_content.encode('utf-8'), "qpilot-uploads", blob_name, is_bytes=True)
+
+        if user_id and project_id:
+            try:
+                db_session = next(get_db())
+                # Update project metadata
+                ensure_db_user_project(
+                    db_session, user_id, project_id,
+                    name=title, subject=subject, grade=grade, 
+                    total_marks=total_marks, duration=duration
+                )
+                
+                # 🔹 Record in Documents
+                if azure_url:
+                    doc = Document(
+                        user_id=user_id,
+                        project_id=project_id,
+                        name=f"{project_id} - Syllabus",
+                        doc_type="syllabus",
+                        azure_url=azure_url
+                    )
+                    db_session.add(doc)
+                
+                # 🔹 Record in PipelineData
+                pld = ensure_pipeline_data(db_session, project_id)
+                pld.syllabus_json = result["syllabus"]
+                
+                db_session.commit()
+            except Exception as e:
+                print(f"Failed to record syllabus doc/data: {e}")
+
         return JSONResponse(content={
             "status": "success",
             "session_id": session_id,
             "syllabus": result["syllabus"],
+            "azure_url": azure_url,
             "message": "Syllabus analyzed successfully"
         })
         
@@ -114,8 +225,10 @@ async def analyze_syllabus(
 async def analyze_pyqs(
     syllabus_session_id: str = Form(...),
     file: Optional[UploadFile] = File(None),
-    text: Optional[str] = Form(None),
-    session_id: Optional[str] = Form(None)
+    text_content: Optional[str] = Form(None),
+    session_id: Optional[str] = Form(None),
+    user_id: Optional[str] = Form(None),
+    project_id: Optional[str] = Form(None)
 ):
     """
     Accepts:
@@ -127,12 +240,11 @@ async def analyze_pyqs(
     Returns: session_id and parsed PYQs data
     """
     # Clean up empty strings to None
-    text_content = None
-    if text and text.strip():
-        text_content = text.strip()
+    if text_content and not text_content.strip():
+        text_content = None
     
     if not file and not text_content:
-        raise HTTPException(status_code=400, detail="Either 'file' or 'text' must be provided")
+        raise HTTPException(status_code=400, detail="Either 'file' or 'text_content' must be provided")
     
     # Verify syllabus session exists
     syllabus_folder = os.path.join("backend", "services", "data", syllabus_session_id)
@@ -169,10 +281,47 @@ async def analyze_pyqs(
             text_content=text_content
         )
         
+        # ☁️ Azure Upload: PYQs PDF
+        azure_url = None
+        if pdf_path:
+            blob_name = f"pyqs/{pyqs_session_id}/pyqs.pdf"
+            azure_url = upload_to_azure(pdf_path, "qpilot-uploads", blob_name)
+            print(f"☁️ PYQs uploaded to Azure: {azure_url}")
+
+        if user_id and project_id:
+            # ☁️ If text was provided instead of file, upload text as a convenience record too
+            if not azure_url and text_content:
+                blob_name = f"user_{user_id}/pyqs/pyqs_text_{pyqs_session_id}.txt"
+                azure_url = upload_to_azure(text_content.encode('utf-8'), "qpilot-uploads", blob_name, is_bytes=True)
+
+            try:
+                db_session = next(get_db())
+                ensure_db_user_project(db_session, user_id, project_id)
+                
+                # 🔹 Record in Documents
+                if azure_url:
+                    doc = Document(
+                        user_id=user_id,
+                        project_id=project_id,
+                        name=f"{project_id} - PYQs",
+                        doc_type="pyqs",
+                        azure_url=azure_url
+                    )
+                    db_session.add(doc)
+                    
+                # 🔹 Record in PipelineData
+                pld = ensure_pipeline_data(db_session, project_id)
+                pld.pyqs_json = result["pyqs"]
+                
+                db_session.commit()
+            except Exception as e:
+                print(f"Failed to record PYQ doc/data: {e}")
+
         return JSONResponse(content={
             "status": "success",
             "session_id": pyqs_session_id,
             "pyqs": result["pyqs"],
+            "azure_url": azure_url,
             "total_questions": len(result["pyqs"].get("questions", [])),
             "message": "PYQs analyzed successfully"
         })
@@ -202,7 +351,9 @@ async def generate_paper(
     # Teacher Input (custom instructions/focus areas)
     teacher_input: Optional[str] = Form(None),
     # WebSocket tracking
-    session_id: Optional[str] = Form(None)
+    session_id: Optional[str] = Form(None),
+    user_id: Optional[str] = Form(None),
+    project_id: Optional[str] = Form(None)
 ):
     """
     Accepts:
@@ -291,12 +442,95 @@ async def generate_paper(
         verification_data = result.get("paper_verdict", {})
         pdf_path = result.get("final_path", "")
         
+        # 📄 Convert JSON Paper to Formatted PDF
+        generated_pdf_path = os.path.join("backend", "services", "data", paper_session_id, "question_paper.pdf")
+        os.makedirs(os.path.dirname(generated_pdf_path), exist_ok=True)
+        
+        # Add metadata for PDF formatting
+        paper_for_pdf = paper_data.copy()
+        paper_for_pdf.update({
+            "title": "Question Paper",
+            "subject": "Examination",  # Could be pulled from metadata if available
+            "grade": "Semester",
+            "total_marks": total_marks or 80,
+            "duration": "3 Hours"
+        })
+        
+        format_paper_to_pdf(paper_for_pdf, generated_pdf_path)
+        
+        # ☁️ Azure Upload: Generated Paper PDF
+        azure_pdf_url = upload_to_azure(generated_pdf_path, "qpilot-results", f"{paper_session_id}/question_paper.pdf")
+        print(f"☁️ Generated Paper uploaded to Azure: {azure_pdf_url}")
+
+        if user_id and project_id:
+            try:
+                db_session = next(get_db())
+                
+                # Check User and Project using our helper
+                ensure_db_user_project(db_session, user_id, project_id)
+                proj = db_session.query(Project).filter_by(id=project_id).first()
+                
+                # Use project metadata for PDF if available
+                pdf_subject = proj.subject if proj and proj.subject else "Examination"
+                pdf_grade = proj.grade if proj and proj.grade else "Semester"
+                pdf_title = proj.name if proj and proj.name else "Question Paper"
+
+                # 📄 Re-generate PDF with REAL metadata if available
+                paper_for_pdf = paper_data.copy()
+                paper_for_pdf.update({
+                    "title": pdf_title,
+                    "subject": pdf_subject,
+                    "grade": pdf_grade,
+                    "total_marks": total_marks or 80,
+                    "duration": proj.duration if proj and proj.duration else "3 Hours"
+                })
+                format_paper_to_pdf(paper_for_pdf, generated_pdf_path)
+                azure_pdf_url = upload_to_azure(generated_pdf_path, "qpilot-results", f"{paper_session_id}/question_paper.pdf")
+
+                if proj:
+                    proj.status = "done"
+                    proj.total_marks = total_marks or 80
+                
+                # Add Paper Doc
+                if azure_pdf_url:
+                    doc = Document(
+                        user_id=user_id,
+                        project_id=project_id,
+                        name=f"{project_id} - Question Paper PDF",
+                        doc_type="final_pdf",
+                        azure_url=azure_pdf_url
+                    )
+                    db_session.add(doc)
+
+                # Add/Update Pipeline Data
+                pld = ensure_pipeline_data(db_session, project_id)
+                
+                def load_json(name):
+                    try:
+                        with open(os.path.join("backend", "services", "data", paper_session_id, name), "r", encoding="utf-8") as f:
+                            return json_lib.load(f)
+                    except Exception:
+                        return None
+                
+                pld.syllabus_json = load_json("syllabus.json")
+                pld.knowledge_graph_json = load_json("knowledge_graph.json")
+                pld.pyqs_json = load_json("pyqs.json")
+                pld.blueprint_json = load_json("blueprint.json")
+                pld.blueprint_verification_json = load_json("blueprint_verification.json")
+                pld.draft_paper_json = load_json("draft_paper.json")
+                pld.final_paper_json = load_json("final_paper.json")
+                
+                db_session.commit()
+                print("✅ Successfully saved paper data to database")
+            except Exception as db_err:
+                print(f"❌ Database save error: {db_err}")
+
         return JSONResponse(content={
             "status": "success",
             "session_id": paper_session_id,
             "paper": paper_data,
             "verification": verification_data,
-            "pdf_path": pdf_path,
+            "pdf_url": azure_pdf_url,
             "message": "Question paper generated successfully"
         })
         
@@ -305,3 +539,325 @@ async def generate_paper(
         print(f"❌ Error in paper generation: {str(e)}")
         print(traceback.format_exc())
         raise HTTPException(status_code=500, detail=f"Paper generation failed: {str(e)}")
+
+
+# ==========================================
+# API 4: Upload Template
+# ==========================================
+@backend.post("/templates/upload")
+async def upload_template(
+    file: UploadFile = File(...),
+    user_id: Optional[str] = Form(None),
+):
+    """
+    Upload a DOCX template file, extract its placeholders + pattern,
+    and store it for the given user_id (or a default 'anonymous').
+    Returns the extracted pattern and placeholder list.
+    """
+    if not file.filename or not file.filename.endswith(".docx"):
+        raise HTTPException(status_code=400, detail="Only .docx files are supported.")
+
+    uid = (user_id or "anonymous").strip()
+    file_bytes = await file.read()
+
+    # Save temporarily to extract metadata
+    import tempfile
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".docx", mode="wb") as tmp:
+        tmp.write(file_bytes)
+        tmp_path = tmp.name
+
+    try:
+        placeholders = extract_placeholders(tmp_path)
+        pattern = extract_pattern(tmp_path)
+    finally:
+        os.unlink(tmp_path)
+
+    # Persist the template
+    meta = save_template(
+        user_id=uid,
+        file_bytes=file_bytes,
+        filename=file.filename,
+        pattern=pattern,
+        placeholders=placeholders.get("all", []),
+    )
+
+    # ☁️ Azure Upload: DOCX Template
+    template_id = meta["template_id"]
+    blob_name = f"templates/{uid}/{template_id}/{file.filename}"
+    azure_template_url = upload_to_azure(file_bytes, "qpilot-templates", blob_name, is_bytes=True)
+
+    if user_id and azure_template_url:
+        try:
+            db_session = next(get_db())
+            ensure_db_user_project(db_session, user_id)
+            doc = Document(
+                user_id=user_id,
+                name=f"Template: {file.filename}",
+                doc_type="template",
+                azure_url=azure_template_url
+            )
+            db_session.add(doc)
+            db_session.commit()
+        except Exception as e:
+            print(f"Failed to record template doc: {e}")
+            
+    # Inject azure url into meta so it can be sent in /templates/list
+    meta["azure_url"] = azure_template_url
+    
+    user_dir = os.path.dirname(meta["docx_path"])
+    meta_path = os.path.join(user_dir, f"{template_id}.meta.json")
+    with open(meta_path, "w") as f:
+        json_lib.dump(meta, f, indent=2)
+
+    return JSONResponse(content={
+        "status": "success",
+        "template_id": meta["template_id"],
+        "name": meta["name"],
+        "pattern": pattern,
+        "placeholders": placeholders,
+        "azure_url": azure_template_url,
+        "message": "Template uploaded and analyzed successfully.",
+    })
+
+
+# ==========================================
+# API 5: List Templates
+# ==========================================
+@backend.get("/templates/list")
+async def list_user_templates(user_id: Optional[str] = None):
+    """
+    List all uploaded templates for a user.
+    """
+    uid = (user_id or "anonymous").strip()
+    templates = list_templates(uid)
+    return JSONResponse(content={
+        "status": "success",
+        "templates": templates,
+    })
+
+
+# ==========================================
+# API 6: Get Template Pattern
+# ==========================================
+@backend.get("/templates/{template_id}/pattern")
+async def get_template_pattern(template_id: str, user_id: Optional[str] = None):
+    """
+    Get the extracted pattern for a specific template (for autofill in frontend).
+    """
+    uid = (user_id or "anonymous").strip()
+    meta = get_template_meta(uid, template_id)
+    if not meta:
+        raise HTTPException(status_code=404, detail=f"Template {template_id} not found.")
+
+    return JSONResponse(content={
+        "status": "success",
+        "template_id": template_id,
+        "name": meta["name"],
+        "pattern": meta["pattern"],
+        "placeholders": meta.get("placeholders", []),
+    })
+
+
+# ==========================================
+# API 7: Render Paper in Template
+# ==========================================
+@backend.post("/templates/render")
+async def render_paper_in_template(
+    template_id: str = Form(...),
+    user_id: Optional[str] = Form(None),
+    paper_json: str = Form(...),          # JSON string of the generated paper
+    subject: Optional[str] = Form(None),
+    class_name: Optional[str] = Form(None),
+    marks: Optional[str] = Form(None),
+    date: Optional[str] = Form(None),
+    duration: Optional[str] = Form(None),
+    exam_name: Optional[str] = Form(None),
+    project_id: Optional[str] = Form(None),
+):
+    """
+    Render a generated paper JSON into the chosen DOCX template.
+    Replaces all [placeholder] tokens and returns the DOCX file for download.
+    """
+    uid = (user_id or "anonymous").strip()
+    docx_path = get_template_path(uid, template_id)
+    if not docx_path or not os.path.exists(docx_path):
+        raise HTTPException(status_code=404, detail=f"Template {template_id} DOCX file not found.")
+
+    try:
+        paper = json_lib.loads(paper_json)
+    except json_lib.JSONDecodeError:
+        raise HTTPException(status_code=400, detail="Invalid JSON in paper_json field.")
+
+    metadata = {
+        "subject":   subject or "",
+        "class":     class_name or "",
+        "marks":     marks or "",
+        "date":      date or "",
+        "duration":  duration or "",
+        "exam_name": exam_name or "",
+    }
+
+    try:
+        import tempfile
+        out_path = os.path.join(tempfile.gettempdir(), f"rendered_{template_id}_{uuid.uuid4().hex[:8]}.docx")
+        rendered_path = render_template(
+            docx_path=docx_path,
+            paper_json=paper,
+            metadata=metadata,
+            out_path=out_path,
+        )
+    except Exception as e:
+        import traceback
+        print(f"❌ Template render error: {e}")
+        print(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"Template rendering failed: {str(e)}")
+
+    filename = f"question_paper_{exam_name or 'exam'}.docx".replace(" ", "_")
+    
+    # Upload generated template DOCX to Azure + DB if tied to a project
+    if user_id and project_id:
+        try:
+            import uuid as uuid_pkg
+            blob_name = f"rendered_templates/{project_id}/{filename}"
+            azure_url = upload_to_azure(rendered_path, "qpilot-results", blob_name)
+            if azure_url:
+                db_session = next(get_db())
+                ensure_db_user_project(db_session, user_id, project_id)
+                doc = Document(
+                    user_id=user_id,
+                    project_id=project_id,
+                    name=f"{project_id} - Generated Paper (DOCX)",
+                    doc_type="docx_paper",
+                    azure_url=azure_url
+                )
+                db_session.add(doc)
+                db_session.commit()
+        except:
+            pass
+
+    return FileResponse(
+        path=rendered_path,
+        media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        filename=filename,
+    )
+
+
+@backend.delete("/templates/delete")
+async def delete_template_endpoint(
+    template_id: str,
+    user_id: Optional[str] = None
+):
+    uid = (user_id or "anonymous").strip()
+    
+    # Remove from local
+    user_dir = os.path.join("backend", "Storage", "templates", uid)
+    meta_path = os.path.join(user_dir, f"{template_id}.meta.json")
+    
+    azure_url = None
+    if os.path.exists(meta_path):
+        try:
+            with open(meta_path, "r") as f:
+                meta = json_lib.load(f)
+                azure_url = meta.get("azure_url")
+                docx_path = meta.get("docx_path")
+                if docx_path and os.path.exists(docx_path):
+                    os.unlink(docx_path)
+            os.unlink(meta_path)
+        except Exception:
+            pass
+            
+    # Remove from DB if possible
+    if user_id:
+        try:
+            db_session = next(get_db())
+            # Find document with this azure_url or doc_type="template" matching name (heuristic)
+            if azure_url:
+                db_session.query(Document).filter_by(azure_url=azure_url, user_id=uid).delete()
+                db_session.commit()
+        except:
+            pass
+
+    return JSONResponse(content={"status": "success", "message": "Template deleted"})
+
+# ==========================================
+# API 8: Generate Answer Key
+# ==========================================
+@backend.post("/generate-answer-key")
+async def generate_answer_key_api(
+    paper_json: str = Form(...),          # JSON string of the generated paper (same format as /generate-paper response)
+    syllabus_text: Optional[str] = Form(None),  # Optional raw syllabus text for richer context
+    download_pdf: Optional[str] = Form(None),    # "true" to return PDF, else returns JSON
+    user_id: Optional[str] = Form(None),
+    project_id: Optional[str] = Form(None)
+):
+    """
+    Accepts the generated paper JSON, calls the Answer Key Generator
+    (using the shared OpenAI LLM service), and returns either:
+    - JSON answer key  (default)
+    - PDF file download (when download_pdf="true")
+    """
+    try:
+        paper = json_lib.loads(paper_json)
+    except json_lib.JSONDecodeError:
+        raise HTTPException(status_code=400, detail="Invalid JSON in paper_json field.")
+
+    syllabus = (syllabus_text or "").strip()
+
+    try:
+        answer_key_data = generate_answer_key(paper, syllabus)
+    except Exception as e:
+        import traceback
+        print(f"\u274c Answer key generation error: {e}")
+        print(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"Answer key generation failed: {str(e)}")
+
+    if (download_pdf or "").lower() == "true":
+        import tempfile
+        import uuid as uuid_pkg
+        out_path = os.path.join(tempfile.gettempdir(), f"answer_key_{uuid_pkg.uuid4().hex[:8]}.pdf")
+        try:
+            generate_pdf(answer_key_data, output_path=out_path)
+            
+            # ☁️ Azure Upload: Answer Key PDF
+            blob_name = f"answer_keys/{uuid_pkg.uuid4().hex[:8]}/answer_key.pdf"
+            azure_url = upload_to_azure(out_path, "qpilot-results", blob_name)
+            print(f"☁️ Answer Key uploaded to Azure: {azure_url}")
+            
+            if user_id and azure_url:
+                try:
+                    db_session = next(get_db())
+                    ensure_db_user_project(db_session, user_id, project_id)
+                    # 🔹 Record in Documents
+                    doc = Document(
+                        user_id=user_id,
+                        project_id=project_id,
+                        name=f"{project_id} - Answer Key",
+                        doc_type="answer_key",
+                        azure_url=azure_url
+                    )
+                    db_session.add(doc)
+                    
+                    # 🔹 Record in PipelineData
+                    pld = ensure_pipeline_data(db_session, project_id)
+                    pld.answer_key_json = answer_key_data
+                    
+                    db_session.commit()
+                except Exception as db_err:
+                    print(f"Failed to save Answer Key Doc/Data to DB: {db_err}")
+            
+            
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"PDF generation or Azure upload failed: {str(e)}")
+        
+        return JSONResponse(content={
+            "status": "success",
+            "answer_key": answer_key_data,
+            "pdf_url": azure_url,
+            "message": "Answer key generated and saved to cloud"
+        })
+
+    return JSONResponse(content={
+        "status": "success",
+        "answer_key": answer_key_data,
+        "message": "Answer key generated successfully"
+    })

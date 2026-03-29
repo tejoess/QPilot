@@ -37,6 +37,13 @@ export interface GenerationConfig {
     totalMarks: number;
     totalQuestions: number;
     teacherInput?: string;
+    userId?: string;
+    projectId?: string;
+    // Metadata
+    title?: string;
+    subject?: string;
+    grade?: string;
+    duration?: string;
 }
 
 // Derive phase from the three step statuses
@@ -91,8 +98,15 @@ export function useGenerationFlow() {
             try {
                 const syllabusRes = await analyzeSyllabus({
                     file: config.syllabusFile,
-                    text: config.syllabusText,
+                    text_content: config.syllabusText,
                     sessionId: sessionId,
+                    userId: config.userId,
+                    projectId: config.projectId,
+                    title: config.title,
+                    subject: config.subject,
+                    grade: config.grade,
+                    totalMarks: config.totalMarks,
+                    duration: config.duration,
                 });
                 syllabusId = syllabusRes.session_id;
                 store.setSyllabusData(syllabusRes.syllabus);
@@ -110,10 +124,12 @@ export function useGenerationFlow() {
             let pyqsId: string;
             try {
                 const pyqsRes = await analyzePyqs({
-                    syllabusSessionId: syllabusId,
+                    syllabusSessionId: syllabusId!,
                     file: config.pyqsFile,
-                    text: config.pyqsText,
+                    text_content: config.pyqsText,
                     sessionId: sessionId,
+                    userId: config.userId,
+                    projectId: config.projectId,
                 });
                 pyqsId = pyqsRes.session_id;
                 store.setPyqsData(pyqsRes.pyqs);
@@ -150,6 +166,8 @@ export function useGenerationFlow() {
                     bloomLevels: config.bloomLevels,
                     paperPattern,
                     teacherInput: config.teacherInput,
+                    userId: config.userId,
+                    projectId: config.projectId,
                 });
                 store.setPaperData(paperRes.paper);
                 store.setPaperStatus("completed");

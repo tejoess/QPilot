@@ -49,8 +49,8 @@ export function Navbar() {
 
                     <div className="flex items-center gap-4">
                         <ThemeToggle />
-                        <Link href="/sign-in"><button className="text-sm font-bold text-foreground px-4 py-2 hover:bg-muted rounded-full transition-all">Sign In</button></Link>
-                        <Link href="/sign-up"><button className="bg-primary text-primary-foreground text-sm font-bold px-6 py-2 rounded-full shadow-lg shadow-primary/20 hover:scale-105 transition-all">Get Started</button></Link>
+                        <Link href="/sign-in" className="text-sm font-bold text-foreground px-4 py-2 hover:bg-muted rounded-full transition-all">Sign In</Link>
+                        <Link href="/dashboard" className="bg-primary text-primary-foreground text-sm font-bold px-6 py-2 rounded-full shadow-lg shadow-primary/20 hover:scale-105 transition-all">Get Started</Link>
                     </div>
                 </div>
             </header>

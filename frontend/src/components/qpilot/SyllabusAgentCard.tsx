@@ -127,7 +127,7 @@ export function SyllabusAgentCard({ projectId }: SyllabusAgentCardProps) {
 
             await orchestrator.analyzeSyllabus({
                 file: activeTab === "pdf" ? uploadedFile : undefined,
-                text: activeTab === "text" ? textContent : undefined,
+                text_content: activeTab === "text" ? textContent : undefined,
             });
 
             // Success handled by WebSocket completion message

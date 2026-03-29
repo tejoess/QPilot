@@ -5,6 +5,11 @@ import { cn } from "@/lib/utils";
 export const BackgroundBeams = ({ className }: { className?: string }) => {
     const beamsRef = useRef<HTMLDivElement>(null);
 
+    const [mounted, setMounted] = React.useState(false);
+    useEffect(() => {
+        setMounted(true);
+    }, []);
+
     return (
         <div
             ref={beamsRef}
@@ -27,7 +32,7 @@ export const BackgroundBeams = ({ className }: { className?: string }) => {
                 <rect width="100%" height="100%" fill="url(#beam-gradient)" />
             </svg>
             {/* Simulation of beams */}
-            {[...Array(5)].map((_, i) => (
+            {mounted && [...Array(5)].map((_, i) => (
                 <div
                     key={i}
                     className="absolute h-[1px] w-full bg-gradient-to-r from-transparent via-primary/20 to-transparent animate-beam"

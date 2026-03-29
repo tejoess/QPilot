@@ -4,7 +4,7 @@
  * components/qpilot/QPilotSidebar.tsx
  */
 
-import { LayoutDashboard, Rocket, History, Settings, ChevronLeft, ChevronRight } from "lucide-react";
+import { LayoutDashboard, Rocket, History, Settings, ChevronLeft, ChevronRight, LayoutTemplate } from "lucide-react";
 import {
     Sidebar,
     SidebarContent,
@@ -25,8 +25,9 @@ import { UserButton } from "@clerk/nextjs";
 
 const NAV_ITEMS = [
     { title: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-    { title: "QPilot", href: "/qpilot", icon: Rocket },
-    { title: "History", href: "/history", icon: History },
+    { title: "Generate paper", href: "/qpilot", icon: Rocket },
+    { title: "Templates", href: "/templates", icon: LayoutTemplate },
+    { title: "Repository", href: "/repository", icon: History },
     { title: "Settings", href: "/settings", icon: Settings },
 ];
 
@@ -69,7 +70,7 @@ export function QPilotSidebar() {
                     <SidebarGroupContent>
                         <SidebarMenu className={cn("px-3 space-y-2", isCollapsed && "px-2")}>
                             {NAV_ITEMS.map((item) => {
-                                const isActive = item.title === "QPilot"
+                                const isActive = item.title === "Generate paper"
                                     ? pathname?.startsWith("/qpilot")
                                     : pathname === item.href;
 

@@ -1,8 +1,17 @@
 """
-Question Selector Agent - Updated Version
-- Fuzzy/substring PYQ topic matching (fixes zero-match problem)
-- Few-shot examples in generate_new_question() and rephrase_pyq()
-- PYQ-absent safe handling (all is_pyq treated as False when bank is empty)
+Question Selector Agent — Updated Version
+Changes from previous version:
+  1. Marks → Answer Structure constraint block (hard constraints injected into both
+     generate and rephrase prompts — no sub-parts for 2M, no "and" joining, etc.)
+  2. Few-shot examples tightened: 2-3M are strictly one-concept / one-line,
+     4-6M are one-line deep, 8-10M capped at 1-2 sub-parts. Domain variety kept.
+  3. Rephrase prompt hardened with STRIP RULE: if target marks < 50% of source,
+     extract atomic core only — no second LLM call, just smarter prompting.
+  4. History tracking upgraded to soft verb-class fingerprinting: tracks
+     (verb-class, topic) pairs and nudges model to vary, but does NOT hard-block
+     (allows repeats after 2+ intervening questions for natural balance).
+  5. KG child-node enrichment for marks > 5: passes child subtopics from the
+     knowledge graph as additional context when available, falls back cleanly.
 """
 
 import json
@@ -14,51 +23,31 @@ from langchain_core.messages import HumanMessage
 
 
 # ============================================================================
-# CORE MATCHING HELPERS  (fuzzy substring — fixes zero-match problem)
+# CORE MATCHING HELPERS
 # ============================================================================
 
 def normalize(text: str) -> str:
-    """Lowercase, strip, collapse whitespace."""
     return re.sub(r"\s+", " ", text.lower().strip())
 
 
 def _topic_match(pyq_field: str, blueprint_topic: str) -> bool:
-    """
-    Flexible matching between a PYQ topic/subtopic string and the blueprint
-    topic string.  Tries in order:
-      1. Exact normalized equality
-      2. Blueprint topic is a substring of PYQ field  (e.g. "Dropout" in "Regularization Methods: Dropout")
-      3. PYQ field is a substring of blueprint topic
-      4. Any significant word (≥5 chars) from blueprint topic appears in PYQ field
-    """
     pt = normalize(pyq_field)
     bt = normalize(blueprint_topic)
-
     if not pt or not bt:
         return False
-
-    # 1 — exact
     if pt == bt:
         return True
-
-    # 2 — blueprint topic is inside PYQ field
     if bt in pt:
         return True
-
-    # 3 — PYQ field is inside blueprint topic
     if pt in bt:
         return True
-
-    # 4 — significant word overlap
     bt_words = {w for w in bt.split() if len(w) >= 5}
     if bt_words and any(w in pt for w in bt_words):
         return True
-
     return False
 
 
 def _pyq_topic_match(pyq: Dict, blueprint_topic: str) -> bool:
-    """Check both topic and subtopic fields of a PYQ against blueprint topic."""
     return (
         _topic_match(pyq.get("topic", ""), blueprint_topic) or
         _topic_match(pyq.get("subtopic", ""), blueprint_topic)
@@ -66,7 +55,6 @@ def _pyq_topic_match(pyq: Dict, blueprint_topic: str) -> bool:
 
 
 def match_level_1(pyq: Dict, topic: str, marks: int, bloom_level: str) -> bool:
-    """Fuzzy topic + exact marks + exact bloom_level."""
     return (
         _pyq_topic_match(pyq, topic)
         and pyq.get("marks") == marks
@@ -75,7 +63,6 @@ def match_level_1(pyq: Dict, topic: str, marks: int, bloom_level: str) -> bool:
 
 
 def match_level_2(pyq: Dict, topic: str, bloom_level: str) -> bool:
-    """Fuzzy topic + exact bloom_level (drop marks)."""
     return (
         _pyq_topic_match(pyq, topic)
         and normalize(pyq.get("bloom_level", "")) == normalize(bloom_level)
@@ -83,15 +70,10 @@ def match_level_2(pyq: Dict, topic: str, bloom_level: str) -> bool:
 
 
 def match_level_3(pyq: Dict, topic: str) -> bool:
-    """Fuzzy topic only (drop marks + bloom)."""
     return _pyq_topic_match(pyq, topic)
 
 
 def find_match(pyq_bank: List[Dict], used_pyq_ids: set, **criteria) -> Optional[Dict]:
-    """
-    Search PYQ bank with given criteria, skipping already-used PYQs.
-    criteria keys: level, topic, marks (optional), bloom_level (optional)
-    """
     level       = criteria.get("level", 1)
     topic       = criteria["topic"]
     marks       = criteria.get("marks")
@@ -111,8 +93,81 @@ def find_match(pyq_bank: List[Dict], used_pyq_ids: set, **criteria) -> Optional[
 
 
 # ============================================================================
-# MARK RANGE HELPER
+# MARKS → ANSWER STRUCTURE  (Change #1)
 # ============================================================================
+
+MARKS_STRUCTURE = {
+    "2-3": {
+        "label":           "2–3 marks",
+        "answer_length":   "3–5 lines in the answer booklet",
+        "question_length": "ONE short sentence — strictly one line, no exceptions",
+        "concepts":        "exactly ONE concept, ONE idea",
+        "sub_parts":       "NEVER allowed. No 'and', no 'also', no '/', no OR between two concepts.",
+        "style":           "definition / identification / one-point recall",
+        "examples":        [
+            "What is dropout in neural networks?",
+            "Define gradient descent.",
+            "What is a kernel function in SVM?",
+            "State the purpose of the activation function.",
+            "What is ACID in DBMS?",
+        ],
+        "banned_patterns": [
+            "X and Y",
+            "X as well as Y",
+            "X along with Y",
+            "X / Y",
+            "both X and Y",
+            "explain X and also explain Y",
+        ],
+    },
+    "4-6": {
+        "label":           "4–6 marks",
+        "answer_length":   "half a page in the answer booklet",
+        "question_length": "ONE line — may be a slightly deeper single concept",
+        "concepts":        "ONE concept with depth, OR one concept + one brief example",
+        "sub_parts":       "At most ONE sub-part, only if absolutely necessary. Prefer no sub-parts.",
+        "style":           "explanation / working / brief comparison of two closely related ideas",
+        "examples":        [
+            "Explain dropout and how it prevents overfitting.",
+            "Explain LSTM architecture.",
+            "What is an activation function? Describe any two types.",
+            "Explain the working of SVM with a kernel.",
+            "Describe the producer-consumer problem in OS.",
+        ],
+        "banned_patterns": [
+            "explain X, Y, and Z",
+            "three or more sub-parts",
+            "list all types of ...",
+        ],
+    },
+    "8-10": {
+        "label":           "8–10 marks",
+        "answer_length":   "full page in the answer booklet",
+        "question_length": "1–2 lines, may include one specific sub-task or parameter",
+        "concepts":        "one main concept with detailed explanation, OR a comparison of two related concepts",
+        "sub_parts":       "At most TWO sub-parts. No more.",
+        "style":           "detailed explanation / comparison / application with example or calculation",
+        "examples":        [
+            "Explain CNN architecture in detail. Calculate the number of parameters for a 32×32×3 input with ten 5×5 filters.",
+            "Differentiate between LSTM and GRU networks in detail.",
+            "Explain any three types of autoencoders with their working.",
+            "Explain GAN architecture and its real-world applications.",
+            "Compare distance vector and link state routing protocols based on working, advantages, and limitations.",
+        ],
+        "banned_patterns": [
+            "more than two sub-parts",
+            "list all ... explain all ...",
+        ],
+    },
+}
+
+def _get_marks_structure(marks: int) -> Dict:
+    if marks <= 3:
+        return MARKS_STRUCTURE["2-3"]
+    elif marks <= 6:
+        return MARKS_STRUCTURE["4-6"]
+    else:
+        return MARKS_STRUCTURE["8-10"]
 
 def _mark_range_label(marks: int) -> str:
     if marks <= 3:
@@ -124,142 +179,298 @@ def _mark_range_label(marks: int) -> str:
 
 
 # ============================================================================
-# FEW-SHOT EXAMPLES
+# BLOOM VERB GUIDANCE
 # ============================================================================
 
-# Used in rephrase_pyq()
+_BLOOM_VERBS = {
+    "Remember":   "Use verbs: define / list / state / name / recall / what is / identify",
+    "Understand": "Use verbs: explain / describe / summarize / classify / how does",
+    "Apply":      "Use verbs: solve / demonstrate / calculate / use / show with example",
+    "Analyze":    "Use verbs: compare / differentiate / examine / break down / analyze",
+    "Evaluate":   "Use verbs: justify / critique / assess / argue for/against / evaluate",
+    "Create":     "Use verbs: design / formulate / construct / propose / develop",
+}
+
+
+# ============================================================================
+# HISTORY TRACKING — Soft verb-class fingerprinting  (Change #4)
+# ============================================================================
+
+# Verb classes used to fingerprint each generated question
+_VERB_CLASSES = {
+    "define":    ["define", "what is", "what are", "state", "name", "identify", "list"],
+    "explain":   ["explain", "describe", "how does", "how do", "elaborate"],
+    "compare":   ["compare", "differentiate", "distinguish", "contrast"],
+    "apply":     ["calculate", "solve", "demonstrate", "show", "compute", "derive"],
+    "discuss":   ["discuss", "analyze", "examine", "evaluate", "assess", "justify"],
+    "outline":   ["outline", "summarize", "briefly", "write a short note", "short note"],
+}
+
+def _detect_verb_class(question_text: str) -> Optional[str]:
+    """Detect the verb class of a question from its first 60 characters."""
+    prefix = question_text.lower()[:60]
+    for cls, verbs in _VERB_CLASSES.items():
+        if any(v in prefix for v in verbs):
+            return cls
+    return None
+
+def _build_history_fingerprints(history: List[Dict]) -> List[Tuple[str, str]]:
+    """Returns list of (verb_class, topic) pairs from history."""
+    result = []
+    for h in history:
+        vc = _detect_verb_class(h.get("text", ""))
+        if vc:
+            result.append((vc, normalize(h.get("topic", ""))))
+    return result
+
+def _build_soft_history_instruction(
+    history: List[Dict],
+    current_topic: str,
+    marks: int,
+) -> str:
+    """
+    Soft nudge: if the same (verb_class, topic) pair appeared in the last 2
+    questions, ask model to vary. Does NOT hard-block — allows natural balance.
+    """
+    if not history:
+        return ""
+
+    fingerprints = _build_history_fingerprints(history)
+    recent = fingerprints[-2:]  # only look at last 2
+
+    current_topic_norm = normalize(current_topic)
+    same_topic_recent_verbs = [
+        vc for vc, t in recent if t == current_topic_norm
+    ]
+
+    if not same_topic_recent_verbs:
+        return ""
+
+    lines = [
+        "\nVARIETY NUDGE (soft — do not hard-repeat these for the same topic):",
+        f"  Recent verb classes used for '{current_topic}': {same_topic_recent_verbs}",
+        "  Try a different opening verb class if naturally possible.",
+        "  It is acceptable to repeat if no other verb fits the bloom level.",
+    ]
+    return "\n".join(lines)
+
+
+# ============================================================================
+# KG CHILD-NODE ENRICHMENT  (Change #5)
+# ============================================================================
+
+def _get_kg_children(knowledge_graph: Dict, topic: str) -> List[str]:
+    """
+    Returns child subtopic names for a given topic from the knowledge graph.
+    Supports both flat { module: [topics] } and nested { Modules: [...] } formats.
+    Returns empty list if topic not found or has no children.
+    """
+    if not knowledge_graph or not topic:
+        return []
+
+    topic_norm = normalize(topic)
+
+    # Handle nested format: { Modules: [ { Module_Name, Topics: [ { Topic_Name, Subtopics } ] } ] }
+    modules = knowledge_graph.get("Modules", [])
+    if isinstance(modules, list):
+        for mod in modules:
+            for t in mod.get("Topics", []):
+                if isinstance(t, dict):
+                    if normalize(t.get("Topic_Name", "")) == topic_norm:
+                        subtopics = t.get("Subtopics", [])
+                        if isinstance(subtopics, list):
+                            return [
+                                s.get("Subtopic_Name", s) if isinstance(s, dict) else s
+                                for s in subtopics
+                            ]
+
+    # Handle flat format: { Module_Name: ["Topic1", "Topic2"] }
+    # In flat format, topics are strings, no children available
+    return []
+
+def _enrich_topic_with_children(
+    topic: str,
+    subtopic: str,
+    marks: int,
+    knowledge_graph: Dict,
+) -> str:
+    """
+    For marks > 5, appends child subtopics to topic context string.
+    Falls back to topic + subtopic if no children found.
+    """
+    if marks <= 5 or not knowledge_graph:
+        return topic if not subtopic else f"{topic} (focus: {subtopic})"
+
+    children = _get_kg_children(knowledge_graph, topic)
+
+    if children:
+        children_str = ", ".join(children[:6])  # cap at 6 to avoid prompt bloat
+        return f"{topic} [key sub-concepts: {children_str}]"
+    elif subtopic:
+        return f"{topic} (focus: {subtopic})"
+    else:
+        return topic
+
+
+# ============================================================================
+# FEW-SHOT EXAMPLES  (Change #2 — tightened per mark range)
+# ============================================================================
+
 _REPHRASE_FEW_SHOTS = """
-EXAMPLES — how to scale a question to different mark ranges:
+EXAMPLES — how to scale a PYQ to a different mark range:
 
-Example 1 (ML — SVM):
-  Original question: "Explain Support Vector Machines and their working with kernel functions."
-  2–3 marks : What is a Support Vector Machine?
-  4–6 marks : Explain how Support Vector Machines work and the role of kernels.
-  8–10 marks: Explain Support Vector Machines in detail, including margin maximization, kernel trick, types of kernels, and real-world applications.
+NOTE: Watch how the question SHRINKS or GROWS. A 2-3M question is ALWAYS one line,
+one concept, zero sub-parts, no "and" joining two ideas.
 
-Example 2 (DBMS — Transactions):
-  Original question: "Discuss ACID properties and their importance in transaction management systems."
-  2–3 marks : What are ACID properties?
-  4–6 marks : Explain the ACID properties in DBMS with brief examples.
-  8–10 marks: Explain ACID properties in detail and analyze their role in ensuring reliability and consistency in transaction management systems with examples.
+Example 1 (Deep Learning — Autoencoders):
+  Original (10M): "Explain the concept and architecture of denoising autoencoders with their real-world applications and limitations."
+  2–3 marks : What is a denoising autoencoder?
+  4–6 marks : Explain denoising autoencoders and their working.
+  8–10 marks: Explain the architecture of denoising autoencoders and describe their real-world applications.
 
-Example 3 (OS — Scheduling):
-  Original question: "Compare different CPU scheduling algorithms and evaluate their performance."
+Example 2 (OS — Scheduling):
+  Original (10M): "Compare FCFS, SJF, and Round Robin scheduling algorithms. Analyze their performance based on waiting time and turnaround time."
   2–3 marks : What is CPU scheduling?
   4–6 marks : Explain any two CPU scheduling algorithms.
-  8–10 marks: Compare CPU scheduling algorithms such as FCFS, SJF, and Round Robin. Analyze their performance based on waiting time and turnaround time.
+  8–10 marks: Compare FCFS, SJF, and Round Robin scheduling algorithms based on waiting time and turnaround time.
 
-Example 4 (CN — Routing):
-  Original question: "Explain routing algorithms and compare distance vector and link state approaches."
+Example 3 (DBMS — Transactions):
+  Original (8M): "Discuss ACID properties and their importance in transaction management systems with suitable examples."
+  2–3 marks : What are ACID properties?
+  4–6 marks : Explain ACID properties in DBMS with a brief example.
+  8–10 marks: Explain ACID properties in detail and analyze their importance in ensuring reliability in transaction management systems.
+
+Example 4 (ML — SVM):
+  Original (6M): "Explain Support Vector Machines and their working with kernel functions."
+  2–3 marks : What is a Support Vector Machine?
+  4–6 marks : Explain how SVM works with kernel functions.
+  8–10 marks: Explain Support Vector Machines in detail, covering margin maximization, the kernel trick, and types of kernels.
+
+Example 5 (CN — Routing):
+  Original (8M): "Explain routing algorithms and compare distance vector and link state approaches."
   2–3 marks : What is routing in computer networks?
   4–6 marks : Explain distance vector and link state routing.
-  8–10 marks: Explain routing algorithms in detail and compare distance vector and link state approaches based on working, advantages, and limitations.
+  8–10 marks: Compare distance vector and link state routing algorithms based on working, convergence, and overhead.
 
-Example 5 (SE — SDLC):
-  Original question: "Explain different SDLC models and evaluate their suitability for various projects."
-  2–3 marks : What is SDLC?
-  4–6 marks : Explain any two SDLC models.
-  8–10 marks: Explain different SDLC models such as Waterfall, Agile, and Spiral. Evaluate their suitability for different project types with examples.
-
-Example 6 (Deep Learning — Autoencoders):
-  Original question: "Explain the concept and architecture of denoising autoencoders with real-world applications."
-  2–3 marks : What is a denoising autoencoder? How does it work?
-  4–6 marks : Explain denoising autoencoders in detail.
-  8–10 marks: Explain the concept of denoising autoencoders, describe their architecture, and explain their applications in real-world unsupervised learning scenarios.
+BAD EXAMPLES (do NOT do this):
+  ❌ 2M: "What is dropout and how does it help prevent overfitting in neural networks?"  ← TWO ideas joined with "and"
+  ❌ 2M: "Define gradient descent and explain its types."  ← sub-part hidden after "and"
+  ❌ 5M: "Explain LSTM, GRU, and their differences with applications."  ← too many concepts
 """
 
-# Used in generate_new_question()
 _GENERATE_FEW_SHOTS = """
-EXAMPLES — what good Mumbai University questions look like at each mark range:
+EXAMPLES — good Mumbai University questions at each mark range:
 
-─── 2–3 marks (1 line, recall/definition) ───
-  Topic: Denoising Autoencoders    | Bloom: Remember   → What are denoising autoencoders?
-  Topic: Gradient Descent          | Bloom: Remember   → Define gradient descent. State its purpose.
-  Topic: Sequence Learning Problem | Bloom: Understand → Describe the sequence learning problem.
-  Topic: GAN Architecture          | Bloom: Understand → What is a Generative Adversarial Network?
-  Topic: Pooling Layer             | Bloom: Remember   → What is pooling in CNNs? List its types.
+─── 2–3 marks (ONE line, ONE concept, ZERO "and" joining two ideas) ───
+  Topic: Denoising Autoencoders    | Bloom: Remember   → What is a denoising autoencoder?
+  Topic: Gradient Descent          | Bloom: Remember   → Define gradient descent.
+  Topic: GAN Architecture          | Bloom: Understand → How does a Generative Adversarial Network work?
+  Topic: Pooling Layer             | Bloom: Remember   → What is pooling in CNNs?
+  Topic: Dropout                   | Bloom: Understand → How does dropout reduce overfitting?
+  Topic: ACID Properties           | Bloom: Remember   → What are ACID properties in DBMS?
+  Topic: CPU Scheduling            | Bloom: Remember   → What is CPU scheduling?
+  Topic: Routing                   | Bloom: Remember   → What is routing in computer networks?
 
-─── 4–6 marks (1 line, short but deep) ───
-  Topic: Dropout                   | Bloom: Understand → Explain dropout. How does it solve overfitting?
-  Topic: LSTM                      | Bloom: Understand → Explain LSTM architecture.
-  Topic: CNN Architecture          | Bloom: Understand → Explain basic working of CNN.
-  Topic: Backpropagation           | Bloom: Understand → Explain Stochastic Gradient Descent and momentum-based gradient descent.
-  Topic: Regularization            | Bloom: Understand → Explain early stopping, batch normalization, and data augmentation.
-  Topic: Activation Functions      | Bloom: Understand → What is an activation function? Describe any four activation functions.
+  ✅ Each is ONE line. ONE concept. No "and" between two different ideas.
 
-─── 8–10 marks (1.5-2 lines maximum, detailed explanation or comparison) ───
-  Topic: CNN Architecture          | Bloom: Apply    → Explain CNN architecture. Calculate parameters for a 32×32×3 input with ten 5×5 filters, stride 1, pad 2.
+─── 4–6 marks (ONE line, one concept with depth or brief comparison of two related things) ───
+  Topic: Dropout                   | Bloom: Understand → Explain dropout and how it prevents overfitting.
+  Topic: LSTM                      | Bloom: Understand → Explain the architecture of LSTM networks.
+  Topic: Backpropagation           | Bloom: Understand → Explain stochastic and momentum-based gradient descent.
+  Topic: Activation Functions      | Bloom: Understand → What is an activation function? Describe any two types.
+  Topic: ACID Properties           | Bloom: Understand → Explain ACID properties with a suitable example.
+  Topic: CPU Scheduling            | Bloom: Understand → Explain any two CPU scheduling algorithms.
+
+─── 8–10 marks (1–2 lines, detailed or comparative, AT MOST 2 sub-parts) ───
+  Topic: CNN Architecture          | Bloom: Apply    → Explain CNN architecture in detail. Calculate parameters for a 32×32×3 input with ten 5×5 filters, stride 1.
   Topic: LSTM                      | Bloom: Analyze  → Differentiate between LSTM and GRU networks in detail.
-  Topic: Gradient Descent          | Bloom: Understand → What are the different types of Gradient Descent methods? Explain any three.
-  Topic: Autoencoders              | Bloom: Understand → Explain any three types of autoencoders with their working.
+  Topic: Autoencoders              | Bloom: Understand → Explain any three types of autoencoders with their working and applications.
   Topic: GAN                       | Bloom: Understand → Explain GAN architecture and its applications in detail.
-  Topic: AlexNet                   | Bloom: Analyze  → Explain and analyze the architectural components of AlexNet CNN.
+  Topic: AlexNet                   | Bloom: Analyze  → Explain the architectural components of AlexNet and analyze their contribution to its performance.
+  Topic: Routing                   | Bloom: Analyze  → Compare distance vector and link state routing based on working, convergence speed, and overhead.
 """
-
-# Bloom verb guidance — concise, used inline
-_BLOOM_VERBS = {
-    "Remember":   "Use verbs: define / list / state / name / recall",
-    "Understand": "Use verbs: explain / describe / summarize / classify",
-    "Apply":      "Use verbs: solve / demonstrate / calculate / use",
-    "Analyze":    "Use verbs: compare / differentiate / examine / break down",
-    "Evaluate":   "Use verbs: justify / critique / assess / argue for/against",
-    "Create":     "Use verbs: design / formulate / construct / propose",
-}
 
 
 # ============================================================================
 # LLM CALLS
 # ============================================================================
 
-def rephrase_pyq(pyq_text: str, target_marks: int, topic: str, bloom_level: str, question_type: str = "short_answer", history_texts: list = None) -> str:
+def rephrase_pyq(
+    pyq_text: str,
+    target_marks: int,
+    topic: str,
+    bloom_level: str,
+    question_type: str = "short_answer",
+    history: List[Dict] = None,
+    enriched_topic: str = None,
+) -> str:
     """
     Rephrase / scale an existing PYQ to the target marks and bloom level.
-    Uses few-shot examples so the model understands mark-range scaling.
+
+    Changes:
+    - Injects MARKS_STRUCTURE hard constraint block (Change #1)
+    - Soft history nudge via verb-class fingerprinting (Change #4)
+    - STRIP RULE for large downscaling (Change #3 — no extra LLM call)
+    - Uses enriched_topic if provided (Change #5)
     """
-    mark_range = _mark_range_label(target_marks)
-    bloom_verb = _BLOOM_VERBS.get(bloom_level, "Ask an appropriate question.")
+    ms           = _get_marks_structure(target_marks)
+    mark_range   = _mark_range_label(target_marks)
+    bloom_verb   = _BLOOM_VERBS.get(bloom_level, "Ask an appropriate question.")
+    display_topic = enriched_topic or topic
 
-    type_instructions = ""
-    if question_type == "mcq":
-        type_instructions = "\nQUESTION FORMAT REQUIREMENT: Convert the question into a Multiple Choice Question (MCQ). Provide 4 clear options labeled A), B), C), D)."
-    elif question_type == "true_false":
-        type_instructions = "\nQUESTION FORMAT REQUIREMENT: Convert the question into a True/False question."
-    elif question_type == "fill_in_the_blank":
-        type_instructions = "\nQUESTION FORMAT REQUIREMENT: Convert the question into a Fill-in-the-Blanks question."
-    elif question_type == "short_notes":
-        type_instructions = "\nQUESTION FORMAT REQUIREMENT: Convert the question into a 'Write a short note on...' style question."
+    # Detect if we're downscaling significantly
+    # Estimate source marks from text length as a rough heuristic
+    source_is_long = len(pyq_text.split()) > 20
+    strip_rule = ""
+    if target_marks <= 3 and source_is_long:
+        strip_rule = """
+STRIP RULE (target is 2–3 marks):
+  The original question covers too much. You MUST:
+  1. Extract ONLY the single core concept from the original question.
+  2. Ask about ONLY that one concept. Discard everything else.
+  3. Do NOT carry over any sub-parts, comparisons, or secondary ideas from the original.
+"""
 
-    history_context = ""
-    if history_texts:
-        recent = history_texts[-15:] # keep token usage small
-        history_context = "\nPREVIOUSLY GENERATED QUESTIONS IN THIS PAPER (Do NOT repeat their grammatical layout or introductory verbs):\n"
-        for text in recent:
-            history_context += f"- {text}\n"
+    type_instructions = _question_type_instruction(question_type)
+    history_nudge     = _build_soft_history_instruction(history or [], topic, target_marks)
 
     prompt = f"""You are a Mumbai University question paper setter.
-Your job: rewrite the given question so it fits exactly {target_marks} marks at {bloom_level} level.
+Rewrite the given question so it fits exactly {target_marks} marks at {bloom_level} Bloom level.
 
-TOPIC: {topic}
+TOPIC: {display_topic}
 TARGET MARKS: {target_marks}  (range: {mark_range})
 BLOOM LEVEL: {bloom_level}  — {bloom_verb}
 {type_instructions}
-{history_context}
+
+══════════════════════════════════════════════════════
+MARKS CONSTRAINT — FOLLOW EXACTLY, NO EXCEPTIONS
+══════════════════════════════════════════════════════
+Mark range  : {ms['label']}
+Answer size : {ms['answer_length']}
+Question    : {ms['question_length']}
+Concepts    : {ms['concepts']}
+Sub-parts   : {ms['sub_parts']}
+Style       : {ms['style']}
+
+BANNED PATTERNS for this mark range:
+{chr(10).join(f"  ✗ {p}" for p in ms['banned_patterns'])}
+
+GOOD QUESTION EXAMPLES for {ms['label']}:
+{chr(10).join(f"  ✓ {e}" for e in ms['examples'])}
+══════════════════════════════════════════════════════
+{strip_rule}
+{history_nudge}
 
 ORIGINAL QUESTION:
 {pyq_text}
 
 {_REPHRASE_FEW_SHOTS}
 
-SCALING RULES:
-  2–3 marks → 1 short line. Single concept. Definition or one-word-answer style.
-  4–6 marks → 1 line (short but deep).
-  8–10 marks → 1.5-2 lines maximum. May include a brief comparison or 1 sub-part.
-
 BLOOM ADJUSTMENT:
-  - If bloom level is Remember/Understand: keep the question theoretical ("explain", "describe", "define").
-  - If bloom level is Apply: add a small practical task ("demonstrate", "calculate", "show with example").
-  - If bloom level is Analyze: add comparison or breakdown ("compare", "differentiate", "examine").
-  - Do NOT add numerical problems unless the original question already has them.
+  - Remember/Understand → theoretical ("explain", "describe", "define", "what is")
+  - Apply → add a small practical task ("demonstrate", "calculate", "show with example")
+  - Analyze → add comparison ("compare", "differentiate", "examine")
+  - Do NOT add numerical problems unless the original already has them.
 
 OUTPUT: Write ONLY the rewritten question text. No preamble, no explanation.
 """
@@ -277,72 +488,64 @@ def generate_new_question(
     question_number: str,
     teacher_input: dict = None,
     question_type: str = "short_answer",
-    history_texts: list = None,
+    history: List[Dict] = None,
+    enriched_topic: str = None,
 ) -> str:
     """
     Generate a brand-new Mumbai University style question.
-    Uses few-shot examples calibrated to mark ranges.
+
+    Changes:
+    - Injects MARKS_STRUCTURE hard constraint block (Change #1)
+    - Soft history nudge via verb-class fingerprinting (Change #4)
+    - Uses enriched_topic if provided (Change #5)
     """
-    mark_range = _mark_range_label(marks)
-    bloom_verb = _BLOOM_VERBS.get(bloom_level, "Ask an appropriate question.")
+    ms            = _get_marks_structure(marks)
+    mark_range    = _mark_range_label(marks)
+    bloom_verb    = _BLOOM_VERBS.get(bloom_level, "Ask an appropriate question.")
+    display_topic = enriched_topic or (f"{topic} (focus: {subtopic})" if subtopic else topic)
 
-    # Teacher context
-    teacher_context = ""
-    if teacher_input:
-        t_text = teacher_input.get("input", "")
-        if t_text:
-            teacher_context = f"\nTeacher instructions (FOLLOW STRICTLY): {t_text}"
-        t_lower = t_text.lower()
-        if any(w in t_lower for w in ["easy", "simple", "basic", "introductory"]):
-            teacher_context += "\nDifficulty: EASY — definitions and simple explanations only."
-        elif any(w in t_lower for w in ["hard", "difficult", "advanced", "challenging"]):
-            teacher_context += "\nDifficulty: HARD — multi-step reasoning or analysis required."
-        if any(w in t_lower for w in ["no numerical", "avoid numerical", "no calculation"]):
-            teacher_context += "\nIMPORTANT: Do NOT include numerical problems."
-
-    type_instructions = ""
-    if question_type == "mcq":
-        type_instructions = "\nQUESTION FORMAT REQUIREMENT: You MUST generate a Multiple Choice Question (MCQ). Provide 4 clear options labeled A), B), C), D)."
-    elif question_type == "true_false":
-        type_instructions = "\nQUESTION FORMAT REQUIREMENT: You MUST generate a True/False question."
-    elif question_type == "fill_in_the_blank":
-        type_instructions = "\nQUESTION FORMAT REQUIREMENT: You MUST generate a Fill-in-the-Blanks question."
-    elif question_type == "short_notes":
-        type_instructions = "\nQUESTION FORMAT REQUIREMENT: You MUST generate a 'Write a short note on...' style question."
-
-    history_context = ""
-    if history_texts:
-        recent = history_texts[-15:]
-        history_context = "\nPREVIOUSLY GENERATED QUESTIONS IN THIS PAPER (Do NOT repeat their grammatical start or phrasing structure):\n"
-        for text in recent:
-            history_context += f"- {text}\n"
+    teacher_context   = _build_teacher_context(teacher_input)
+    type_instructions = _question_type_instruction(question_type)
+    history_nudge     = _build_soft_history_instruction(history or [], topic, marks)
 
     prompt = f"""You are a Mumbai University question paper setter.
 Generate ONE exam question for the specification below.
 
 SPECIFICATION:
   Module      : {module}
-  Topic       : {topic}
-  Subtopic    : {subtopic if subtopic else topic}
+  Topic       : {display_topic}
   Marks       : {marks}  (mark range: {mark_range})
   Bloom Level : {bloom_level}  — {bloom_verb}
 {teacher_context}
 {type_instructions}
-{history_context}
+
+══════════════════════════════════════════════════════
+MARKS CONSTRAINT — FOLLOW EXACTLY, NO EXCEPTIONS
+══════════════════════════════════════════════════════
+Mark range  : {ms['label']}
+Answer size : {ms['answer_length']}
+Question    : {ms['question_length']}
+Concepts    : {ms['concepts']}
+Sub-parts   : {ms['sub_parts']}
+Style       : {ms['style']}
+
+BANNED PATTERNS for this mark range:
+{chr(10).join(f"  ✗ {p}" for p in ms['banned_patterns'])}
+
+GOOD QUESTION EXAMPLES for {ms['label']}:
+{chr(10).join(f"  ✓ {e}" for e in ms['examples'])}
+══════════════════════════════════════════════════════
+{history_nudge}
 
 {_GENERATE_FEW_SHOTS}
 
 STRICT RULES:
-  1. Match the LENGTH to the mark range exactly:
-       2–3 marks → 1 line maximum (short recall/definition/concept question)
-       4–6 marks → 1 line (short but deep)
-       8–10 marks → 1.5-2 lines only but should cover 1-2 subparts. 
-  2. Match the VERB to the bloom level ({bloom_level}): {bloom_verb}
+  1. Match LENGTH to mark range — see constraint block above. Non-negotiable.
+  2. Match VERB to bloom level ({bloom_level}): {bloom_verb}
   3. Do NOT generate numerical/calculation problems unless teacher explicitly asked.
   4. Do NOT invent sub-topics outside the given topic.
-  5. Keep language natural and direct — like the PYQ examples above.
-  6. The question must be solvable in exam conditions by a student.
-  7. CRITICAL (VARIETY): Heavily vary your wording and grammatical structure! Do NOT start every question with the same word (e.g. avoid repeating "Define..." or "Explain..."). Use alternative phrasing (e.g. "What is...", "Identify the...", "Describe how...", "Outline the...", "Discuss the role of...").
+  5. Keep language natural and direct.
+  6. VARIETY: Vary your opening verb. Do not start with the same word as the nudge hints above.
 
 OUTPUT: Write ONLY the question text. No preamble, no label, no explanation.
 """
@@ -352,11 +555,42 @@ OUTPUT: Write ONLY the question text. No preamble, no label, no explanation.
 
 
 # ============================================================================
-# PYQ BANK GUARD  (handles empty / missing PYQ bank)
+# PROMPT HELPERS
+# ============================================================================
+
+def _question_type_instruction(question_type: str) -> str:
+    if question_type == "mcq":
+        return "\nQUESTION FORMAT: MCQ — provide 4 options labeled A), B), C), D)."
+    elif question_type == "true_false":
+        return "\nQUESTION FORMAT: True/False question."
+    elif question_type == "fill_in_the_blank":
+        return "\nQUESTION FORMAT: Fill-in-the-Blanks question."
+    elif question_type == "short_notes":
+        return "\nQUESTION FORMAT: 'Write a short note on...' style."
+    return ""
+
+def _build_teacher_context(teacher_input: dict) -> str:
+    if not teacher_input:
+        return ""
+    t_text = teacher_input.get("input", "")
+    if not t_text:
+        return ""
+    ctx = f"\nTeacher instructions (FOLLOW STRICTLY): {t_text}"
+    t_lower = t_text.lower()
+    if any(w in t_lower for w in ["easy", "simple", "basic", "introductory"]):
+        ctx += "\nDifficulty: EASY — definitions and simple explanations only."
+    elif any(w in t_lower for w in ["hard", "difficult", "advanced", "challenging"]):
+        ctx += "\nDifficulty: HARD — multi-step reasoning or analysis required."
+    if any(w in t_lower for w in ["no numerical", "avoid numerical", "no calculation"]):
+        ctx += "\nIMPORTANT: Do NOT include numerical problems."
+    return ctx
+
+
+# ============================================================================
+# PYQ BANK GUARD
 # ============================================================================
 
 def _pyq_bank_available(pyq_bank: List[Dict]) -> bool:
-    """Returns True only if the bank has at least one question with an id."""
     return bool(pyq_bank) and any(q.get("id") for q in pyq_bank)
 
 
@@ -369,22 +603,25 @@ def select_questions(
     pyq_bank: List[Dict],
     teacher_input: dict = None,
     qp_pattern: dict = None,
+    knowledge_graph: Dict = None,        # Change #5 — new optional param
 ) -> Dict:
     """
     Main question selection function.
 
-    If pyq_bank is empty / unavailable, all questions are treated as is_pyq=False
-    and generated directly — no PYQ matching is attempted.
+    knowledge_graph: optional — used to enrich topic context with child subtopics
+    for questions with marks > 5 (Change #5).
     """
 
     pyq_available = _pyq_bank_available(pyq_bank)
     if not pyq_available:
         print("⚠️  PYQ bank is empty or unavailable — all questions will be generated fresh.")
 
-    used_pyq_ids   = set()
+    used_pyq_ids  = set()
     draft_sections = []
     selection_log  = []
-    history_texts  = []
+
+    # History now stores dicts with 'text' and 'topic' for fingerprinting (Change #4)
+    history: List[Dict] = []
 
     stats = {
         "total_questions":      0,
@@ -402,13 +639,11 @@ def select_questions(
     for section in blueprint.get("sections", []):
         section_name = section["section_name"]
         section_desc = section.get("section_description", "")
-        
-        # Determine question type from qp_pattern
+
         section_type = "short_answer"
         if qp_pattern:
             for s in qp_pattern.get("sections", []):
                 if s.get("section_name") == section_name:
-                    # The frontend maps 'type' to 'section_description'
                     section_type = s.get("section_description") or s.get("type") or "short_answer"
                     break
 
@@ -426,21 +661,30 @@ def select_questions(
             module      = bp_q["module"]
             marks       = bp_q["marks"]
             bloom_level = bp_q["bloom_level"]
-            # If PYQ bank is absent, override is_pyq to False regardless of blueprint
             is_pyq      = bp_q.get("is_pyq", False) and pyq_available
 
+            # Change #5 — enrich topic with KG children for marks > 5
+            enriched_topic = _enrich_topic_with_children(
+                topic, subtopic, marks, knowledge_graph or {}
+            )
+
             print(f"\n  ▶ Q{q_num}: {topic} | {marks}M | {bloom_level} | is_pyq={is_pyq}")
+            if enriched_topic != topic:
+                print(f"     🌿 Enriched topic: {enriched_topic}")
 
             selected_text    = None
             selection_method = None
             source_pyq_id    = None
 
             # ────────────────────────────────────────────────────────────────
-            # CASE A: Generate directly (no PYQ needed)
+            # CASE A: Generate directly
             # ────────────────────────────────────────────────────────────────
             if not is_pyq:
-                selected_text    = generate_new_question(
-                    topic, subtopic, module, marks, bloom_level, q_num, teacher_input, section_type, history_texts
+                selected_text = generate_new_question(
+                    topic, subtopic, module, marks, bloom_level, q_num,
+                    teacher_input, section_type,
+                    history=history,                  # Change #4
+                    enriched_topic=enriched_topic,    # Change #5
                 )
                 selection_method = "generated_direct"
                 stats["direct_generated"] += 1
@@ -452,7 +696,6 @@ def select_questions(
             else:
                 match = None
 
-                # Level 1 — fuzzy topic + exact marks + exact bloom
                 match = find_match(
                     pyq_bank, used_pyq_ids,
                     level=1, topic=topic, marks=marks, bloom_level=bloom_level
@@ -467,51 +710,60 @@ def select_questions(
                     if mid != "unknown": used_pyq_ids.add(mid)
                     stats["pyq_exact_match"] += 1
 
-                # Level 2 — fuzzy topic + exact bloom (drop marks)
                 if not match:
                     match = find_match(
                         pyq_bank, used_pyq_ids,
                         level=2, topic=topic, bloom_level=bloom_level
                     )
                     if match:
-                        mid      = match.get("id", "unknown")
-                        orig_m   = match.get("marks", marks)
-                        text     = match.get("text", match.get("question", ""))
+                        mid    = match.get("id", "unknown")
+                        orig_m = match.get("marks", marks)
+                        text   = match.get("text", match.get("question", ""))
                         print(f"     🔄 L2 match (topic+bloom, {orig_m}M→{marks}M) → rephrasing PYQ #{mid}")
-                        selected_text    = rephrase_pyq(text, marks, topic, bloom_level, section_type, history_texts)
+                        selected_text = rephrase_pyq(
+                            text, marks, topic, bloom_level, section_type,
+                            history=history,
+                            enriched_topic=enriched_topic,
+                        )
                         selection_method = "pyq_rephrased_marks"
                         source_pyq_id    = mid
                         if mid != "unknown": used_pyq_ids.add(mid)
                         stats["pyq_rephrased_marks"] += 1
 
-                # Level 3 — fuzzy topic only (drop marks + bloom)
                 if not match:
                     match = find_match(
                         pyq_bank, used_pyq_ids,
                         level=3, topic=topic
                     )
                     if match:
-                        mid      = match.get("id", "unknown")
-                        orig_bl  = match.get("bloom_level", bloom_level)
-                        text     = match.get("text", match.get("question", ""))
+                        mid     = match.get("id", "unknown")
+                        orig_bl = match.get("bloom_level", bloom_level)
+                        text    = match.get("text", match.get("question", ""))
                         print(f"     🔄 L3 match (topic only, bloom {orig_bl}→{bloom_level}) → rephrasing PYQ #{mid}")
-                        selected_text    = rephrase_pyq(text, marks, topic, bloom_level, section_type, history_texts)
+                        selected_text = rephrase_pyq(
+                            text, marks, topic, bloom_level, section_type,
+                            history=history,
+                            enriched_topic=enriched_topic,
+                        )
                         selection_method = "pyq_rephrased_bloom"
                         source_pyq_id    = mid
                         if mid != "unknown": used_pyq_ids.add(mid)
                         stats["pyq_rephrased_bloom"] += 1
 
-                # Fallback — generate fresh
                 if not match:
                     print(f"     ⚡ No PYQ match → generating fresh question")
-                    selected_text    = generate_new_question(
-                        topic, subtopic, module, marks, bloom_level, q_num, teacher_input, section_type, history_texts
+                    selected_text = generate_new_question(
+                        topic, subtopic, module, marks, bloom_level, q_num,
+                        teacher_input, section_type,
+                        history=history,
+                        enriched_topic=enriched_topic,
                     )
                     selection_method = "generated_fallback"
                     stats["generated_new"] += 1
 
+            # Append to history with topic for fingerprinting (Change #4)
             if selected_text:
-                history_texts.append(selected_text)
+                history.append({"text": selected_text, "topic": topic})
 
             draft_q = {
                 "id":               str(uuid.uuid4())[:8],
@@ -549,7 +801,6 @@ def select_questions(
         "used_pyq_ids":       list(used_pyq_ids),
     }
 
-    # Summary
     print("\n" + "=" * 70)
     print("📊  SELECTION SUMMARY")
     print("=" * 70)
@@ -561,13 +812,18 @@ def select_questions(
     print(f"  PYQ Rephrased (bloom) : {stats['pyq_rephrased_bloom']}")
     print(f"  Generated (fallback)  : {stats['generated_new']}")
     print(f"  Generated (direct)    : {stats['direct_generated']}")
-    print(f"  PYQ Utilization       : {pyq_hits}/{total} ({pyq_hits/total*100:.0f}%)" if total else "")
+    if total:
+        print(f"  PYQ Utilization       : {pyq_hits}/{total} ({pyq_hits/total*100:.0f}%)")
     if not pyq_available:
         print("  ⚠️  PYQ bank was empty — all questions generated fresh")
     print("=" * 70)
 
     return draft_paper
 
+
+# ============================================================================
+# PRINT HELPER
+# ============================================================================
 
 def print_draft_paper(draft_paper: Dict):
     METHOD_LABELS = {

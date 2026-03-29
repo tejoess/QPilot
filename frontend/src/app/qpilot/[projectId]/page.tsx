@@ -10,6 +10,7 @@
 
 import { useRef, useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
+import { useUser } from "@clerk/nextjs";
 import Link from "next/link";
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import { QPilotSidebar } from "@/components/qpilot/QPilotSidebar";
@@ -25,6 +26,8 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import {
     Upload,
@@ -43,12 +46,16 @@ import {
     BrainCircuit,
     CheckCircle2,
     AlertTriangle,
-    Settings2
+    Settings2,
+    LayoutTemplate,
+    Download,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useBloomStore, type BloomKey } from "@/store/bloomStore";
 import { usePatternStore, type PatternSection } from "@/store/patternStore";
 import { useGenerationFlow, type GenerationConfig } from "@/hooks/useGenerationFlow";
+import { useTemplateStore, templatePatternToSections } from "@/store/templateStore";
+import { useQPilotConfigStore } from "@/store/qpilotConfigStore";
 
 function Typewriter({ text, delay = 10 }: { text: string; delay?: number }) {
     const [currentText, setCurrentText] = useState("");
@@ -468,9 +475,11 @@ function LogIcon({ level }: { level: "info" | "warning" | "error" }) {
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
-export default function QPilotPage() {
+
+export default function QPilotBuilderPage() {
     const { projectId } = useParams<{ projectId: string }>();
     const router = useRouter();
+    const { user } = useUser();
 
     // ── Input state ───────────────────────────────────────────────────────────
     const [syllabusMode, setSyllabusMode] = useState<"file" | "text">("file");
@@ -480,15 +489,69 @@ export default function QPilotPage() {
     const [pyqsMode, setPyqsMode] = useState<"file" | "text">("file");
     const [pyqsFile, setPyqsFile] = useState<File | null>(null);
     const [pyqsText, setPyqsText] = useState("");
+    const [hasPyq, setHasPyq] = useState<boolean>(true);
+    const [pyqWeightage, setPyqWeightage] = useState<number>(50);
 
     const [teacherInput, setTeacherInput] = useState("");
 
     // ── Stores ────────────────────────────────────────────────────────────────
     const { bloomLevels, setLevel } = useBloomStore();
-    const { sections, addSection, getTotalAllocated, getTotalQuestions } = usePatternStore();
+    const { sections, addSection, getTotalAllocated, getTotalQuestions, setSections, setTotalMarks } = usePatternStore();
+
+    // ── Template store ────────────────────────────────────────────────────────
+    const {
+        templates,
+        selectedTemplate,
+        selectTemplate,
+        fetchTemplates,
+        isRendering,
+        renderPaper,
+    } = useTemplateStore();
+
+    const { metadata: projectMeta } = useQPilotConfigStore();
+
+    useEffect(() => { fetchTemplates(); }, [fetchTemplates]);
+
+    const handleSelectTemplate = (tpl: typeof templates[0]) => {
+        if (isRunning) return;
+        if (selectedTemplate?.template_id === tpl.template_id) {
+            selectTemplate(null);
+            return;
+        }
+        selectTemplate(tpl);
+        if (tpl.pattern?.length) {
+            setSections(templatePatternToSections(tpl.pattern));
+            setTotalMarks(tpl.pattern.reduce((s, p) => s + p.num_parts * p.marks_per_part, 0));
+            toast.success(`Pattern autofilled from "${tpl.name}"`);
+        }
+    };
+
+    const [templateRendering, setTemplateRendering] = useState(false);
+    const [templateDone, setTemplateDone] = useState(false);
+
+    const handleRenderTemplate = async () => {
+        if (!selectedTemplate || !paperData) return;
+        setTemplateRendering(true);
+        try {
+            await renderPaper(paperData as object, {
+                subject: "",
+                class_name: "",
+                marks: String(getTotalAllocated()),
+                date: new Date().toLocaleDateString("en-IN"),
+                duration: "",
+                exam_name: "Question Paper",
+            });
+            setTemplateDone(true);
+            toast.success("Downloaded! Check your downloads folder.");
+        } catch (e) {
+            toast.error("Template render failed. Is backend running?");
+        } finally {
+            setTemplateRendering(false);
+        }
+    };
 
     // ── Generation flow ───────────────────────────────────────────────────────
-    const { phase, logs, error, runFullGeneration, reset } = useGenerationFlow();
+    const { phase, logs, error, paperData, runFullGeneration, reset } = useGenerationFlow();
     const isRunning = phase === "syllabus" || phase === "pyqs" || phase === "generating";
     const isDone = phase === "done";
 
@@ -498,18 +561,18 @@ export default function QPilotPage() {
         logEndRef.current?.scrollIntoView({ behavior: "smooth" });
     }, [logs.length]);
 
-    // Redirect when done
+    // Redirect when done — 8s delay so user can click "Generate in Template" first
     useEffect(() => {
         if (isDone) {
-            toast.success("Paper generated!", { description: "Redirecting to result…" });
-            const t = setTimeout(() => router.push(`/qpilot/${projectId}/resultqp`), 2000);
+            toast.success("Paper generated!", { description: "You can now download it in your template, or view the paper." });
+            const t = setTimeout(() => router.push(`/qpilot/${projectId}/resultqp`), 8000);
             return () => clearTimeout(t);
         }
     }, [isDone, projectId, router]);
 
     // ── Validation ────────────────────────────────────────────────────────────
     const syllabusOk = syllabusMode === "file" ? !!syllabusFile : syllabusText.trim().length > 20;
-    const pyqsOk = pyqsMode === "file" ? !!pyqsFile : pyqsText.trim().length > 20;
+    const pyqsOk = !hasPyq || (pyqsMode === "file" ? !!pyqsFile : pyqsText.trim().length > 20);
     const bloomTotal = Object.values(bloomLevels).reduce((a, b) => a + b, 0);
     const canGenerate = syllabusOk && pyqsOk && bloomTotal === 100 && !isRunning;
 
@@ -518,13 +581,20 @@ export default function QPilotPage() {
         const config: GenerationConfig = {
             syllabusFile: syllabusMode === "file" ? (syllabusFile ?? undefined) : undefined,
             syllabusText: syllabusMode === "text" ? syllabusText : undefined,
-            pyqsFile: pyqsMode === "file" ? (pyqsFile ?? undefined) : undefined,
-            pyqsText: pyqsMode === "text" ? pyqsText : undefined,
+            pyqsFile: hasPyq && pyqsMode === "file" ? (pyqsFile ?? undefined) : undefined,
+            pyqsText: !hasPyq ? `No pyqs available for this subject. Default weightage is ${pyqWeightage}%.` : (pyqsMode === "text" ? `PYQ Weightage: ${pyqWeightage}%.\n\n${pyqsText}` : `PYQ Weightage: ${pyqWeightage}%.`),
             bloomLevels,
             sections,
             totalMarks: getTotalAllocated() || 0,
             totalQuestions: getTotalQuestions() || sections.reduce((s, sec) => s + sec.numQuestions, 0),
             teacherInput: teacherInput.trim() || undefined,
+            userId: user?.id || "anonymous",
+            projectId: projectId,
+            // Metadata from store
+            title: projectMeta.title,
+            subject: projectMeta.subject,
+            grade: projectMeta.grade,
+            duration: projectMeta.duration,
         };
         await runFullGeneration(config);
     };
@@ -576,17 +646,39 @@ export default function QPilotPage() {
                             {/* ── 2. Previous Year Questions ── */}
                             <section className="space-y-3">
                                 <SectionLabel index={2} title="Previous Year Questions (PYQs)" />
-                                <ModeToggle mode={pyqsMode} onMode={setPyqsMode} disabled={isRunning} />
-                                {pyqsMode === "file" ? (
-                                    <FileUploadArea file={pyqsFile} onFile={setPyqsFile} disabled={isRunning} />
+                                
+                                {/* Optional PYQ Toggle */}
+                                <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg border border-border/40">
+                                    <div className="space-y-0.5">
+                                        <Label htmlFor="pyq-toggle" className="text-sm font-bold uppercase tracking-wide">Include PYQs?</Label>
+                                        <p className="text-[10px] text-muted-foreground font-medium">Toggle if you want to include previous year questions.</p>
+                                    </div>
+                                    <Switch id="pyq-toggle" checked={hasPyq} onCheckedChange={setHasPyq} disabled={isRunning} />
+                                </div>
+
+                                {!hasPyq ? (
+                                    <div className="p-4 bg-amber-500/5 border border-amber-500/20 rounded-lg text-amber-600/80">
+                                        <p className="text-xs font-bold uppercase tracking-tight flex items-center gap-2">
+                                            <AlertTriangle className="h-4 w-4" />
+                                            No PYQs Provided
+                                        </p>
+                                        <p className="text-[10px] mt-1 font-medium">Generation will rely solely on the syllabus context.</p>
+                                    </div>
                                 ) : (
-                                    <Textarea
-                                        placeholder="Paste previous year questions here…"
-                                        value={pyqsText}
-                                        disabled={isRunning}
-                                        onChange={(e) => setPyqsText(e.target.value)}
-                                        className="h-[120px] text-xs resize-none overflow-y-auto"
-                                    />
+                                    <div className="space-y-3">
+                                        <ModeToggle mode={pyqsMode} onMode={setPyqsMode} disabled={isRunning} />
+                                        {pyqsMode === "file" ? (
+                                            <FileUploadArea file={pyqsFile} onFile={setPyqsFile} disabled={isRunning} />
+                                        ) : (
+                                            <Textarea
+                                                placeholder="Paste previous year questions here…"
+                                                value={pyqsText}
+                                                disabled={isRunning}
+                                                onChange={(e) => setPyqsText(e.target.value)}
+                                                className="h-[120px] text-xs resize-none overflow-y-auto"
+                                            />
+                                        )}
+                                    </div>
                                 )}
                             </section>
 
@@ -665,6 +757,61 @@ export default function QPilotPage() {
                                         Add Section
                                     </Button>
                                 </div>
+
+                                {/* Template selector */}
+                                {templates.length > 0 && (
+                                    <div className="space-y-2">
+                                        <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                                            Use Template
+                                        </p>
+                                        <div className="space-y-1.5">
+                                            {templates.map((tpl) => {
+                                                const isSelected = selectedTemplate?.template_id === tpl.template_id;
+                                                const summary = tpl.pattern?.map(
+                                                    (p) => `Q${p.question_num}:${p.num_parts}×${p.marks_per_part}M`
+                                                ).join(" | ") ?? "";
+                                                return (
+                                                    <button
+                                                        key={tpl.template_id}
+                                                        disabled={isRunning}
+                                                        onClick={() => handleSelectTemplate(tpl)}
+                                                        className={cn(
+                                                            "w-full flex items-center gap-2.5 p-2.5 rounded-lg border text-left transition-all group",
+                                                            isSelected
+                                                                ? "border-emerald-500/50 bg-emerald-500/8 shadow-sm"
+                                                                : "border-border/50 bg-muted/20 hover:border-primary/30 hover:bg-primary/5",
+                                                            isRunning && "opacity-50 cursor-not-allowed"
+                                                        )}
+                                                    >
+                                                        <div className={cn(
+                                                            "p-1.5 rounded-md flex-shrink-0",
+                                                            isSelected ? "bg-emerald-500/15 text-emerald-600" : "bg-muted text-muted-foreground"
+                                                        )}>
+                                                            <FileText className="h-3 w-3" />
+                                                        </div>
+                                                        <div className="flex-1 min-w-0">
+                                                            <p className="text-[11px] font-bold text-foreground truncate">{tpl.name}</p>
+                                                            <p className="text-[10px] text-muted-foreground">{summary}</p>
+                                                        </div>
+                                                        {isSelected && <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 flex-shrink-0" />}
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+                                        {selectedTemplate && (
+                                            <p className="text-[10px] text-emerald-600 font-bold flex items-center gap-1">
+                                                <CheckCircle2 className="h-3 w-3" />
+                                                Pattern autofilled from &quot;{selectedTemplate.name}&quot;
+                                            </p>
+                                        )}
+                                    </div>
+                                )}
+
+                                {templates.length === 0 && (
+                                    <p className="text-[10px] text-muted-foreground">
+                                        <a href="/templates" className="underline text-primary">Upload a template</a> to autofill this section.
+                                    </p>
+                                )}
 
                                 {sections.length === 0 ? (
                                     <div className="py-8 text-center border-2 border-dashed border-muted rounded-xl text-xs text-muted-foreground">
@@ -787,13 +934,57 @@ export default function QPilotPage() {
                                     </div>
                                 )}
                                 {isDone && (
-                                    <Link href={`/qpilot/${projectId}/resultqp`}>
-                                        <Button className="w-full h-9 text-xs font-bold gap-2">
-                                            <CheckCircle2 className="h-3.5 w-3.5" />
-                                            View Paper
-                                            <ChevronRight className="h-3.5 w-3.5" />
-                                        </Button>
-                                    </Link>
+                                    <div className="space-y-2">
+                                        <Link href={`/qpilot/${projectId}/resultqp`}>
+                                            <Button className="w-full h-9 text-xs font-bold gap-2">
+                                                <CheckCircle2 className="h-3.5 w-3.5" />
+                                                View Paper
+                                                <ChevronRight className="h-3.5 w-3.5" />
+                                            </Button>
+                                        </Link>
+
+                                        {/* Generate in Template */}
+                                        {selectedTemplate && paperData && (
+                                            <button
+                                                disabled={templateRendering || templateDone}
+                                                onClick={handleRenderTemplate}
+                                                className={cn(
+                                                    "w-full flex items-center gap-2.5 p-3 rounded-xl border text-left transition-all",
+                                                    templateDone
+                                                        ? "border-emerald-500/40 bg-emerald-500/8"
+                                                        : "border-primary/30 bg-primary/5 hover:bg-primary/10",
+                                                    (templateRendering || templateDone) && "cursor-not-allowed opacity-80"
+                                                )}
+                                            >
+                                                <div className={cn(
+                                                    "p-1.5 rounded-lg flex-shrink-0",
+                                                    templateDone ? "bg-emerald-500/15 text-emerald-600" : "bg-primary/10 text-primary"
+                                                )}>
+                                                    <LayoutTemplate className="h-4 w-4" />
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <p className="text-[11px] font-bold text-foreground">
+                                                        {templateDone ? "Downloaded!" : "Generate in Template"}
+                                                    </p>
+                                                    <p className="text-[10px] text-muted-foreground truncate">
+                                                        {templateDone
+                                                            ? `Rendered into "${selectedTemplate.name}"`
+                                                            : `Fill into "${selectedTemplate.name}"`
+                                                        }
+                                                    </p>
+                                                </div>
+                                                <div className="flex-shrink-0">
+                                                    {templateRendering ? (
+                                                        <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                                                    ) : templateDone ? (
+                                                        <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                                                    ) : (
+                                                        <Download className="h-4 w-4 text-primary" />
+                                                    )}
+                                                </div>
+                                            </button>
+                                        )}
+                                    </div>
                                 )}
                                 {(phase === "done" || phase === "error") && (
                                     <Button

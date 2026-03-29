@@ -17,11 +17,13 @@ import { useQPilotConfigStore } from "@/store/qpilotConfigStore";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { Rocket, Loader2, ArrowRight, ShieldCheck } from "lucide-react";
-import { generatePaper } from "@/lib/projectApi";
+import { initProject } from "@/lib/projectApi";
+import { useUser } from "@clerk/nextjs";
 import { Separator } from "@/components/ui/separator";
 
 export default function QPilotConfigPage() {
     const router = useRouter();
+    const { user } = useUser();
     const {
         metadata,
         isSubmitting,
@@ -53,48 +55,33 @@ export default function QPilotConfigPage() {
             return;
         }
 
-        // 2. Execution
+        // 2. Skip DB insert (DB unavailable) — generate a local project ID and redirect directly
         setSubmitting(true);
-        console.log("QP Metadata:", metadata);
         const id = toast.loading("Initializing QPilot Engines...");
 
         try {
-            /**
-             * Phase 1 & 2 Integration:
-             * 1. Collect form values
-             * 2. Call backend API route /api/qp-metadata
-             * 3. Insert into Neon DB
-             */
-            const response = await fetch('/api/qp-metadata', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    exam_title: metadata.title,
+            const projectId = `proj-${Date.now()}`;
+            
+            // Sync metadata to DB
+            if (user?.id) {
+                await initProject({
+                    userId: user.id,
+                    projectId: projectId,
+                    name: metadata.title,
                     subject: metadata.subject,
                     grade: metadata.grade,
-                    total_marks: metadata.totalMarks || 80,
-                    duration: metadata.duration || "3 Hours",
-                    instructions: metadata.instructions || ""
-                })
-            });
-
-            const insertedData = await response.json();
-
-            if (response.ok) {
-                toast.success("Ready for Launch!", { id });
-                /**
-                 * Phase 3: Redirect to proj-demo-1 with metaId
-                 */
-                setTimeout(() => {
-                    router.push(`/qpilot/proj-demo-1?metaId=${insertedData.id}`);
-                }, 1000);
-            } else {
-                toast.error("Database Error", { id, description: "The server failed to save the metadata." });
-                setSubmitting(false);
+                    totalMarks: metadata.totalMarks,
+                    duration: metadata.duration
+                });
             }
+
+            toast.success("Ready for Launch!", { id });
+            setTimeout(() => {
+                router.push(`/qpilot/${projectId}`);
+            }, 800);
         } catch (err) {
             const error = err as { message?: string };
-            toast.error("Connection Failed", { id, description: error?.message || "Ensure backend is running." });
+            toast.error("Failed to start", { id, description: error?.message || "Unexpected error." });
             setSubmitting(false);
         }
     };

@@ -27,6 +27,8 @@ import {
     SelectTrigger,
     SelectValue
 } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import {
     History,
     FileUp,
@@ -80,6 +82,8 @@ export function PyqAgentCard({ projectId }: PyqAgentCardProps) {
 
     const [activeTab, setActiveTab] = useState<"pdf" | "text">("pdf");
     const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+    const [hasPyq, setHasPyq] = useState<boolean>(true);
+    const [pyqWeightage, setPyqWeightage] = useState<number>(50);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     // 🚀 NEW: Sync WebSocket progress to local steps
@@ -133,8 +137,8 @@ export function PyqAgentCard({ projectId }: PyqAgentCardProps) {
         try {
             // 🚀 NEW: Use WebSocket Orchestrator
             await orchestrator.analyzePyqs({
-                file: activeTab === "pdf" ? uploadedFile : undefined,
-                text: activeTab === "text" ? textContent : undefined,
+                file: hasPyq && activeTab === "pdf" ? uploadedFile : undefined,
+                text_content: hasPyq && activeTab === "text" ? `PYQ Weightage: ${pyqWeightage}%.\n\n${textContent}` : !hasPyq ? `No pyqs available for this subject. Default weightage is ${pyqWeightage}%.` : `PYQ Weightage: ${pyqWeightage}%`,
                 syllabusSessionId: orchestrator.syllabusSessionId || "", // Use syllabus session
             });
 
@@ -221,26 +225,52 @@ export function PyqAgentCard({ projectId }: PyqAgentCardProps) {
             <CardContent className="px-4 pb-4 space-y-4">
                 {status === "idle" ? (
                     <div className="space-y-4 animate-in fade-in duration-300">
-                        {/* Context Filters */}
-                        <div className="grid grid-cols-2 gap-2">
-                            <Select value={year} onValueChange={setYear}>
-                                <SelectTrigger className="h-8 text-[11px] font-bold">
-                                    <SelectValue placeholder="Year" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {YEARS.map(y => <SelectItem key={y} value={y} className="text-[11px] font-bold">{y}</SelectItem>)}
-                                </SelectContent>
-                            </Select>
-                            <Input
-                                placeholder="Board"
-                                className="h-8 text-[11px] font-bold"
-                                value={board}
-                                onChange={(e) => setBoard(e.target.value)}
-                            />
+                        {/* Optional PYQ Toggle */}
+                        <div className="flex items-center justify-between p-3 bg-muted/20 rounded-lg border border-border/40">
+                            <div className="space-y-0.5">
+                                <Label htmlFor="pyq-toggle" className="text-xs font-bold uppercase tracking-wide">Do you have PYQs?</Label>
+                                <p className="text-[10px] text-muted-foreground font-medium">Toggle if you want to include previous year questions.</p>
+                            </div>
+                            <Switch id="pyq-toggle" checked={hasPyq} onCheckedChange={setHasPyq} />
                         </div>
 
-                        {/* Tab Selection */}
-                        <div className="flex gap-1 p-1 bg-muted/50 rounded-lg text-muted-foreground">
+                        {!hasPyq ? (
+                            <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-lg text-amber-600">
+                                <p className="text-xs font-bold uppercase tracking-tight flex items-center gap-2">
+                                    <AlertCircle className="h-4 w-4" />
+                                    No PYQs Provided
+                                </p>
+                                <p className="text-[10px] mt-1 font-medium">Generation will rely on the syllabus alone.</p>
+                            </div>
+                        ) : (
+                            <>
+                                {/* Context Filters */}
+                                <div className="grid grid-cols-2 gap-2">
+                                    <Select value={year} onValueChange={setYear}>
+                                        <SelectTrigger className="h-8 text-[11px] font-bold bg-card">
+                                            <SelectValue placeholder="Year" />
+                                        </SelectTrigger>
+                                        <SelectContent className="bg-card z-[100]">
+                                            {YEARS.map(y => <SelectItem key={y} value={y} className="text-[11px] font-bold">{y}</SelectItem>)}
+                                        </SelectContent>
+                                    </Select>
+                                    <div className="flex items-center gap-2 border rounded-md px-2 bg-card">
+                                        <Label className="text-[10px] font-bold whitespace-nowrap text-muted-foreground uppercase">Weightage %</Label>
+                                        <Input
+                                            type="number"
+                                            value={pyqWeightage}
+                                            onChange={(e) => setPyqWeightage(Number(e.target.value))}
+                                            className="h-6 w-16 text-[11px] font-bold p-1 border-none focus-visible:ring-0 text-right bg-transparent"
+                                            min={0}
+                                            max={100}
+                                        />
+                                    </div>
+                                </div>
+        
+
+
+                                {/* Tab Selection */}
+                                <div className="flex gap-1 p-1 bg-muted/50 rounded-lg text-muted-foreground">
                             <Button
                                 variant={activeTab === "pdf" ? "secondary" : "ghost"}
                                 size="sm"
@@ -288,6 +318,8 @@ export function PyqAgentCard({ projectId }: PyqAgentCardProps) {
                                 value={textContent}
                                 onChange={(e) => setTextContent(e.target.value)}
                             />
+                                )}
+                            </>
                         )}
                     </div>
                 ) : (

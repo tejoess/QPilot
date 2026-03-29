@@ -366,8 +366,8 @@ export async function triggerFinalGeneration(data: FinalGenerationRequest): Prom
 // ─────────────────────────────────────────────────────────────────────────────
 // ✨ NEW: Backend Integration APIs (Real Implementation)
 // ─────────────────────────────────────────────────────────────────────────────
-
-const BACKEND_URL = "http://127.0.0.1:8000";
+/** backend baseURL */
+export const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
 
 /**
  * API 1: Analyze Syllabus
@@ -375,8 +375,15 @@ const BACKEND_URL = "http://127.0.0.1:8000";
  */
 export interface AnalyzeSyllabusRequest {
     file?: File;
-    text?: string;
-    sessionId?: string; // Optional: for WebSocket tracking
+    text_content?: string;
+    sessionId?: string;
+    userId?: string;
+    projectId?: string;
+    title?: string;
+    subject?: string;
+    grade?: string;
+    totalMarks?: number;
+    duration?: string;
 }
 
 export interface AnalyzeSyllabusResponse {
@@ -395,18 +402,19 @@ export interface AnalyzeSyllabusResponse {
     message: string;
 }
 
-export async function analyzeSyllabus(request: AnalyzeSyllabusRequest): Promise<AnalyzeSyllabusResponse> {
+export async function analyzeSyllabus(params: AnalyzeSyllabusRequest): Promise<AnalyzeSyllabusResponse> {
     const formData = new FormData();
     
-    if (request.file) {
-        formData.append("file", request.file);
-    }
-    if (request.text) {
-        formData.append("text", request.text);
-    }
-    if (request.sessionId) {
-        formData.append("session_id", request.sessionId);
-    }
+    if (params.file) formData.append("file", params.file);
+    if (params.text_content) formData.append("text_content", params.text_content);
+    if (params.sessionId) formData.append("session_id", params.sessionId);
+    if (params.userId) formData.append("user_id", params.userId);
+    if (params.projectId) formData.append("project_id", params.projectId);
+    if (params.title) formData.append("title", params.title);
+    if (params.subject) formData.append("subject", params.subject);
+    if (params.grade) formData.append("grade", params.grade);
+    if (params.totalMarks) formData.append("total_marks", params.totalMarks.toString());
+    if (params.duration) formData.append("duration", params.duration);
 
     const response = await fetch(`${BACKEND_URL}/analyze-syllabus`, {
         method: "POST",
@@ -421,6 +429,33 @@ export async function analyzeSyllabus(request: AnalyzeSyllabusRequest): Promise<
     return response.json();
 }
 
+/** Initialize project with metadata */
+export async function initProject(params: {
+    userId: string;
+    projectId: string;
+    name?: string;
+    subject?: string;
+    grade?: string;
+    totalMarks?: number;
+    duration?: string;
+}) {
+    const formData = new FormData();
+    formData.append("user_id", params.userId);
+    formData.append("project_id", params.projectId);
+    if (params.name) formData.append("name", params.name || "");
+    if (params.subject) formData.append("subject", params.subject || "");
+    if (params.grade) formData.append("grade", params.grade || "");
+    if (params.totalMarks) formData.append("total_marks", (params.totalMarks || 80).toString());
+    if (params.duration) formData.append("duration", params.duration || "3 Hours");
+
+    const res = await fetch(`${BACKEND_URL}/init-project`, {
+        method: "POST",
+        body: formData
+    });
+    if (!res.ok) throw new Error(await res.text());
+    return res.json();
+}
+
 /**
  * API 2: Analyze PYQs (Previous Year Questions)
  * Requires syllabus_session_id from step 1
@@ -428,8 +463,10 @@ export async function analyzeSyllabus(request: AnalyzeSyllabusRequest): Promise<
 export interface AnalyzePyqsRequest {
     syllabusSessionId: string;
     file?: File;
-    text?: string;
+    text_content?: string;
     sessionId?: string; // Optional: for WebSocket tracking
+    userId?: string;
+    projectId?: string;
 }
 
 export interface AnalyzePyqsResponse {
@@ -457,11 +494,17 @@ export async function analyzePyqs(request: AnalyzePyqsRequest): Promise<AnalyzeP
     if (request.file) {
         formData.append("file", request.file);
     }
-    if (request.text) {
-        formData.append("text", request.text);
+    if (request.text_content) {
+        formData.append("text_content", request.text_content);
     }
     if (request.sessionId) {
         formData.append("session_id", request.sessionId);
+    }
+    if (request.userId) {
+        formData.append("user_id", request.userId);
+    }
+    if (request.projectId) {
+        formData.append("project_id", request.projectId);
     }
 
     const response = await fetch(`${BACKEND_URL}/analyze-pyqs`, {
@@ -508,6 +551,8 @@ export interface GenerateQuestionPaperRequest {
     teacherInput?: string;
     // WebSocket tracking
     sessionId?: string;
+    userId?: string;
+    projectId?: string;
 }
 
 export interface GenerateQuestionPaperResponse {
@@ -581,6 +626,12 @@ export async function generateQuestionPaper(
     // Session ID for WebSocket tracking
     if (request.sessionId) {
         formData.append("session_id", request.sessionId);
+    }
+    if (request.userId) {
+        formData.append("user_id", request.userId);
+    }
+    if (request.projectId) {
+        formData.append("project_id", request.projectId);
     }
 
     const response = await fetch(`${BACKEND_URL}/generate-paper`, {

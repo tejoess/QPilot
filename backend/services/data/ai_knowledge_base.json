@@ -1,0 +1,82 @@
+{
+    "subject": "Advanced Artificial Intelligence",
+    "course_code": "CSC801",
+    "modules": [
+        {
+            "module_number": "1.0",
+            "module_name": "Generative and Probabilistic Models",
+            "topics": [
+                {
+                    "topic_number": "1.1",
+                    "topic_name": "Introduction",
+                    "content": "Overview of generative models, fundamentals of probability theory, introduction to GANs, VAEs, challenges in generative models."
+                },
+                {
+                    "topic_number": "1.2",
+                    "topic_name": "Probabilistic Models",
+                    "content": "Gaussian Mixture Models (GMMs), Hidden Markov Models (HMMs), Bayesian Networks, Markov Random Fields (MRFs), Probabilistic Graphical Models."
+                }
+            ]
+        },
+        {
+            "module_number": "2.0",
+            "module_name": "Generative Adversarial Networks",
+            "topics": [
+                {
+                    "topic_number": "2.1",
+                    "topic_name": "Basics of GAN",
+                    "content": "GAN architecture, discriminator and generator, training process, DCGAN, Conditional GAN, CycleGAN, GAN challenges."
+                }
+            ]
+        },
+        {
+            "module_number": "3.0",
+            "module_name": "Variational Autoencoders",
+            "topics": [
+                {
+                    "topic_number": "3.1",
+                    "topic_name": "Introduction to VAE",
+                    "content": "Architecture and training of VAEs, loss functions, latent space representation, inference."
+                },
+                {
+                    "topic_number": "3.2",
+                    "topic_name": "Types of Autoencoders",
+                    "content": "Undercomplete autoencoders, Sparse autoencoders, Contractive autoencoders, Denoising autoencoders."
+                }
+            ]
+        },
+        {
+            "module_number": "4.0",
+            "module_name": "Transfer Learning",
+            "topics": [
+                {
+                    "topic_number": "4.1",
+                    "topic_name": "Introduction to Transfer Learning",
+                    "content": "Pre-trained models, feature extraction, fine tuning, self-supervised learning, meta learning."
+                }
+            ]
+        },
+        {
+            "module_number": "5.0",
+            "module_name": "Ensemble Learning",
+            "topics": [
+                {
+                    "topic_number": "5.1",
+                    "topic_name": "Ensemble Classifiers",
+                    "content": "Bagging, Random Forest, Boosting, AdaBoost, Stacking, Blending, XGBoost."
+                }
+            ]
+        },
+        {
+            "module_number": "6.0",
+            "module_name": "Nascent Technologies in AI",
+            "topics": [
+                {
+                    "topic_number": "6.1",
+                    "topic_name": "Emerging Technologies",
+                    "content": "Metaverse, Augmented Reality, Virtual Worlds, Quantum AI paradigms."
+                }
+            ]
+        }
+    ]
+}

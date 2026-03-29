@@ -32,7 +32,7 @@ export function useWorkflowOrchestrator() {
     // ─── Step 1: Analyze Syllabus ─────────────────────────────────────────────
 
     const runSyllabusAnalysis = useCallback(async (
-        fileOrText: { file?: File; text?: string }
+        fileOrText: { file?: File; text_content?: string }
     ) => {
         try {
             // Generate session ID for WebSocket
@@ -51,7 +51,7 @@ export function useWorkflowOrchestrator() {
             // Make API call
             const response = await analyzeSyllabus({
                 file: fileOrText.file,
-                text: fileOrText.text,
+                text_content: fileOrText.text,
                 sessionId: sessionId,
             });
 
@@ -78,7 +78,7 @@ export function useWorkflowOrchestrator() {
     // ─── Step 2: Analyze PYQs ─────────────────────────────────────────────────
 
     const runPyqsAnalysis = useCallback(async (
-        fileOrText: { file?: File; text?: string }
+        fileOrText: { file?: File; text_content?: string }
     ) => {
         try {
             const syllabusSessionId = store.syllabusSessionId;
@@ -107,7 +107,7 @@ export function useWorkflowOrchestrator() {
             const response = await analyzePyqs({
                 syllabusSessionId,
                 file: fileOrText.file,
-                text: fileOrText.text,
+                text_content: fileOrText.text_content,
                 sessionId: sessionId,
             });
 

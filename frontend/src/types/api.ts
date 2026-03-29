@@ -86,6 +86,7 @@ export interface Project {
     settings: GenerationSettings; // Added: Switches and difficulty
     createdAt: string;
     updatedAt: string;
+    pdfUrl?: string;
 }
 
 export interface GenerationSettings {

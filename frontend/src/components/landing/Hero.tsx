@@ -29,7 +29,7 @@ export function Hero() {
 
                     <div className="flex flex-wrap gap-4 mt-4">
                         <Link href="/qpilot">
-                            <HoverBorderGradient className="bg-primary text-primary-foreground font-bold px-8 py-4 text-lg">
+                            <HoverBorderGradient as="div" className="bg-primary text-primary-foreground font-bold px-8 py-4 text-lg">
                                 Start Generating
                             </HoverBorderGradient>
                         </Link>

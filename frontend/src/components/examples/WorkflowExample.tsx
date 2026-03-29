@@ -36,7 +36,7 @@ export function WorkflowExample() {
         try {
             await orchestrator.analyzeSyllabus({
                 file: syllabusFile || undefined,
-                text: syllabusText || undefined,
+                text_content: syllabusText || undefined,
             });
             
             // Queue PYQs analysis to run after this completes

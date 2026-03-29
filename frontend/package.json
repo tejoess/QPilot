@@ -9,6 +9,7 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@azure/storage-blob": "^12.31.0",
     "@clerk/nextjs": "^6.38.1",
     "@neondatabase/serverless": "^1.0.2",
     "class-variance-authority": "^0.7.1",

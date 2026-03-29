@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/select";
 import { FileText, GraduationCap, BookOpen, Clock } from "lucide-react";
 
-const GRADES = ["6", "7", "8", "9", "10", "11", "12", "Other"];
+const GRADES = ["FE", "SE", "TE", "BE", "Other"];
 const BOARDS = ["CBSE", "ICSE", "IGCSE", "State Board", "Other"];
 
 export function QPilotMetadataForm() {
@@ -105,7 +105,7 @@ export function QPilotMetadataForm() {
                                 <SelectTrigger id="board" className="bg-card font-medium">
                                     <SelectValue placeholder="Select Board" />
                                 </SelectTrigger>
-                                <SelectContent>
+                                <SelectContent className="z-[100] bg-card">
                                     {BOARDS.map((b) => (
                                         <SelectItem key={b} value={b}>{b === "Other" ? "Other / Custom" : b}</SelectItem>
                                     ))}

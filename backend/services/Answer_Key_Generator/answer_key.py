@@ -1,5 +1,7 @@
 import json
-import requests
+import os
+import tempfile
+from dotenv import load_dotenv
 from reportlab.lib.pagesizes import A4
 from reportlab.lib import colors
 from reportlab.lib.styles import ParagraphStyle
@@ -7,8 +9,7 @@ from reportlab.lib.units import cm
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable, KeepTogether
 from reportlab.lib.enums import TA_CENTER, TA_LEFT
 
-MODEL = "openai/gpt-4o-mini"
-
+load_dotenv()
 
 # ── Prompt Builder ────────────────────────────────────────────────────────────
 
@@ -55,41 +56,70 @@ STRICT RULES:
     return prompt
 
 
-# ── OpenRouter API Call ───────────────────────────────────────────────────────
+# ── LangChain OpenAI Call ─────────────────────────────────────────────────────
 
-def call_openrouter(prompt: str) -> dict:
-    headers = {
-        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-        "Content-Type": "application/json"
-    }
-    payload = {
-        "model": MODEL,
-        "messages": [{"role": "user", "content": prompt}]
-    }
-    response = requests.post(
-        "https://openrouter.ai/api/v1/chat/completions",
-        headers=headers,
-        json=payload
-    )
-    response.raise_for_status()
-    content = response.json()["choices"][0]["message"]["content"]
+def call_openai(prompt: str) -> dict:
+    from backend.services.llm_service import openai_llm
+    from langchain_core.messages import HumanMessage
 
-    content = content.strip()
+    response = openai_llm.invoke([HumanMessage(content=prompt)])
+    content = response.content.strip()
+
+    # Strip markdown code fences if present
     if content.startswith("```"):
-        content = content.split("```")[1]
-        if content.startswith("json"):
-            content = content[4:]
+        lines = content.split("\n")
+        # Remove first and last fence lines
+        lines = [l for l in lines if not l.strip().startswith("```")]
+        content = "\n".join(lines).strip()
 
-    return json.loads(content.strip())
+    return json.loads(content)
 
 
 # ── Answer Key Generator ──────────────────────────────────────────────────────
 
+def _normalise_to_questions_list(input_json: dict) -> list:
+    """
+    The QPilot pipeline produces a *sections-based* format:
+        { "sections": [ { "section_name": ..., "questions": [ { "question_text": ..., "marks": ... } ] } ] }
+
+    The original answer_key.py expected a *questions-based* format:
+        { "questions": [ { "question_no": ..., "sub_questions": [...] } ] }
+
+    This helper detects which format we have and returns a normalised list of
+    question dicts that the generator loop can consume in the same way.
+    """
+    # ── Sections-based format (pipeline output) ───────────────────────────────
+    if "sections" in input_json:
+        questions = []
+        q_counter = 1
+        for section in input_json.get("sections", []):
+            section_name = section.get("section_name", "S")
+            for q in section.get("questions", []):
+                question_text = q.get("question_text") or q.get("text") or q.get("question", "")
+                marks = q.get("marks", 0)
+                questions.append({
+                    "question_no": f"Q{q_counter}",
+                    "type": section.get("section_type", ""),
+                    "marks_each": marks,
+                    "total_marks": marks,
+                    # Wrap the single question as one sub_question so the loop
+                    # below works without modification.
+                    "sub_questions": [{"question": question_text, "marks": marks}],
+                })
+                q_counter += 1
+        return questions
+
+    # ── Original questions-based format ───────────────────────────────────────
+    return input_json.get("questions", [])
+
+
 def generate_answer_key(input_json: dict, syllabus: str = "") -> dict:
     answer_key = []
 
-    for question in input_json["questions"]:
-        question_no = question["question_no"]
+    questions = _normalise_to_questions_list(input_json)
+
+    for question in questions:
+        question_no = question.get("question_no", "Q?")
         marks_each = question.get("marks_each")
         question_type = question.get("type", "")
         sub_questions = question.get("sub_questions", [])
@@ -109,7 +139,7 @@ def generate_answer_key(input_json: dict, syllabus: str = "") -> dict:
 
             if isinstance(sub_q, str):
                 question_text = sub_q
-                marks = marks_each or (question.get("total_marks", 20) // 4)
+                marks = marks_each or (question.get("total_marks", 20) // max(len(sub_questions), 1))
                 parts = None
             elif isinstance(sub_q, dict):
                 question_text = sub_q.get("question", "")
@@ -125,7 +155,7 @@ def generate_answer_key(input_json: dict, syllabus: str = "") -> dict:
             print(f"Generating answer key for {sub_question_no}...")
             try:
                 prompt = build_prompt(question_data, syllabus)
-                answer = call_openrouter(prompt)
+                answer = call_openai(prompt)
                 answer_key_question["sub_questions"].append(answer)
             except Exception as e:
                 print(f"Error for {sub_question_no}: {e}")
@@ -301,26 +331,4 @@ def generate_pdf(answer_key_json: dict, output_path: str = "answer_key.pdf"):
 
     doc.build(story)
     print("PDF saved to:", output_path)
-
-
-# ── Main ──────────────────────────────────────────────────────────────────────
-
-if __name__ == "__main__":
-    with open("questions.json", "r") as f:
-        input_json = json.load(f)
-
-    syllabus = ""
-    try:
-        with open("syllabus.txt", "r") as f:
-            syllabus = f.read()
-        print("Syllabus loaded successfully!")
-    except FileNotFoundError:
-        print("No syllabus.txt found, proceeding without syllabus context.")
-
-    result = generate_answer_key(input_json, syllabus)
-
-    with open("answer_key.json", "w") as f:
-        json.dump(result, f, indent=2)
-    print("\nAnswer key JSON saved to: answer_key.json")
-
-    generate_pdf(result, output_path="answer_key.pdf")
+    return output_path
