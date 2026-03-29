@@ -59,7 +59,7 @@ export function WorkflowExample() {
         try {
             await orchestrator.analyzePyqs({
                 file: pyqsFile || undefined,
-                text: pyqsText || undefined,
+                text_content: pyqsText || undefined,
             });
 
             console.log("✅ PYQs analysis started!");
