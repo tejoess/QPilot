@@ -59,7 +59,7 @@ jobs:
             --name qpilot-backend-${{ env.ENV_NAME }} \
             --resource-group ${{ secrets.RG }} \
             --image ${{ secrets.ACR_NAME }}.azurecr.io/qpilot-backend-${{ env.ENV_NAME }}:${{ github.sha }} \
-            --set-env-vars DATABASE_URL=${{ secrets.DATABASE_URL }} OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }} AZURE_STORAGE_CONNECTION_STRING=${{ secrets.AZURE_STORAGE_CONNECTION_STRING }}
+            --set-env-vars DATABASE_URL="${{ secrets.DATABASE_URL }}" OPENAI_API_KEY="${{ secrets.OPENAI_API_KEY }}" OPENROUTER_API_KEY="${{ secrets.OPENROUTER_API_KEY }}" GEMINI_API_KEY="${{ secrets.GEMINI_API_KEY }}" AZURE_STORAGE_CONNECTION_STRING="${{ secrets.AZURE_STORAGE_CONNECTION_STRING }}"
 
       # 4. Deploy/Update Frontend ACA
       - name: Deploy Frontend to ACA
