@@ -20,7 +20,7 @@ from backend.services.Answer_Key_Generator.answer_key import generate_answer_key
 from backend.Storage.Blob_Storage.blob_upload import upload_to_azure
 from backend.services.paper_pdf_gen import format_paper_to_pdf
 from backend.database import get_db, engine
-from backend.models import Base, User, Project, PipelineData, Document
+from backend.models import Base, User, Project, PipelineData, Document, TemplateData
 from sqlalchemy.orm import Session
 
 # Create DB tables
@@ -64,6 +64,14 @@ def ensure_db_user_project(db_session: Session, user_id: str, project_id: Option
             if duration: proj.duration = duration
         
         db_session.commit()
+
+def ensure_pipeline_data(db_session: Session, project_id: str):
+    pld = db_session.query(PipelineData).filter_by(project_id=project_id).first()
+    if not pld:
+        pld = PipelineData(project_id=project_id)
+        db_session.add(pld)
+        db_session.flush()
+    return pld
 
 @backend.post("/init-project")
 async def init_project(
@@ -597,6 +605,18 @@ async def upload_template(
                 azure_url=azure_template_url
             )
             db_session.add(doc)
+            
+            # Persist to TemplateData so it survives container restarts
+            td = TemplateData(
+                id=template_id,
+                user_id=user_id,
+                name=file.filename,
+                azure_url=azure_template_url,
+                pattern_json=pattern,
+                placeholders_json=placeholders.get("all", [])
+            )
+            db_session.add(td)
+            
             db_session.commit()
         except Exception as e:
             print(f"Failed to record template doc: {e}")
@@ -629,7 +649,29 @@ async def list_user_templates(user_id: Optional[str] = None):
     List all uploaded templates for a user.
     """
     uid = (user_id or "anonymous").strip()
-    templates = list_templates(uid)
+    
+    templates = []
+    
+    # Try fetching from database first
+    if user_id:
+        try:
+            db_session = next(get_db())
+            db_templates = db_session.query(TemplateData).filter_by(user_id=uid).all()
+            for t in db_templates:
+                templates.append({
+                    "template_id": t.id,
+                    "name": t.name,
+                    "azure_url": t.azure_url,
+                    "pattern": t.pattern_json,
+                    "placeholders": t.placeholders_json,
+                })
+        except Exception as e:
+            print(f"Error fetching templates from DB: {e}")
+            
+    # Fallback to local disk if DB is empty or fails
+    if not templates:
+        templates = list_templates(uid)
+        
     return JSONResponse(content={
         "status": "success",
         "templates": templates,
@@ -645,6 +687,23 @@ async def get_template_pattern(template_id: str, user_id: Optional[str] = None):
     Get the extracted pattern for a specific template (for autofill in frontend).
     """
     uid = (user_id or "anonymous").strip()
+    
+    # Check DB first
+    if user_id:
+        try:
+            db_session = next(get_db())
+            t = db_session.query(TemplateData).filter_by(id=template_id, user_id=uid).first()
+            if t:
+                return JSONResponse(content={
+                    "status": "success",
+                    "template_id": template_id,
+                    "name": t.name,
+                    "pattern": t.pattern_json,
+                    "placeholders": t.placeholders_json or [],
+                })
+        except:
+            pass
+            
     meta = get_template_meta(uid, template_id)
     if not meta:
         raise HTTPException(status_code=404, detail=f"Template {template_id} not found.")
@@ -680,6 +739,29 @@ async def render_paper_in_template(
     """
     uid = (user_id or "anonymous").strip()
     docx_path = get_template_path(uid, template_id)
+    
+    # If not found locally, download it from Azure Blob Storage using DB
+    if not docx_path or not os.path.exists(docx_path):
+        azure_url = None
+        if user_id:
+            try:
+                db_session = next(get_db())
+                t = db_session.query(TemplateData).filter_by(id=template_id, user_id=uid).first()
+                if t and t.azure_url:
+                    azure_url = t.azure_url
+            except Exception as e:
+                print(f"Error querying template DB: {e}")
+                
+        if azure_url:
+            import urllib.request
+            import tempfile
+            try:
+                temp_docx_path = os.path.join(tempfile.gettempdir(), f"{template_id}_downloaded.docx")
+                urllib.request.urlretrieve(azure_url, temp_docx_path)
+                docx_path = temp_docx_path
+            except Exception as e:
+                print(f"Failed to download azure url {azure_url} : {e}")
+                
     if not docx_path or not os.path.exists(docx_path):
         raise HTTPException(status_code=404, detail=f"Template {template_id} DOCX file not found.")
 
@@ -749,32 +831,39 @@ async def delete_template_endpoint(
 ):
     uid = (user_id or "anonymous").strip()
     
+    # Remove from DB if possible
+    azure_url = None
+    if user_id:
+        try:
+            db_session = next(get_db())
+            t = db_session.query(TemplateData).filter_by(id=template_id, user_id=uid).first()
+            if t:
+                azure_url = t.azure_url
+                db_session.delete(t)
+            
+            # Also clean up Document table
+            if azure_url:
+                db_session.query(Document).filter_by(azure_url=azure_url, user_id=uid).delete()
+            else:
+                db_session.query(Document).filter(Document.name.contains(template_id), Document.user_id==uid).delete()
+                
+            db_session.commit()
+        except Exception as e:
+            print(f"Error deleting template from DB: {e}")
+            
     # Remove from local
     user_dir = os.path.join("backend", "Storage", "templates", uid)
     meta_path = os.path.join(user_dir, f"{template_id}.meta.json")
     
-    azure_url = None
     if os.path.exists(meta_path):
         try:
             with open(meta_path, "r") as f:
                 meta = json_lib.load(f)
-                azure_url = meta.get("azure_url")
                 docx_path = meta.get("docx_path")
                 if docx_path and os.path.exists(docx_path):
                     os.unlink(docx_path)
             os.unlink(meta_path)
         except Exception:
-            pass
-            
-    # Remove from DB if possible
-    if user_id:
-        try:
-            db_session = next(get_db())
-            # Find document with this azure_url or doc_type="template" matching name (heuristic)
-            if azure_url:
-                db_session.query(Document).filter_by(azure_url=azure_url, user_id=uid).delete()
-                db_session.commit()
-        except:
             pass
 
     return JSONResponse(content={"status": "success", "message": "Template deleted"})

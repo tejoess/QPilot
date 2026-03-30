@@ -28,7 +28,10 @@ export function useQPilotInterface(projectId: string, requestData: PaperGenerati
     const wsRef = useRef<WebSocket | null>(null);
 
     const connectWebSocket = useCallback((sessionId: string) => {
-        const wsUrl = `${process.env.NEXT_PUBLIC_WS_BASE_URL}/ws/${sessionId}`;
+        const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000";
+        const wsProtocol = apiBaseUrl.startsWith("https") ? "wss" : "ws";
+        const hostString = apiBaseUrl.replace(/^https?:\/\//, "");
+        const wsUrl = `${wsProtocol}://${hostString}/ws/${sessionId}`;
         const ws = new WebSocket(wsUrl);
 
         ws.onmessage = (event) => {

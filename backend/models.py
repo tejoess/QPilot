@@ -79,3 +79,19 @@ class Document(Base):
 
     user = relationship("User", back_populates="documents")
     project = relationship("Project", back_populates="documents")
+
+class TemplateData(Base):
+    """
+    Persistent storage for uploaded user templates to survive container restarts.
+    """
+    __tablename__ = "template_data"
+
+    id = Column(String, primary_key=True, index=True) # template_id
+    user_id = Column(String, ForeignKey("users.clerk_id"))
+    
+    name = Column(String)
+    azure_url = Column(String, nullable=True)
+    pattern_json = Column(JSON, nullable=True)
+    placeholders_json = Column(JSON, nullable=True)
+
+    created_at = Column(DateTime(timezone=True), server_default=func.now())

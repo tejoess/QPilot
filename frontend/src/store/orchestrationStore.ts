@@ -116,7 +116,10 @@ export const useOrchestrationStore = create<OrchestrationState>((set, get) => ({
         if (ws) ws.close();
 
         const connect = () => {
-            const socket = new WebSocket(`ws://127.0.0.1:8000/ws/${sessionId}`);
+            const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000";
+            const wsProtocol = baseUrl.startsWith("https") ? "wss" : "ws";
+            const hostString = baseUrl.replace(/^https?:\/\//, "");
+            const socket = new WebSocket(`${wsProtocol}://${hostString}/ws/${sessionId}`);
 
             socket.onopen = () => set({ ws: socket, isConnected: true });
 
