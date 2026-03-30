@@ -7,7 +7,7 @@ from openai import OpenAI
 env_path = os.path.join(os.path.dirname(__file__), "..", ".env")
 load_dotenv(dotenv_path=env_path)
 
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY", "missing_openai_key"))
 
 def load_syllabus(file_path):
     # Handle both relative and absolute paths

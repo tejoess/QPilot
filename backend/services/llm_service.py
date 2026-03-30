@@ -7,9 +7,10 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 load_dotenv()
 
 # API keys from .env
-OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "missing_openrouter_key")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "missing_openai_key")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "missing_gemini_key")
+
 
 
 # --- OpenRouter LLM ---
