@@ -131,10 +131,25 @@ export async function getUserDocuments() {
             else if (label === "final_pdf") label = "Generated PDF";
             else if (label === "template") label = "DOCX Template";
             else if (label === "docx_paper") label = "Generated DOCX";
+
+            // For legacy PYQ rows that saved placeholder names, prefer blob filename.
+            let displayName = d.name;
+            if (d.docType === "pyqs" && d.azureUrl) {
+                try {
+                    const url = new URL(d.azureUrl);
+                    const parts = url.pathname.split("/").filter(Boolean);
+                    const blobName = parts[parts.length - 1];
+                    if (blobName) {
+                        displayName = decodeURIComponent(blobName);
+                    }
+                } catch {
+                    displayName = d.name;
+                }
+            }
             
             return {
                 id: d.id,
-                name: d.name,
+                name: displayName,
                 type: label,
                 date: d.createdAt.toLocaleDateString(),
                 size: d.fileSizeBytes ? `${(d.fileSizeBytes / 1024 / 1024).toFixed(1)} MB` : "—",
@@ -144,5 +159,44 @@ export async function getUserDocuments() {
     } catch (e) {
         console.error("DB Error:", e);
         return [];
+    }
+}
+
+export async function getProjectPaperSnapshot(projectId: string) {
+    const user = await currentUser();
+    if (!user) return null;
+
+    try {
+        const projectRows = await db
+            .select()
+            .from(projectsTable)
+            .where(and(eq(projectsTable.id, projectId), eq(projectsTable.userId, user.id)))
+            .limit(1);
+
+        if (projectRows.length === 0) return null;
+
+        const pipelineRows = await db
+            .select()
+            .from(pipelineDataTable)
+            .where(eq(pipelineDataTable.projectId, projectId))
+            .limit(1);
+
+        const project = projectRows[0];
+        const pipeline = pipelineRows[0];
+
+        return {
+            project: {
+                id: project.id,
+                name: project.name,
+                subject: project.subject,
+                grade: project.grade,
+                totalMarks: project.totalMarks,
+                duration: project.duration,
+            },
+            finalPaper: pipeline?.finalPaperJson ?? null,
+        };
+    } catch (e) {
+        console.error("Failed to fetch project paper snapshot:", e);
+        return null;
     }
 }

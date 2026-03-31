@@ -30,10 +30,17 @@ interface TemplateRenderButtonProps {
     paperJson: object | null;
     /** Optional override for date string */
     examDate?: string;
+    metadataOverride?: {
+        subject?: string;
+        class_name?: string;
+        marks?: string;
+        duration?: string;
+        exam_name?: string;
+    };
     className?: string;
 }
 
-export function TemplateRenderButton({ paperJson, examDate, className }: TemplateRenderButtonProps) {
+export function TemplateRenderButton({ paperJson, examDate, metadataOverride, className }: TemplateRenderButtonProps) {
     const { user } = useUser();
     const { projectId } = useParams();
     const { selectedTemplate, isRendering, renderPaper, setUserId } = useTemplateStore();
@@ -50,12 +57,12 @@ export function TemplateRenderButton({ paperJson, examDate, className }: Templat
         const toastId = toast.loading(`Rendering into "${selectedTemplate.name}"...`);
         try {
             await renderPaper(paperJson, {
-                subject: metadata.subject || "",
-                class_name: metadata.grade || "",
-                marks: String(metadata.totalMarks || ""),
+                subject: metadataOverride?.subject ?? metadata.subject ?? "",
+                class_name: metadataOverride?.class_name ?? metadata.grade ?? "",
+                marks: metadataOverride?.marks ?? String(metadata.totalMarks || ""),
                 date: examDate || new Date().toLocaleDateString("en-IN"),
-                duration: metadata.duration || "",
-                exam_name: metadata.title || "",
+                duration: metadataOverride?.duration ?? metadata.duration ?? "",
+                exam_name: metadataOverride?.exam_name ?? metadata.title ?? "",
                 project_id: projectId as string,
             });
             toast.success("Downloaded! Check your downloads folder.", { id: toastId });

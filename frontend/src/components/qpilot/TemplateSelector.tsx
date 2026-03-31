@@ -21,18 +21,21 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
+import { useUser } from "@clerk/nextjs";
 
 interface TemplateSelectorProps {
     disabled?: boolean;
 }
 
 export function TemplateSelector({ disabled }: TemplateSelectorProps) {
-    const { templates, selectedTemplate, selectTemplate, fetchTemplates } = useTemplateStore();
+    const { templates, selectedTemplate, selectTemplate, fetchTemplates, userId } = useTemplateStore();
+    const { isLoaded, user } = useUser();
     const { setSections, setTotalMarks } = usePatternStore();
 
     useEffect(() => {
+        if (!isLoaded || !user) return;
         fetchTemplates();
-    }, [fetchTemplates]);
+    }, [fetchTemplates, isLoaded, user?.id, userId]);
 
     if (templates.length === 0) {
         return (

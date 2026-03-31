@@ -82,6 +82,12 @@ export function useGenerationFlow() {
     const runFullGeneration = useCallback(
         async (config: GenerationConfig) => {
             store.reset();
+            store.addLog({
+                type: "log",
+                timestamp: new Date().toISOString(),
+                level: "info",
+                message: "Generation started. Initializing agents...",
+            });
 
             // ── Step 1: Analyze Syllabus ──────────────────────────────────────
             const sessionId = `qpilot-${Date.now()}`;
@@ -90,6 +96,14 @@ export function useGenerationFlow() {
             store.setPaperSession(sessionId);
             store.setSyllabusStatus("running");
             store.connectWebSocket(sessionId);
+            store.addProgress({
+                type: "progress",
+                timestamp: new Date().toISOString(),
+                step: "syllabus_fetch",
+                status: "running",
+                progress: 5,
+                details: "Connecting to processing engine...",
+            });
 
             // Give WebSocket time to connect
             await new Promise((r) => setTimeout(r, 400));
@@ -120,6 +134,14 @@ export function useGenerationFlow() {
 
             // ── Step 2: Analyze PYQs ─────────────────────────────────────────
             store.setPyqsStatus("running");
+            store.addProgress({
+                type: "progress",
+                timestamp: new Date().toISOString(),
+                step: "pyqs_fetch",
+                status: "running",
+                progress: 35,
+                details: "Moving to previous-year paper analysis...",
+            });
 
             let pyqsId: string;
             try {
@@ -143,6 +165,14 @@ export function useGenerationFlow() {
 
             // ── Step 3: Generate Paper ────────────────────────────────────────
             store.setPaperStatus("running");
+            store.addProgress({
+                type: "progress",
+                timestamp: new Date().toISOString(),
+                step: "question_select",
+                status: "running",
+                progress: 70,
+                details: "Generating and validating final question paper...",
+            });
 
             try {
                 const paperPattern =
@@ -183,6 +213,7 @@ export function useGenerationFlow() {
     return {
         phase,
         logs: store.logs,
+        progressUpdates: store.progressUpdates,
         progress: store.currentProgress,
         isConnected: store.isConnected,
         paperData: store.paperData,

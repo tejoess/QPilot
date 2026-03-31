@@ -9,17 +9,32 @@ import { Button } from "@/components/ui/button";
 import { getUserDocuments, deleteDocumentAndBlob } from "@/actions/dashboardActions";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { useUser } from "@clerk/nextjs";
 
 export default function RepositoryPage() {
+    const { isLoaded, user } = useUser();
     const [documents, setDocuments] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
+        if (!isLoaded) return;
+        if (!user) {
+            setDocuments([]);
+            setIsLoading(false);
+            return;
+        }
+
+        setIsLoading(true);
         getUserDocuments().then(docs => {
             setDocuments(docs);
             setIsLoading(false);
         });
-    }, []);
+    }, [isLoaded, user?.id]);
+
+    const getPreviewUrl = (url: string, name?: string) => {
+        const safeName = encodeURIComponent(name || "document");
+        return `/api/file-preview?url=${encodeURIComponent(url)}&name=${safeName}`;
+    };
 
     return (
         <SidebarProvider style={{ "--sidebar-width": "240px", "--sidebar-width-icon": "70px" } as React.CSSProperties}>
@@ -108,7 +123,12 @@ export default function RepositoryPage() {
                                         </div>
 
                                         <div className="flex gap-2 pt-2 border-t border-border/50 mt-auto">
-                                            <Button variant="outline" size="sm" className="flex-1 text-xs shadow-none" onClick={() => window.open(doc.url, '_blank')}>
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                className="flex-1 text-xs shadow-none"
+                                                onClick={() => window.open(getPreviewUrl(doc.url, doc.name), "_blank", "noopener,noreferrer")}
+                                            >
                                                 <Eye className="h-3 w-3 mr-1" /> View
                                             </Button>
                                             <Button variant="outline" size="sm" className="flex-1 text-xs shadow-none" onClick={() => window.open(doc.url, '_blank')}>

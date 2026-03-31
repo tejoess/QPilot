@@ -13,6 +13,7 @@ export interface PatternSection {
     name: string;
     type: string;
     numQuestions: number;
+    optionalQuestions: number;
     marksPerQuestion: number;
     totalMarks: number;
 }
@@ -45,6 +46,8 @@ interface PatternState {
     startPatternProcess: () => void;
     getTotalAllocated: () => number;
     getTotalQuestions: () => number;
+    getEffectiveAllocated: () => number;
+    getEffectiveQuestions: () => number;
 }
 
 const INITIAL_STEPS: SubprocessStep[] = [
@@ -67,6 +70,7 @@ export const usePatternStore = create<PatternState>((set, get) => ({
         const newSection: PatternSection = {
             ...data,
             id: crypto.randomUUID(),
+            optionalQuestions: data.optionalQuestions ?? 0,
             totalMarks: data.numQuestions * data.marksPerQuestion
         };
         return { sections: [...state.sections, newSection] };
@@ -78,6 +82,7 @@ export const usePatternStore = create<PatternState>((set, get) => ({
         const newSections = state.sections.map((s) => {
             if (s.id === id) {
                 const updated = { ...s, ...updates };
+                updated.optionalQuestions = Math.max(0, Math.min(updated.optionalQuestions || 0, updated.numQuestions || 0));
                 updated.totalMarks = updated.numQuestions * updated.marksPerQuestion;
                 return updated;
             }
@@ -108,6 +113,20 @@ export const usePatternStore = create<PatternState>((set, get) => ({
 
     getTotalQuestions: () => {
         return get().sections.reduce((acc, s) => acc + s.numQuestions, 0);
+    },
+
+    getEffectiveAllocated: () => {
+        return get().sections.reduce((acc, s) => {
+            const optional = Math.max(0, Math.min(s.optionalQuestions || 0, s.numQuestions || 0));
+            return acc + (s.numQuestions - optional) * s.marksPerQuestion;
+        }, 0);
+    },
+
+    getEffectiveQuestions: () => {
+        return get().sections.reduce((acc, s) => {
+            const optional = Math.max(0, Math.min(s.optionalQuestions || 0, s.numQuestions || 0));
+            return acc + (s.numQuestions - optional);
+        }, 0);
     },
 
     reset: () => set({

@@ -8,7 +8,7 @@
  * Right column – live log panel + phase indicator
  */
 
-import { useRef, useState, useEffect } from "react";
+import { useRef, useState, useEffect, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useUser } from "@clerk/nextjs";
 import Link from "next/link";
@@ -56,6 +56,7 @@ import { usePatternStore, type PatternSection } from "@/store/patternStore";
 import { useGenerationFlow, type GenerationConfig } from "@/hooks/useGenerationFlow";
 import { useTemplateStore, templatePatternToSections } from "@/store/templateStore";
 import { useQPilotConfigStore } from "@/store/qpilotConfigStore";
+import { useQPilotStore } from "@/store/qpilotStore";
 
 function Typewriter({ text, delay = 10 }: { text: string; delay?: number }) {
     const [currentText, setCurrentText] = useState("");
@@ -278,6 +279,53 @@ const PHASE_LABELS: Record<string, string> = {
     error:      "Error",
 };
 
+const STEP_LABELS: Record<string, string> = {
+    syllabus_fetch: "Reading syllabus",
+    syllabus_format: "Understanding syllabus structure",
+    knowledge_graph_build: "Building topic map",
+    pyqs_fetch: "Reading previous papers",
+    pyqs_format: "Finding PYQ patterns",
+    blueprint_build: "Designing paper blueprint",
+    blueprint_verify: "Validating blueprint",
+    question_select: "Generating questions",
+    paper_verify: "Quality-checking paper",
+    final_generate: "Finalizing paper",
+};
+
+function simplifyLogMessage(message: string): string {
+    const m = (message || "").trim();
+    if (!m) return "Working on your paper...";
+    if (m.includes("rate-limited")) return "High traffic detected. Retrying automatically...";
+    if (m.includes("Saved:")) return "Saved intermediate results.";
+    if (m.includes("Initial verdict")) return "Running quality checks on the draft.";
+    if (m.includes("Final paper verdict")) return "Final quality check completed.";
+    if (m.includes("repair loop")) return "Detected imbalance. Auto-correcting the draft.";
+    if (m.startsWith("JSON_DATA:")) return "";
+    return m.replace(/[^\x20-\x7E]/g, "").trim();
+}
+
+function TypingIndicator({ phase }: { phase: string }) {
+    const hints: Record<string, string> = {
+        syllabus: "Analyzing syllabus and extracting key topics",
+        pyqs: "Reviewing previous year papers for patterns",
+        generating: "Drafting and validating your final paper",
+    };
+    const text = hints[phase] || "Processing your request";
+    return (
+        <div className="rounded-xl border border-border/60 bg-background/60 px-3 py-2">
+            <div className="flex items-center gap-2 text-[11px] font-semibold text-muted-foreground">
+                <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
+                <span>{text}</span>
+                <span className="ml-1 flex items-center gap-1">
+                    <span className="h-1.5 w-1.5 rounded-full bg-primary/70 animate-bounce" style={{ animationDelay: "0ms" }} />
+                    <span className="h-1.5 w-1.5 rounded-full bg-primary/70 animate-bounce" style={{ animationDelay: "150ms" }} />
+                    <span className="h-1.5 w-1.5 rounded-full bg-primary/70 animate-bounce" style={{ animationDelay: "300ms" }} />
+                </span>
+            </div>
+        </div>
+    );
+}
+
 // ─── File input helper ────────────────────────────────────────────────────────
 
 function FileUploadArea({
@@ -372,6 +420,19 @@ function SectionRow({
                     min={1}
                     onChange={(e) =>
                         updateSection(section.id, { numQuestions: parseInt(e.target.value) || 1 })
+                    }
+                    className="w-full text-xs font-bold bg-transparent outline-none"
+                />
+            </div>
+            <div className="flex items-center h-7 bg-background rounded border border-border/60 px-1.5 w-14">
+                <input
+                    type="number"
+                    disabled={disabled}
+                    value={section.optionalQuestions || 0}
+                    min={0}
+                    max={section.numQuestions}
+                    onChange={(e) =>
+                        updateSection(section.id, { optionalQuestions: Math.max(0, Math.min(parseInt(e.target.value) || 0, section.numQuestions)) })
                     }
                     className="w-full text-xs font-bold bg-transparent outline-none"
                 />
@@ -496,7 +557,7 @@ export default function QPilotBuilderPage() {
 
     // ── Stores ────────────────────────────────────────────────────────────────
     const { bloomLevels, setLevel } = useBloomStore();
-    const { sections, addSection, getTotalAllocated, getTotalQuestions, setSections, setTotalMarks } = usePatternStore();
+    const { sections, addSection, getTotalAllocated, getTotalQuestions, getEffectiveAllocated, getEffectiveQuestions, setSections, setTotalMarks } = usePatternStore();
 
     // ── Template store ────────────────────────────────────────────────────────
     const {
@@ -509,8 +570,12 @@ export default function QPilotBuilderPage() {
     } = useTemplateStore();
 
     const { metadata: projectMeta } = useQPilotConfigStore();
+    const { setCurrentMetadata } = useQPilotStore();
 
-    useEffect(() => { fetchTemplates(); }, [fetchTemplates]);
+    useEffect(() => {
+        if (!user) return;
+        fetchTemplates();
+    }, [fetchTemplates, user?.id]);
 
     const handleSelectTemplate = (tpl: typeof templates[0]) => {
         if (isRunning) return;
@@ -534,12 +599,12 @@ export default function QPilotBuilderPage() {
         setTemplateRendering(true);
         try {
             await renderPaper(paperData as object, {
-                subject: "",
-                class_name: "",
-                marks: String(getTotalAllocated()),
+                subject: projectMeta.subject || "",
+                class_name: projectMeta.grade || "",
+                marks: String(getEffectiveAllocated()),
                 date: new Date().toLocaleDateString("en-IN"),
-                duration: "",
-                exam_name: "Question Paper",
+                duration: projectMeta.duration || "",
+                exam_name: projectMeta.title || "Question Paper",
             });
             setTemplateDone(true);
             toast.success("Downloaded! Check your downloads folder.");
@@ -551,9 +616,42 @@ export default function QPilotBuilderPage() {
     };
 
     // ── Generation flow ───────────────────────────────────────────────────────
-    const { phase, logs, error, paperData, runFullGeneration, reset } = useGenerationFlow();
+    const { phase, logs, progressUpdates, error, paperData, runFullGeneration, reset } = useGenerationFlow();
     const isRunning = phase === "syllabus" || phase === "pyqs" || phase === "generating";
     const isDone = phase === "done";
+    const combinedTimeline = useMemo(() => {
+        // Keep only latest status per step to avoid stale "running" lines after completion
+        const latestByStep = new Map<string, (typeof progressUpdates)[number]>();
+        for (const p of progressUpdates) latestByStep.set(p.step, p);
+        const progressItems = Array.from(latestByStep.values()).map((p, idx) => ({
+            key: `p-${idx}-${p.timestamp}`,
+            timestamp: p.timestamp,
+            kind: "progress" as const,
+            message: p.details || `${STEP_LABELS[p.step] || "Working"}...`,
+            step: p.step,
+            status: p.status,
+            progress: p.progress,
+        }));
+
+        // De-duplicate repeated log lines
+        const dedupedLogs: typeof logs = [];
+        for (const l of logs) {
+            const prev = dedupedLogs[dedupedLogs.length - 1];
+            if (prev && prev.message === l.message && prev.level === l.level) continue;
+            dedupedLogs.push(l);
+        }
+        const logItems = dedupedLogs.map((l, idx) => ({
+            key: `l-${idx}-${l.timestamp}`,
+            timestamp: l.timestamp,
+            kind: "log" as const,
+            level: l.level,
+            message: l.message,
+        }));
+
+        return [...progressItems, ...logItems].sort(
+            (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+        );
+    }, [logs, progressUpdates]);
 
     // Auto-scroll log panel
     const logEndRef = useRef<HTMLDivElement>(null);
@@ -578,6 +676,16 @@ export default function QPilotBuilderPage() {
 
     const handleGenerate = async () => {
         if (!canGenerate) return;
+        const effectiveMarks = getEffectiveAllocated() || getTotalAllocated() || 0;
+        const effectiveQuestions = getEffectiveQuestions() || getTotalQuestions() || sections.reduce((s, sec) => s + sec.numQuestions, 0);
+        setCurrentMetadata({
+            examTitle: projectMeta.title || "Question Paper",
+            subject: projectMeta.subject || "—",
+            grade: projectMeta.grade || "—",
+            duration: projectMeta.duration || "3 Hours",
+            totalMarks: effectiveMarks,
+            totalQuestions: effectiveQuestions,
+        });
         const config: GenerationConfig = {
             syllabusFile: syllabusMode === "file" ? (syllabusFile ?? undefined) : undefined,
             syllabusText: syllabusMode === "text" ? syllabusText : undefined,
@@ -749,6 +857,7 @@ export default function QPilotBuilderPage() {
                                                 name: `Section ${String.fromCharCode(65 + sections.length)}`,
                                                 type: "short_answer",
                                                 numQuestions: 5,
+                                                optionalQuestions: 0,
                                                 marksPerQuestion: 2,
                                             })
                                         }
@@ -819,8 +928,8 @@ export default function QPilotBuilderPage() {
                                     </div>
                                 ) : (
                                     <div className="space-y-2">
-                                        <div className="hidden md:grid grid-cols-[1fr_7rem_3.5rem_3.5rem_2.5rem_1.5rem] gap-2 px-2.5 text-[10px] font-black uppercase tracking-widest text-muted-foreground/60">
-                                            <span>Name</span><span>Type</span><span>Q&apos;s</span><span>Marks</span><span>Total</span><span />
+                                        <div className="hidden md:grid grid-cols-[1fr_7rem_3.5rem_4.5rem_3.5rem_2.5rem_1.5rem] gap-2 px-2.5 text-[10px] font-black uppercase tracking-widest text-muted-foreground/60">
+                                            <span>Name</span><span>Type</span><span>Q&apos;s</span><span>Optional</span><span>Marks</span><span>Total</span><span />
                                         </div>
                                         {sections.map((s) => (
                                             <SectionRow key={s.id} section={s} disabled={isRunning} />
@@ -830,8 +939,10 @@ export default function QPilotBuilderPage() {
 
                                 {sections.length > 0 && (
                                     <div className="flex justify-end">
-                                        <span className="text-xs font-black text-muted-foreground">
+                                        <span className="text-xs font-black text-muted-foreground text-right">
                                             Total: <span className="text-foreground">{getTotalAllocated()} marks, {getTotalQuestions()} questions</span>
+                                            <br />
+                                            <span className="text-[11px]">After optional: <span className="text-foreground">{getEffectiveAllocated()} marks, {getEffectiveQuestions()} questions</span></span>
                                         </span>
                                     </div>
                                 )}
@@ -892,37 +1003,59 @@ export default function QPilotBuilderPage() {
 
                             {/* Logs */}
                             <div className="flex-1 overflow-y-auto px-3 py-3 space-y-1.5 font-mono text-[10px]">
-                                {logs.length === 0 ? (
+                                {combinedTimeline.length === 0 ? (
                                     <p className="text-muted-foreground/50 text-center mt-6">
-                                        Logs will appear here once generation starts.
+                                        Starting up agents. Live updates will appear here.
                                     </p>
                                 ) : (
-                                    logs.map((log, i) => {
-                                        const isJson = log.message.startsWith("JSON_DATA:");
-                                        if (!isJson) {
-                                            // Hide completely per user request so plain strings don't ruin the animated chat UX
-                                            return null;
+                                    combinedTimeline.map((item) => {
+                                        if (item.kind === "progress") {
+                                            const label = STEP_LABELS[item.step] || "Working";
+                                            const done = item.status === "completed";
+                                            const failed = item.status === "failed";
+                                            return (
+                                                <div key={item.key} className="rounded-lg border border-border/50 bg-background/50 px-2.5 py-2">
+                                                    <div className="flex items-center justify-between gap-2">
+                                                        <span className="text-[10px] font-semibold text-foreground">{label}</span>
+                                                        <span className={cn("text-[9px] font-bold uppercase", done ? "text-emerald-600" : failed ? "text-destructive" : "text-primary")}>
+                                                            {done ? "done" : failed ? "failed" : "running"}
+                                                        </span>
+                                                    </div>
+                                                    <p className="mt-1 text-[10px] text-muted-foreground">{item.message}</p>
+                                                </div>
+                                            );
                                         }
 
-                                        try {
-                                            const payload = JSON.parse(log.message.replace("JSON_DATA:", ""));
+                                        const isJson = item.message.startsWith("JSON_DATA:");
+                                        if (isJson) {
+                                            try {
+                                                const payload = JSON.parse(item.message.replace("JSON_DATA:", ""));
                                             const displayContent = <RenderAgentTemplate file={payload.file} content={payload.content} />;
                                             
                                             // Don't render empty shells if RenderAgentTemplate returns null (e.g. for silent JSONs)
                                             if (!displayContent) return null;
 
                                             return (
-                                                <div key={i} className="flex gap-2 items-start mb-1.5 w-full">
+                                                    <div key={item.key} className="flex gap-2 items-start mb-1.5 w-full">
                                                     <div className="flex-1 w-full relative">
                                                         {displayContent}
                                                     </div>
                                                 </div>
                                             );
-                                        } catch {
-                                            return null;
+                                            } catch {
+                                                return null;
+                                            }
                                         }
+                                        const friendly = simplifyLogMessage(item.message);
+                                        if (!friendly) return null;
+                                        return (
+                                            <div key={item.key} className="rounded-lg border border-border/50 bg-background/60 px-2.5 py-2 text-muted-foreground">
+                                                <p className="text-[10px] leading-snug">{friendly}</p>
+                                            </div>
+                                        );
                                     })
                                 )}
+                                {isRunning && <TypingIndicator phase={phase} />}
                                 <div ref={logEndRef} />
                             </div>
 

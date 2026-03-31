@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
     Download,
     Printer,
@@ -42,6 +42,7 @@ import { useQPilotStore } from "@/store/qpilotStore";
 import { TemplateRenderButton } from "@/components/qpilot/TemplateRenderButton";
 import { useUser } from "@clerk/nextjs";
 import { BACKEND_URL } from "@/lib/projectApi";
+import { getProjectPaperSnapshot } from "@/actions/dashboardActions";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -295,22 +296,63 @@ export default function ResultQPPage() {
     const [answerKeyPdfUrl, setAnswerKeyPdfUrl] = useState<string>("");
     const [answerKeyError, setAnswerKeyError] = useState<string>("");
     const [activeTab, setActiveTab] = useState<"paper" | "answerkey">("paper");
+    const [persistedPaperData, setPersistedPaperData] = useState<any | null>(null);
+    const [snapshotLoading, setSnapshotLoading] = useState<boolean>(!paperData);
+    const [persistedMeta, setPersistedMeta] = useState<{
+        name?: string | null;
+        subject?: string | null;
+        grade?: string | null;
+        totalMarks?: number | null;
+        duration?: string | null;
+    } | null>(null);
 
-    // Build exam paper from real backend data, fall back to sample data
-    const examPaper: ExamPaper = useMemo(() => {
-        if (paperData && Array.isArray(paperData.sections) && paperData.sections.length > 0) {
-            const totalMarks = (paperData.sections as any[]).reduce(
+    useEffect(() => {
+        let mounted = true;
+        async function loadSnapshot() {
+            if (paperData) {
+                setSnapshotLoading(false);
+                return;
+            }
+            if (!projectId) {
+                setSnapshotLoading(false);
+                return;
+            }
+            try {
+                const snapshot = await getProjectPaperSnapshot(projectId);
+                if (!mounted || !snapshot) return;
+                setPersistedPaperData(snapshot.finalPaper);
+                setPersistedMeta(snapshot.project);
+            } finally {
+                if (mounted) setSnapshotLoading(false);
+            }
+        }
+        loadSnapshot();
+        return () => {
+            mounted = false;
+        };
+    }, [paperData, projectId]);
+
+    const renderPaperJson = (paperData && Array.isArray((paperData as any).sections) && (paperData as any).sections.length > 0)
+        ? paperData
+        : persistedPaperData;
+
+    // Build exam paper from real backend/store data, fall back to sample data
+    const examPaper: ExamPaper | null = useMemo(() => {
+        const sourcePaper = renderPaperJson;
+
+        if (sourcePaper && Array.isArray(sourcePaper.sections) && sourcePaper.sections.length > 0) {
+            const totalMarks = (sourcePaper.sections as any[]).reduce(
                 (sum: number, s: any) =>
                     sum + (s.questions as any[]).reduce((qs: number, q: any) => qs + (q.marks || 0), 0),
                 0
             );
             return {
-                examTitle: currentMetadata?.examTitle || "Question Paper",
-                subject: currentMetadata?.subject || "—",
-                grade: currentMetadata?.grade || "—",
-                totalMarks: currentMetadata?.totalMarks || totalMarks,
-                duration: currentMetadata?.duration || "3 Hours",
-                sections: (paperData.sections as any[]).map((s: any) => ({
+                examTitle: currentMetadata?.examTitle || persistedMeta?.name || "Question Paper",
+                subject: currentMetadata?.subject || persistedMeta?.subject || "—",
+                grade: currentMetadata?.grade || persistedMeta?.grade || "—",
+                totalMarks: currentMetadata?.totalMarks || persistedMeta?.totalMarks || totalMarks,
+                duration: currentMetadata?.duration || persistedMeta?.duration || "3 Hours",
+                sections: (sourcePaper.sections as any[]).map((s: any) => ({
                     title: s.section_name || "Section",
                     instructions: s.section_description || "",
                     questions: (s.questions as any[]).map((q: any) => ({
@@ -321,8 +363,9 @@ export default function ResultQPPage() {
                 })),
             };
         }
+        if (snapshotLoading) return null;
         return EXAM_DATA;
-    }, [paperData, currentMetadata]);
+    }, [renderPaperJson, persistedMeta, currentMetadata, snapshotLoading]);
 
     // ── Generate Answer Key ──────────────────────────────────────────────────
 
@@ -408,6 +451,7 @@ export default function ResultQPPage() {
     const handlePrint = () => { window.print(); };
 
     const handleCopy = () => {
+        if (!examPaper) return;
         let text = `${examPaper.examTitle}\n`;
         text += `Subject: ${examPaper.subject}\n`;
         text += `Grade: ${examPaper.grade} | Duration: ${examPaper.duration} | Total Marks: ${examPaper.totalMarks}\n`;
@@ -544,7 +588,17 @@ export default function ResultQPPage() {
 
                                     {/* Template Rendering Button */}
                                     <div className="mt-2">
-                                        <TemplateRenderButton paperJson={paperData} examDate={new Date().toLocaleDateString("en-IN")} />
+                                        <TemplateRenderButton
+                                            paperJson={renderPaperJson}
+                                            examDate={new Date().toLocaleDateString("en-IN")}
+                                            metadataOverride={{
+                                                subject: examPaper?.subject || "",
+                                                class_name: examPaper?.grade || "",
+                                                marks: String(examPaper?.totalMarks || ""),
+                                                duration: examPaper?.duration || "",
+                                                exam_name: examPaper?.examTitle || "",
+                                            }}
+                                        />
                                     </div>
                                 </div>
 
@@ -576,11 +630,15 @@ export default function ResultQPPage() {
                                 {/* DOC INFO */}
                                 <div className="pt-8 mt-auto">
                                     <div className="p-4 rounded-xl bg-muted/50 border border-border/50">
-                                        <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground/60 block mb-2">Document Metadata</span>
+                                        <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground/60 block mb-2">Project Info</span>
                                         <div className="space-y-1.5">
                                             <div className="flex justify-between text-[11px] font-bold uppercase">
-                                                <span className="text-muted-foreground">ID:</span>
-                                                <span className="text-foreground truncate ml-4">{projectId}</span>
+                                                <span className="text-muted-foreground">Exam:</span>
+                                                <span className="text-foreground truncate ml-4">{currentMetadata?.examTitle || examPaper?.examTitle || "Loading..."}</span>
+                                            </div>
+                                            <div className="flex justify-between text-[11px] font-bold uppercase">
+                                                <span className="text-muted-foreground">Subject:</span>
+                                                <span className="text-foreground truncate ml-4">{currentMetadata?.subject || examPaper?.subject || "Loading..."}</span>
                                             </div>
                                             <div className="flex justify-between text-[11px] font-bold uppercase">
                                                 <span className="text-muted-foreground">Status:</span>
@@ -652,22 +710,22 @@ export default function ResultQPPage() {
                                                     contentEditable
                                                     suppressContentEditableWarning
                                                 >
-                                                    {examPaper.examTitle}
+                                                    {examPaper?.examTitle || "Loading paper..."}
                                                 </h1>
                                                 <div className="h-1.5 w-24 bg-zinc-900 dark:bg-white mx-auto mb-8 rounded-full print:bg-black" />
 
                                                 <div className="grid grid-cols-2 gap-y-4 text-[13px] font-bold uppercase tracking-widest text-zinc-600 dark:text-zinc-400 print:text-black">
                                                     <div className="text-left border-b border-zinc-100 dark:border-zinc-800 pb-2 inline-block">
-                                                        Subject: <span className="text-zinc-950 dark:text-zinc-200 print:text-black outline-none" contentEditable suppressContentEditableWarning>{examPaper.subject}</span>
+                                                        Subject: <span className="text-zinc-950 dark:text-zinc-200 print:text-black outline-none" contentEditable suppressContentEditableWarning>{examPaper?.subject || "Loading..."}</span>
                                                     </div>
                                                     <div className="text-right border-b border-zinc-100 dark:border-zinc-800 pb-2 inline-block">
-                                                        Grade/Year: <span className="text-zinc-950 dark:text-zinc-200 print:text-black outline-none" contentEditable suppressContentEditableWarning>{examPaper.grade}</span>
+                                                        Grade/Year: <span className="text-zinc-950 dark:text-zinc-200 print:text-black outline-none" contentEditable suppressContentEditableWarning>{examPaper?.grade || "Loading..."}</span>
                                                     </div>
                                                     <div className="text-left border-b border-zinc-100 dark:border-zinc-800 pb-2 inline-block">
-                                                        Duration: <span className="text-zinc-950 dark:text-zinc-200 print:text-black outline-none" contentEditable suppressContentEditableWarning>{examPaper.duration}</span>
+                                                        Duration: <span className="text-zinc-950 dark:text-zinc-200 print:text-black outline-none" contentEditable suppressContentEditableWarning>{examPaper?.duration || "Loading..."}</span>
                                                     </div>
                                                     <div className="text-right border-b border-zinc-100 dark:border-zinc-800 pb-2 inline-block">
-                                                        Total Marks: <span className="text-zinc-950 dark:text-zinc-200 print:text-black outline-none" contentEditable suppressContentEditableWarning>{examPaper.totalMarks}</span>
+                                                        Total Marks: <span className="text-zinc-950 dark:text-zinc-200 print:text-black outline-none" contentEditable suppressContentEditableWarning>{examPaper?.totalMarks ?? "..."}</span>
                                                     </div>
                                                 </div>
                                             </header>
@@ -676,7 +734,7 @@ export default function ResultQPPage() {
 
                                             {/* SECTIONS */}
                                             <div className="space-y-12">
-                                                {examPaper.sections.map((section, sIdx) => (
+                                                {(examPaper?.sections || []).map((section, sIdx) => (
                                                     <div key={sIdx} className="space-y-6">
                                                         <div className="flex items-center gap-4">
                                                             <h2

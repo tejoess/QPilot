@@ -171,14 +171,15 @@ async def analyze_syllabus(
         
         # ☁️ Azure Upload: Syllabus PDF
         azure_url = None
+        safe_subject = (subject or "subject").replace(" ", "_").lower()
         if pdf_path:
-            blob_name = f"syllabus/{session_id}/syllabus.pdf"
+            blob_name = f"user_{user_id or 'anon'}/{project_id or session_id}/{safe_subject}_syllabus.pdf"
             azure_url = upload_to_azure(pdf_path, "qpilot-uploads", blob_name)
             print(f"☁️ Syllabus uploaded to Azure: {azure_url}")
 
         # ☁️ If text was provided instead of file, upload text if no PDF was uploaded
         if not azure_url and text_content:
-            blob_name = f"user_{user_id}/syllabus/syllabus_text_{session_id}.txt"
+            blob_name = f"user_{user_id or 'anon'}/{project_id or session_id}/{safe_subject}_syllabus.txt"
             azure_url = upload_to_azure(text_content.encode('utf-8'), "qpilot-uploads", blob_name, is_bytes=True)
 
         if user_id and project_id:
@@ -193,10 +194,11 @@ async def analyze_syllabus(
                 
                 # 🔹 Record in Documents
                 if azure_url:
+                    _subj = subject or "Subject"
                     doc = Document(
                         user_id=user_id,
                         project_id=project_id,
-                        name=f"{project_id} - Syllabus",
+                        name=f"{_subj}_syllabus.pdf",
                         doc_type="syllabus",
                         azure_url=azure_url
                     )
@@ -251,6 +253,10 @@ async def analyze_pyqs(
     if text_content and not text_content.strip():
         text_content = None
     
+    pyq_text = (text_content or "").strip()
+    no_pyq_sentinel = pyq_text.lower().startswith("no pyqs available")
+    has_real_pyq_input = bool(file) or (bool(pyq_text) and not no_pyq_sentinel)
+
     if not file and not text_content:
         raise HTTPException(status_code=400, detail="Either 'file' or 'text_content' must be provided")
     
@@ -291,15 +297,24 @@ async def analyze_pyqs(
         
         # ☁️ Azure Upload: PYQs PDF
         azure_url = None
-        if pdf_path:
-            blob_name = f"pyqs/{pyqs_session_id}/pyqs.pdf"
+        if user_id and project_id:
+            try:
+                _db = next(get_db())
+                _proj_for_pyq = _db.query(Project).filter_by(id=project_id).first()
+                _pyq_subject = (_proj_for_pyq.subject if _proj_for_pyq and _proj_for_pyq.subject else "subject").replace(" ", "_").lower()
+            except Exception:
+                _pyq_subject = "subject"
+        else:
+            _pyq_subject = "subject"
+        if has_real_pyq_input and pdf_path:
+            blob_name = f"user_{user_id or 'anon'}/{project_id or pyqs_session_id}/{_pyq_subject}_pyqs.pdf"
             azure_url = upload_to_azure(pdf_path, "qpilot-uploads", blob_name)
             print(f"☁️ PYQs uploaded to Azure: {azure_url}")
 
         if user_id and project_id:
             # ☁️ If text was provided instead of file, upload text as a convenience record too
-            if not azure_url and text_content:
-                blob_name = f"user_{user_id}/pyqs/pyqs_text_{pyqs_session_id}.txt"
+            if has_real_pyq_input and (not azure_url) and text_content:
+                blob_name = f"user_{user_id}/{project_id}/{_pyq_subject}_pyqs.txt"
                 azure_url = upload_to_azure(text_content.encode('utf-8'), "qpilot-uploads", blob_name, is_bytes=True)
 
             try:
@@ -307,11 +322,17 @@ async def analyze_pyqs(
                 ensure_db_user_project(db_session, user_id, project_id)
                 
                 # 🔹 Record in Documents
-                if azure_url:
+                if has_real_pyq_input and azure_url:
+                    if file and file.filename:
+                        saved_name = file.filename
+                    elif text_content:
+                        saved_name = f"{_pyq_subject.replace('_', ' ').title()}_pyqs.txt"
+                    else:
+                        saved_name = f"{_pyq_subject.replace('_', ' ').title()}_pyqs.pdf"
                     doc = Document(
                         user_id=user_id,
                         project_id=project_id,
-                        name=f"{project_id} - PYQs",
+                        name=saved_name,
                         doc_type="pyqs",
                         azure_url=azure_url
                     )
@@ -466,8 +487,9 @@ async def generate_paper(
         
         format_paper_to_pdf(paper_for_pdf, generated_pdf_path)
         
-        # ☁️ Azure Upload: Generated Paper PDF
-        azure_pdf_url = upload_to_azure(generated_pdf_path, "qpilot-results", f"{paper_session_id}/question_paper.pdf")
+        # ☁️ Azure Upload: Generated Paper PDF (temp upload before we have subject info)
+        _tmp_subject = "subject"
+        azure_pdf_url = upload_to_azure(generated_pdf_path, "qpilot-results", f"user_unknown/{paper_session_id}/{_tmp_subject}_generated_paper.pdf")
         print(f"☁️ Generated Paper uploaded to Azure: {azure_pdf_url}")
 
         if user_id and project_id:
@@ -493,7 +515,8 @@ async def generate_paper(
                     "duration": proj.duration if proj and proj.duration else "3 Hours"
                 })
                 format_paper_to_pdf(paper_for_pdf, generated_pdf_path)
-                azure_pdf_url = upload_to_azure(generated_pdf_path, "qpilot-results", f"{paper_session_id}/question_paper.pdf")
+                _safe_subj_paper = pdf_subject.replace(" ", "_").lower()
+                azure_pdf_url = upload_to_azure(generated_pdf_path, "qpilot-results", f"user_{user_id}/{project_id}/{_safe_subj_paper}_generated_paper.pdf")
 
                 if proj:
                     proj.status = "done"
@@ -504,7 +527,7 @@ async def generate_paper(
                     doc = Document(
                         user_id=user_id,
                         project_id=project_id,
-                        name=f"{project_id} - Question Paper PDF",
+                        name=f"{pdf_subject}_generated_paper.pdf",
                         doc_type="final_pdf",
                         azure_url=azure_pdf_url
                     )
@@ -770,13 +793,29 @@ async def render_paper_in_template(
     except json_lib.JSONDecodeError:
         raise HTTPException(status_code=400, detail="Invalid JSON in paper_json field.")
 
+    # Fill missing template metadata from project to avoid blank [subject]/[class]
+    project_fallback = None
+    if user_id and project_id:
+        try:
+            db_session = next(get_db())
+            project_fallback = db_session.query(Project).filter_by(id=project_id, user_id=uid).first()
+        except Exception:
+            project_fallback = None
+
+    normalized_subject = (subject or "").strip()
+    normalized_class = (class_name or "").strip()
+    normalized_marks = (marks or "").strip()
+    normalized_duration = (duration or "").strip()
+    normalized_exam_name = (exam_name or "").strip()
+    dash_like = {"-", "--", "---", "----", "-----", "—"}
+
     metadata = {
-        "subject":   subject or "",
-        "class":     class_name or "",
-        "marks":     marks or "",
-        "date":      date or "",
-        "duration":  duration or "",
-        "exam_name": exam_name or "",
+        "subject": normalized_subject if normalized_subject and normalized_subject not in dash_like else (project_fallback.subject if project_fallback and project_fallback.subject else ""),
+        "class": normalized_class if normalized_class and normalized_class not in dash_like else (project_fallback.grade if project_fallback and project_fallback.grade else ""),
+        "marks": normalized_marks if normalized_marks and normalized_marks not in dash_like else (str(project_fallback.total_marks) if project_fallback and project_fallback.total_marks is not None else ""),
+        "date": (date or "").strip(),
+        "duration": normalized_duration if normalized_duration and normalized_duration not in dash_like else (project_fallback.duration if project_fallback and project_fallback.duration else ""),
+        "exam_name": normalized_exam_name if normalized_exam_name and normalized_exam_name not in dash_like else (project_fallback.name if project_fallback and project_fallback.name else ""),
     }
 
     try:
@@ -794,13 +833,15 @@ async def render_paper_in_template(
         print(traceback.format_exc())
         raise HTTPException(status_code=500, detail=f"Template rendering failed: {str(e)}")
 
-    filename = f"question_paper_{exam_name or 'exam'}.docx".replace(" ", "_")
+    # Build human-readable filename: {subject}_generated_paper.docx
+    _render_subject = (subject or exam_name or "subject").replace(" ", "_")
+    filename = f"{_render_subject}_generated_paper.docx"
     
     # Upload generated template DOCX to Azure + DB if tied to a project
     if user_id and project_id:
         try:
             import uuid as uuid_pkg
-            blob_name = f"rendered_templates/{project_id}/{filename}"
+            blob_name = f"user_{user_id}/{project_id}/{filename}"
             azure_url = upload_to_azure(rendered_path, "qpilot-results", blob_name)
             if azure_url:
                 db_session = next(get_db())
@@ -808,7 +849,7 @@ async def render_paper_in_template(
                 doc = Document(
                     user_id=user_id,
                     project_id=project_id,
-                    name=f"{project_id} - Generated Paper (DOCX)",
+                    name=filename,
                     doc_type="docx_paper",
                     azure_url=azure_url
                 )
@@ -907,8 +948,17 @@ async def generate_answer_key_api(
         try:
             generate_pdf(answer_key_data, output_path=out_path)
             
-            # ☁️ Azure Upload: Answer Key PDF
-            blob_name = f"answer_keys/{uuid_pkg.uuid4().hex[:8]}/answer_key.pdf"
+            # ☁️ Azure Upload: Answer Key PDF - named by subject from project
+            _ak_subject = "subject"
+            if project_id and user_id:
+                try:
+                    _ak_db = next(get_db())
+                    _ak_proj = _ak_db.query(Project).filter_by(id=project_id).first()
+                    if _ak_proj and _ak_proj.subject:
+                        _ak_subject = _ak_proj.subject.replace(" ", "_").lower()
+                except Exception:
+                    pass
+            blob_name = f"user_{user_id or 'anon'}/{project_id or 'unknown'}/{_ak_subject}_answer_Key.pdf"
             azure_url = upload_to_azure(out_path, "qpilot-results", blob_name)
             print(f"☁️ Answer Key uploaded to Azure: {azure_url}")
             
@@ -920,7 +970,7 @@ async def generate_answer_key_api(
                     doc = Document(
                         user_id=user_id,
                         project_id=project_id,
-                        name=f"{project_id} - Answer Key",
+                        name=f"{_ak_subject.replace('_', ' ').title()}_answer_Key.pdf",
                         doc_type="answer_key",
                         azure_url=azure_url
                     )

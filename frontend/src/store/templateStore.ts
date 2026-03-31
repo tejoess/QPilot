@@ -20,6 +20,7 @@ export interface TemplatePattern {
 export interface UploadedTemplate {
     template_id: string;
     name: string;
+    azure_url?: string;
     pattern: TemplatePattern[];
     placeholders: string[];
 }
@@ -103,6 +104,7 @@ export const useTemplateStore = create<TemplateState>()(
                     const newTemplate: UploadedTemplate = {
                         template_id: data.template_id,
                         name: data.name,
+                        azure_url: data.azure_url,
                         pattern: data.pattern,
                         placeholders: data.placeholders?.all || [],
                     };
@@ -162,9 +164,10 @@ export const useTemplateStore = create<TemplateState>()(
                     const blob = await res.blob();
                     const url = URL.createObjectURL(blob);
                     const a = document.createElement("a");
-                    const examName = metadata.exam_name || "exam";
+                    // Use subject for filename: {subject}_generated_paper.docx
+                    const safeSubject = (metadata.subject || metadata.exam_name || "exam").replace(/\s+/g, "_");
                     a.href = url;
-                    a.download = `question_paper_${examName.replace(/\s+/g, "_")}.docx`;
+                    a.download = `${safeSubject}_generated_paper.docx`;
                     document.body.appendChild(a);
                     a.click();
                     a.remove();
@@ -211,6 +214,7 @@ export function templatePatternToSections(pattern: TemplatePattern[]) {
         name: `Q${p.question_num}`,
         type: p.num_parts > 2 ? "short_answer" : "long_answer",
         numQuestions: p.num_parts,
+        optionalQuestions: 0,
         marksPerQuestion: p.marks_per_part,
         totalMarks: p.num_parts * p.marks_per_part,
     }));

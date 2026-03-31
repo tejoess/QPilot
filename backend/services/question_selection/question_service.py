@@ -123,7 +123,7 @@ MARKS_STRUCTURE = {
     "4-6": {
         "label":           "4–6 marks",
         "answer_length":   "half a page in the answer booklet",
-        "question_length": "ONE line — may be a slightly deeper single concept",
+        "question_length": "ONE line stictly — may be a slightly deeper single concept",
         "concepts":        "ONE concept with depth, OR one concept + one brief example",
         "sub_parts":       "At most ONE sub-part, only if absolutely necessary. Prefer no sub-parts.",
         "style":           "explanation / working / brief comparison of two closely related ideas",
@@ -143,15 +143,15 @@ MARKS_STRUCTURE = {
     "8-10": {
         "label":           "8–10 marks",
         "answer_length":   "full page in the answer booklet",
-        "question_length": "1–2 lines, may include one specific sub-task or parameter",
-        "concepts":        "one main concept with detailed explanation, OR a comparison of two related concepts",
-        "sub_parts":       "At most TWO sub-parts. No more.",
+        "question_length": "1–1.5 lines strictly, may include one subpart",
+        "concepts":        "one main concept with detailed explanation",
+        "sub_parts":       "At most 1 sub-parts. No more.",
         "style":           "detailed explanation / comparison / application with example or calculation",
         "examples":        [
             "Explain CNN architecture in detail. Calculate the number of parameters for a 32×32×3 input with ten 5×5 filters.",
             "Differentiate between LSTM and GRU networks in detail.",
             "Explain any three types of autoencoders with their working.",
-            "Explain GAN architecture and its real-world applications.",
+            "Explain GAN architecture with its applications.",
             "Compare distance vector and link state routing protocols based on working, advantages, and limitations.",
         ],
         "banned_patterns": [
@@ -381,7 +381,7 @@ EXAMPLES — good Mumbai University questions at each mark range:
   Topic: ACID Properties           | Bloom: Understand → Explain ACID properties with a suitable example.
   Topic: CPU Scheduling            | Bloom: Understand → Explain any two CPU scheduling algorithms.
 
-─── 8–10 marks (1–2 lines, detailed or comparative, AT MOST 2 sub-parts) ───
+─── 8–10 marks (1–1.5 lines strictly, detailed or comparative, AT MOST 1 sub-parts) ───
   Topic: CNN Architecture          | Bloom: Apply    → Explain CNN architecture in detail. Calculate parameters for a 32×32×3 input with ten 5×5 filters, stride 1.
   Topic: LSTM                      | Bloom: Analyze  → Differentiate between LSTM and GRU networks in detail.
   Topic: Autoencoders              | Bloom: Understand → Explain any three types of autoencoders with their working and applications.
@@ -586,6 +586,42 @@ def _build_teacher_context(teacher_input: dict) -> str:
     return ctx
 
 
+def _compact_question_text(text: str, marks: int) -> str:
+    """
+    Small safety net to keep questions concise when model output is too long.
+    Keeps existing prompt-first behavior; only trims obvious overlong compounds.
+    """
+    if not text:
+        return text
+
+    cleaned = re.sub(r"\s+", " ", text).strip()
+    words = cleaned.split()
+
+    # Keep limits conservative to avoid over-truncation.
+    max_words = 17 if marks <= 3 else 24 if marks <= 6 else 32
+    if len(words) <= max_words:
+        return cleaned
+
+    cut_markers = [
+        " and explain ",
+        " and how ",
+        " and discuss ",
+        " and analyze ",
+        " and compare ",
+        ". ",
+        "; ",
+    ]
+    lower = cleaned.lower()
+    for marker in cut_markers:
+        idx = lower.find(marker)
+        if idx > 0:
+            candidate = cleaned[:idx].strip(" ,;:.")
+            if len(candidate.split()) >= 6:
+                return candidate + "?"
+
+    return " ".join(words[:max_words]).strip(" ,;:.") + "?"
+
+
 # ============================================================================
 # PYQ BANK GUARD
 # ============================================================================
@@ -763,6 +799,7 @@ def select_questions(
 
             # Append to history with topic for fingerprinting (Change #4)
             if selected_text:
+                selected_text = _compact_question_text(selected_text, marks)
                 history.append({"text": selected_text, "topic": topic})
 
             draft_q = {

@@ -96,6 +96,7 @@ export function PaperPatternAgentCard({ projectId }: PaperPatternAgentCardProps)
             name: `Section ${String.fromCharCode(65 + sections.length)}`,
             type: "mcq",
             numQuestions: 5,
+            optionalQuestions: 0,
             marksPerQuestion: 1,
         });
     };

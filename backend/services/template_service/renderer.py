@@ -46,7 +46,7 @@ BLOOM_TO_CL: Dict[str, str] = {
 }
 
 BRACKET_RE = re.compile(r'\[([^\[\]]+)\]')
-QUESTION_ID_RE = re.compile(r'^(\d{1,2})([a-z]+)$')
+QUESTION_ID_RE = re.compile(r'^(\d{1,2})([a-z]+)$', re.IGNORECASE)
 
 
 def bloom_to_cl(level: str) -> str:
@@ -150,9 +150,10 @@ def _build_question_map(paper_json: Dict) -> Dict[str, Dict]:
 
 def _replace_in_run_text(text: str, replacements: Dict[str, str]) -> str:
     """Replace all [placeholder] tokens in a string with given replacements."""
+    lowered = {k.lower(): v for k, v in replacements.items()}
     def _sub(m):
         token = f"[{m.group(1)}]"
-        return replacements.get(token, token)
+        return lowered.get(token.lower(), token)
     return BRACKET_RE.sub(_sub, text)
 
 

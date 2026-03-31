@@ -29,6 +29,7 @@ import {
     Trash
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useUser } from "@clerk/nextjs";
 
 function PatternBadge({ pattern }: { pattern: TemplatePattern[] }) {
     if (!pattern || pattern.length === 0) return null;
@@ -41,13 +42,15 @@ function PatternBadge({ pattern }: { pattern: TemplatePattern[] }) {
 }
 
 export default function TemplatesPage() {
-    const { templates, isUploading, fetchTemplates, uploadTemplate, deleteTemplate } = useTemplateStore();
+    const { templates, isUploading, fetchTemplates, uploadTemplate, deleteTemplate, userId } = useTemplateStore();
+    const { isLoaded, user } = useUser();
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [dragOver, setDragOver] = useState(false);
 
     useEffect(() => {
+        if (!isLoaded || !user) return;
         fetchTemplates();
-    }, [fetchTemplates]);
+    }, [fetchTemplates, isLoaded, user?.id, userId]);
 
     const handleFileSelected = async (file: File) => {
         if (!file.name.endsWith(".docx")) {
@@ -71,6 +74,11 @@ export default function TemplatesPage() {
         setDragOver(false);
         const file = e.dataTransfer.files[0];
         if (file) handleFileSelected(file);
+    };
+
+    const getPreviewUrl = (url: string, name?: string) => {
+        const safeName = encodeURIComponent(name || "document");
+        return `/api/file-preview?url=${encodeURIComponent(url)}&name=${safeName}`;
     };
 
     return (
@@ -166,7 +174,21 @@ export default function TemplatesPage() {
                                             </div>
 
                                             <div className="flex gap-2 mt-2">
-                                                <Button variant="outline" size="sm" className="flex-1 text-xs shadow-none px-2"><Eye className="h-3 w-3 mr-1"/> Open</Button>
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    className="flex-1 text-xs shadow-none px-2"
+                                                    onClick={() => {
+                                                        const fallback = `${(process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000")}/templates/file/${tpl.template_id}?user_id=${encodeURIComponent(userId)}`;
+                                                        window.open(
+                                                            getPreviewUrl(tpl.azure_url || fallback, tpl.name),
+                                                            "_blank",
+                                                            "noopener,noreferrer"
+                                                        );
+                                                    }}
+                                                >
+                                                    <Eye className="h-3 w-3 mr-1"/> Open
+                                                </Button>
                                                 <Button variant="outline" size="sm" className="flex-1 text-xs shadow-none px-2"><Download className="h-3 w-3 mr-1"/> Link</Button>
                                             </div>
                                             <Button variant="ghost" size="sm" className="w-full text-xs text-destructive hover:bg-destructive/10 mt-1" onClick={() => deleteTemplate(tpl.template_id)}><Trash className="h-3 w-3 mr-1"/> Delete (Azure)</Button>

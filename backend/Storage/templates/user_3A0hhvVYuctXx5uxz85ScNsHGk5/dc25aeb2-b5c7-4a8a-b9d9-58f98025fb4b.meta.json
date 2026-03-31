@@ -1,0 +1,59 @@
+{
+  "template_id": "dc25aeb2-b5c7-4a8a-b9d9-58f98025fb4b",
+  "name": "ACPCE_IA_Template234.docx",
+  "docx_path": "backend\\Storage\\templates\\user_3A0hhvVYuctXx5uxz85ScNsHGk5\\dc25aeb2-b5c7-4a8a-b9d9-58f98025fb4b_ACPCE_IA_Template234.docx",
+  "pattern": [
+    {
+      "question_num": 1,
+      "parts": [
+        "a",
+        "b",
+        "c",
+        "d",
+        "e",
+        "f"
+      ],
+      "num_parts": 6,
+      "marks_per_part": 2
+    },
+    {
+      "question_num": 2,
+      "parts": [
+        "a",
+        "b"
+      ],
+      "num_parts": 2,
+      "marks_per_part": 5
+    },
+    {
+      "question_num": 3,
+      "parts": [
+        "a",
+        "b"
+      ],
+      "num_parts": 2,
+      "marks_per_part": 5
+    }
+  ],
+  "placeholders": [
+    "[1a]",
+    "[1b]",
+    "[1c]",
+    "[1d]",
+    "[1e]",
+    "[1f]",
+    "[2]",
+    "[2a]",
+    "[2b]",
+    "[3a]",
+    "[3b]",
+    "[5]",
+    "[CL]",
+    "[class]",
+    "[date]",
+    "[duration]",
+    "[marks]",
+    "[subject]"
+  ],
+  "azure_url": "https://qpilotstorage1.blob.core.windows.net/qpilot-templates/templates/user_3A0hhvVYuctXx5uxz85ScNsHGk5/dc25aeb2-b5c7-4a8a-b9d9-58f98025fb4b/ACPCE_IA_Template234.docx"
+}
