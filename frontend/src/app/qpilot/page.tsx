@@ -8,7 +8,6 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
-import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import { QPilotSidebar } from "@/components/qpilot/QPilotSidebar";
@@ -29,12 +28,7 @@ export default function QPilotConfigPage() {
         isSubmitting,
         setSubmitting,
         setMetadata,
-        reset
     } = useQPilotConfigStore();
-
-    useEffect(() => {
-        return () => reset(); // Cleanup on unmount
-    }, [reset]);
 
     const handleAutoFill = () => {
         setMetadata({

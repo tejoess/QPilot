@@ -291,7 +291,11 @@ Return ONLY valid JSON. No markdown. No extra text.
         # Hard PYQ constraint — override verdict if PYQs exist but none used
         pyqs_exist = bool((pyq_analysis or {}).get("total_pyqs", 0) > 0)
         pyq_utilized = str(metrics.get("pyq_utilized", "no")).strip().lower() == "yes"
-        teacher_text = str((teacher_input or {}).get("input", "")).lower()
+        teacher_text = str(
+            (teacher_input or {}).get("input")
+            or (teacher_input or {}).get("preferences")
+            or ""
+        ).lower()
         teacher_no_pyqs = any(w in teacher_text for w in ["no pyq", "don't use pyq", "without pyq", "ignore pyq"])
 
         if pyqs_exist and not pyq_utilized and not teacher_no_pyqs:

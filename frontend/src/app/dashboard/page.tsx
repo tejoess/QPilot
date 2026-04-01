@@ -12,7 +12,6 @@ import { useEffect } from "react";
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import { QPilotSidebar } from "@/components/qpilot/QPilotSidebar";
 import { QuickActionCard } from "@/components/dashboard/QuickActionCard";
-import { SystemStatusPanel } from "@/components/dashboard/SystemStatusPanel";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import {
@@ -27,17 +26,14 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
 import { useDashboardStore } from "@/store/dashboardStore";
-import { getSystemStats } from "@/lib/dashboardApi";
 import { getUserProjects, deleteProjectFromDb } from "@/actions/dashboardActions";
 import { toast } from "sonner";
 
 export default function DashboardPage() {
     const router = useRouter();
     const {
-        systemStats,
         recentPapers,
         isLoading,
-        setSystemStats,
         setRecentPapers,
         setLoading
     } = useDashboardStore();
@@ -46,10 +42,7 @@ export default function DashboardPage() {
         async function initDashboard() {
             setLoading(true);
             try {
-                const [stats, rawPapers] = await Promise.all([
-                    getSystemStats(),
-                    getUserProjects()
-                ]);
+                const rawPapers = await getUserProjects();
                 
                 // Map DB schema to UI expected shape
                 const papers = rawPapers.map(p => ({
@@ -69,7 +62,6 @@ export default function DashboardPage() {
                     pdfUrl: p.pdfUrl || undefined,
                 }));
                 
-                setSystemStats(stats);
                 setRecentPapers(papers);
             } catch (error) {
                 console.error("Failed to load dashboard data", error);
@@ -78,7 +70,7 @@ export default function DashboardPage() {
             }
         }
         initDashboard();
-    }, [setSystemStats, setRecentPapers, setLoading]);
+    }, [setRecentPapers, setLoading]);
 
     const lastProjectId = recentPapers.length > 0 ? recentPapers[0].id : null;
 
@@ -163,17 +155,6 @@ export default function DashboardPage() {
                                     ))}
                                 </div>
                             </div>
-
-                            {/* 🔷 SYSTEM STATUS PANEL */}
-                            <div className="space-y-4 mt-12">
-                                <div className="flex items-center gap-2">
-                                    <div className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                                    <h3 className="text-[11px] font-black uppercase tracking-widest text-muted-foreground/80">System Live Insights</h3>
-                                </div>
-                                <SystemStatusPanel stats={systemStats} isLoading={isLoading} />
-                            </div>
-
-
 
                         </main>
                     </ScrollArea>

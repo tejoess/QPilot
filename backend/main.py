@@ -442,7 +442,9 @@ async def generate_paper(
     # Parse teacher input
     teacher_instructions = {
         "focus_areas": [],
-        "preferences": teacher_input or "Standard difficulty"
+        "preferences": teacher_input or "Standard difficulty",
+        # Same text as `preferences` so pipeline / blueprint / question code using `input` still see it
+        "input": teacher_input or "",
     }
     
     # Use provided session_id or generate new one

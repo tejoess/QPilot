@@ -953,6 +953,23 @@ export default function QPilotBuilderPage() {
                             {/* ── 5. Teacher Instructions ── */}
                             <section className="space-y-3">
                                 <SectionLabel index={5} title="Teacher Instructions (Optional)" />
+                                <div className="flex flex-wrap gap-1.5">
+                                    {[
+                                        "I want question paper from first 3 mdoules only.",
+                                        "First 2 modules only; keep difficulty easy to medium.",
+                                        
+                                    ].map((s) => (
+                                        <button
+                                            key={s}
+                                            type="button"
+                                            disabled={isRunning}
+                                            onClick={() => setTeacherInput(s)}
+                                            className="text-[10px] font-medium text-left px-2.5 py-1 rounded-md border border-border/60 bg-muted/40 hover:bg-muted/70 text-foreground/90 transition-colors disabled:opacity-50 max-w-full"
+                                        >
+                                            {s}
+                                        </button>
+                                    ))}
+                                </div>
                                 <Textarea
                                     placeholder="e.g. Focus more on calculus, avoid repetition from PYQs, add at least 2 HOTS questions…"
                                     value={teacherInput}

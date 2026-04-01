@@ -7,7 +7,7 @@ Blueprint Generator Agent - Updated Version
 
 import json
 import re
-from typing import Dict, List
+from typing import Dict, List, Optional
 from backend.services.llm_service import openai_llm as llm
 from langchain_core.messages import HumanMessage
 from backend.services.llm_service import openai4o_llm as llm2
@@ -67,9 +67,11 @@ def _pyq_available(pyq_analysis: Dict) -> bool:
 
 def _flatten_kg(kg: Dict) -> Dict[str, List[str]]:
     """Converts the raw nested Knowledge Graph into { 'Module_Name': ['Topic1', 'Topic2'] }"""
-    flat = {}
+    if not isinstance(kg, dict):
+        return {}
     modules = kg.get("Modules", [])
-    if isinstance(modules, list):
+    if isinstance(modules, list) and len(modules) > 0:
+        flat: Dict[str, List[str]] = {}
         for m in modules:
             m_name = m.get("Module_Name", "Unknown Module")
             topics = []
@@ -79,20 +81,72 @@ def _flatten_kg(kg: Dict) -> Dict[str, List[str]]:
                 elif isinstance(t, str):
                     topics.append(t)
             flat[m_name] = [t for t in topics if t]
-    else:
-        # Fallback if already flattened or unexpected format
-        flat = kg
-    return flat
+        return flat
+    # Already-flattened map (module name -> topics) from callers
+    if "Modules" not in kg:
+        return {
+            k: v
+            for k, v in kg.items()
+            if k not in ("Subject", "Subject_Id") and isinstance(v, list)
+        }
+    return {}
+
+
+def _teacher_text(teacher_input: Dict) -> str:
+    """API sends instructions under `preferences`; older code used `input`."""
+    if not teacher_input:
+        return ""
+    return str(
+        teacher_input.get("input")
+        or teacher_input.get("preferences")
+        or ""
+    ).strip()
+
+
+def _infer_allowed_modules_from_text(text: str, flat_kg: Dict[str, List]) -> Optional[List[str]]:
+    """
+    Deterministic module window from natural language (e.g. last 3 modules).
+    Uses module order as in the knowledge graph (Modules array order).
+    """
+    if not text or not flat_kg:
+        return None
+    names = list(flat_kg.keys())
+    if not names:
+        return None
+    tl = text.lower()
+    for pattern in (r"last\s+(\d+)\s+modules?", r"last\s+(\d+)\s+module"):
+        m = re.search(pattern, tl)
+        if m:
+            n = int(m.group(1))
+            n = max(0, min(n, len(names)))
+            return names[-n:] if n else None
+    for pattern in (r"first\s+(\d+)\s+modules?", r"first\s+(\d+)\s+module"):
+        m = re.search(pattern, tl)
+        if m:
+            n = int(m.group(1))
+            n = max(0, min(n, len(names)))
+            return names[:n] if n else None
+    return None
+
 
 def parse_teacher_constraints(teacher_input: Dict, knowledge_graph: Dict) -> Dict:
     """
     Calls LLM once to extract hard constraints from teacher input.
     Returns structured dict used by both generator and critic.
     """
+    kg_flat = _flatten_kg(knowledge_graph)
+    if not kg_flat and isinstance(knowledge_graph, dict) and "Modules" not in knowledge_graph:
+        kg_flat = {
+            k: v
+            for k, v in knowledge_graph.items()
+            if k not in ("Subject", "Subject_Id", "Modules")
+        }
+
+    mod_list = list(kg_flat.keys())
     prompt = f"""Extract hard constraints from this teacher input for a question paper.
 
 Teacher Input: {json.dumps(teacher_input, indent=2)}
-Available Modules: {list(knowledge_graph.keys())}
+Available Modules (exact names — use these when returning allowed_modules): {mod_list}
 
 Return ONLY valid JSON, no markdown:
 {{
@@ -105,7 +159,7 @@ Return ONLY valid JSON, no markdown:
 
 Rules:
 - allowed_modules must be null if teacher did NOT restrict modules
-- If teacher says "first 3 modules", resolve to actual module names from the available list
+- If teacher says "first 3 modules" or "last 3 modules", resolve to actual module names from the available list
 - For pyq_weightage, if teacher says "50% PYQs" or "half from previous papers", return 50. If they specify a different percentage, return that number. If they don't mention PYQ weightage at all, return null.
 - Only extract things the teacher explicitly stated
 """
@@ -113,7 +167,25 @@ Rules:
     text = str(getattr(response, "content", "")).strip()
     if text.startswith("```"):
         text = text.split("```")[1].lstrip("json").strip()
-    return json.loads(text)
+    try:
+        constraints = json.loads(text)
+    except json.JSONDecodeError:
+        constraints = {}
+
+    if not isinstance(constraints, dict):
+        constraints = {}
+
+    # Deterministic "last N" / "first N" modules overrides LLM (exact KG names)
+    det = _infer_allowed_modules_from_text(_teacher_text(teacher_input), kg_flat)
+    if det:
+        constraints["allowed_modules"] = det
+    else:
+        am = constraints.get("allowed_modules")
+        if isinstance(am, list):
+            valid = [m for m in am if m in kg_flat]
+            constraints["allowed_modules"] = valid if valid else None
+
+    return constraints
 
 
 def generate_blueprint(

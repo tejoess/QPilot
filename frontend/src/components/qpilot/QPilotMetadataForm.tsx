@@ -80,7 +80,7 @@ export function QPilotMetadataForm() {
                                 <SelectTrigger id="grade" className="bg-card font-medium">
                                     <SelectValue placeholder="Select Grade" />
                                 </SelectTrigger>
-                                <SelectContent>
+                                <SelectContent className="z-[100] bg-card">
                                     {GRADES.map((g) => (
                                         <SelectItem key={g} value={g}>{g === "Other" ? "Other / Custom" : `Grade ${g}`}</SelectItem>
                                     ))}

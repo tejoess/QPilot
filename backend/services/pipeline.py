@@ -798,7 +798,9 @@ def _count_active_modules(syllabus: dict, teacher_inputs: dict) -> int:
     If teacher restricted to specific modules, count only those.
     Otherwise count all syllabus modules.
     """
-    teacher_text = str(teacher_inputs.get("input", "")).lower()
+    teacher_text = str(
+        teacher_inputs.get("input") or teacher_inputs.get("preferences") or ""
+    ).lower()
     
     # Check if teacher mentioned specific modules (e.g. "last 3 modules", "module 4 5 6")
     import re

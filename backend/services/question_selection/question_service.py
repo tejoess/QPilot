@@ -572,7 +572,7 @@ def _question_type_instruction(question_type: str) -> str:
 def _build_teacher_context(teacher_input: dict) -> str:
     if not teacher_input:
         return ""
-    t_text = teacher_input.get("input", "")
+    t_text = (teacher_input.get("input") or teacher_input.get("preferences") or "").strip()
     if not t_text:
         return ""
     ctx = f"\nTeacher instructions (FOLLOW STRICTLY): {t_text}"
