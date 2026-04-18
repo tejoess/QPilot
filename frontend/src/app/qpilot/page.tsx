@@ -55,7 +55,7 @@ export default function QPilotConfigPage() {
 
         try {
             const projectId = `proj-${Date.now()}`;
-            
+
             // Sync metadata to DB
             if (user?.id) {
                 await initProject({

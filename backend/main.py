@@ -24,6 +24,46 @@ from backend.models import Base, User, Project, PipelineData, Document, Template
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 
+MAX_GENERATED_PAPERS_PER_USER = 3
+
+
+def enforce_generation_click_limit(db_session: Session, user_id: Optional[str], project_id: Optional[str] = None):
+    """
+    Restrict users to at most MAX_GENERATED_PAPERS_PER_USER paper-generation clicks.
+    This is enforced at /generate-paper request time (before workflow starts).
+    """
+    uid = (user_id or "").strip()
+    if not uid:
+        return
+
+    # Backward compatibility: include legacy generated-paper records.
+    click_count = (
+        db_session.query(Document)
+        .filter(
+            Document.user_id == uid,
+            Document.doc_type.in_(["paper_generation_attempt", "final_pdf"]),
+        )
+        .count()
+    )
+
+    if click_count >= MAX_GENERATED_PAPERS_PER_USER:
+        raise HTTPException(
+            status_code=403,
+            detail=f"Generation limit reached. You can start generation only {MAX_GENERATED_PAPERS_PER_USER} times.",
+        )
+
+    # Record this click immediately so repeated clicks cannot bypass the cap.
+    ensure_db_user_project(db_session, uid, project_id)
+    attempt_doc = Document(
+        user_id=uid,
+        project_id=project_id,
+        name=f"paper_generation_attempt_{click_count + 1}",
+        doc_type="paper_generation_attempt",
+        azure_url="",
+    )
+    db_session.add(attempt_doc)
+    db_session.commit()
+
 # Create DB tables
 Base.metadata.create_all(bind=engine)
 
@@ -467,6 +507,16 @@ async def generate_paper(
         paper_session_id = str(uuid.uuid4())
     else:
         paper_session_id = session_id.strip()
+
+    # Enforce generation-click limit before expensive workflow starts.
+    if user_id and user_id.strip():
+        try:
+            db_session = next(get_db())
+            enforce_generation_click_limit(db_session, user_id, project_id)
+        except HTTPException:
+            raise
+        except Exception as limit_check_err:
+            print(f"⚠️ Paper generation limit check failed, allowing request: {limit_check_err}")
     
     print(f"📄 Using paper generation session_id: {paper_session_id}")
     
