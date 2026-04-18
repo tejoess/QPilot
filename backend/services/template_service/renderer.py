@@ -271,6 +271,11 @@ def render_template(
         "[cl]":        "L1",   # fallback — overridden per-row when question is matched
     }
 
+    # Make question-id placeholders replaceable anywhere in the document,
+    # including non-table paragraphs (not just table rows).
+    for qid, qinfo in qmap.items():
+        global_replacements[f"[{qid}]"] = qinfo.get("text", "")
+
     # Process body paragraphs (non-table content like header)
     for para in doc.paragraphs:
         _replace_paragraph_placeholders(para, global_replacements)

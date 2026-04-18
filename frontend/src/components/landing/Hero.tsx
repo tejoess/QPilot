@@ -29,13 +29,12 @@ export function Hero() {
 
                     <div className="flex flex-wrap gap-4 mt-4">
                         <Link href="/qpilot">
-                            <HoverBorderGradient as="div" className="bg-primary text-primary-foreground font-bold px-8 py-4 text-lg">
-                                Start Generating
-                            </HoverBorderGradient>
+                            <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                                <HoverBorderGradient as="div" className="bg-primary text-primary-foreground font-bold px-8 py-4 text-lg">
+                                    Start Generating
+                                </HoverBorderGradient>
+                            </motion.div>
                         </Link>
-                        <button className="px-8 py-4 rounded-full border border-border bg-transparent text-foreground font-medium hover:bg-muted transition-colors text-lg">
-                            Watch Demo
-                        </button>
                     </div>
 
                 </motion.div>

@@ -10,6 +10,7 @@
  */
 
 import { useEffect, useRef, useState } from "react";
+import { motion } from "framer-motion";
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import { QPilotSidebar } from "@/components/qpilot/QPilotSidebar";
 import { Button } from "@/components/ui/button";
@@ -189,9 +190,11 @@ export default function TemplatesPage() {
                                                 >
                                                     <Eye className="h-3 w-3 mr-1"/> Open
                                                 </Button>
-                                                <Button variant="outline" size="sm" className="flex-1 text-xs shadow-none px-2"><Download className="h-3 w-3 mr-1"/> Link</Button>
+                                                <Button variant="outline" size="sm" className="flex-1 text-xs shadow-none px-2"><Download className="h-3 w-3 mr-1"/> Download</Button>
                                             </div>
-                                            <Button variant="ghost" size="sm" className="w-full text-xs text-destructive hover:bg-destructive/10 mt-1" onClick={() => deleteTemplate(tpl.template_id)}><Trash className="h-3 w-3 mr-1"/> Delete (Azure)</Button>
+                                            <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                                                <Button variant="ghost" size="sm" className="w-full text-xs text-destructive hover:bg-destructive/10 mt-1" onClick={() => deleteTemplate(tpl.template_id)}><Trash className="h-3 w-3 mr-1"/> Delete (Azure)</Button>
+                                            </motion.div>
                                         </div>
                                     ))}
                                 </div>

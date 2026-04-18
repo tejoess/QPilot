@@ -378,12 +378,14 @@ async def pyqs_fetch(state: PipelineState):
     session_id = state["session_id"]
     await manager.send_progress(session_id, "pyqs_fetch", "running", 0, "Starting PYQ extraction")
 
-    if state.get("pyqs_text"):
-        pyqs_text = state["pyqs_text"]
-    elif state.get("pyqs_pdf_path"):
+    # Prefer uploaded PDF when present; text_content may contain only helper hints
+    # (e.g., weightage) and should not bypass OCR/extraction.
+    if state.get("pyqs_pdf_path"):
         await manager.send_progress(session_id, "pyqs_fetch", "running", 25, "Reading PDF file")
         pyqs_pdf_path = cast(str, state["pyqs_pdf_path"])
         pyqs_text = extract_text_from_pdf(pyqs_pdf_path, "pyqs")
+    elif state.get("pyqs_text"):
+        pyqs_text = state["pyqs_text"]
     else:
         raise ValueError("Either pyqs_text or pyqs_pdf_path must be provided")
 
@@ -1027,5 +1029,10 @@ async def generate_paper_workflow(
         "blueprint_repair_summary":   None,
         "paper_repair_summary":       None,
     }
+
+    # Save input configuration to disk so they can be loaded into DB later
+    await save_json_data(session_id, "teacher_inputs.json",   teacher_inputs,          silent=True)
+    await save_json_data(session_id, "bloom_distribution.json", bloom_levels,           silent=True)
+    await save_json_data(session_id, "paper_pattern.json",    state["qp_pattern"],     silent=True)
 
     return await app.ainvoke(state)

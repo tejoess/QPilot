@@ -7,9 +7,9 @@ Changes from previous version:
      4-6M are one-line deep, 8-10M capped at 1-2 sub-parts. Domain variety kept.
   3. Rephrase prompt hardened with STRIP RULE: if target marks < 50% of source,
      extract atomic core only — no second LLM call, just smarter prompting.
-  4. History tracking upgraded to soft verb-class fingerprinting: tracks
-     (verb-class, topic) pairs and nudges model to vary, but does NOT hard-block
-     (allows repeats after 2+ intervening questions for natural balance).
+  4. History tracking upgraded to complete in-run history: every generation
+      call receives the full prior question list, and the prompt shows only
+      the question texts in order. It still does NOT hard-block repeats.
   5. KG child-node enrichment for marks > 5: passes child subtopics from the
      knowledge graph as additional context when available, falls back cleanly.
 """
@@ -78,14 +78,16 @@ def find_match(pyq_bank: List[Dict], used_pyq_ids: set, **criteria) -> Optional[
     topic       = criteria["topic"]
     marks       = criteria.get("marks")
     bloom_level = criteria.get("bloom_level")
+    marks_value = int(marks) if marks is not None else 0
+    bloom_level_value = str(bloom_level) if bloom_level is not None else ""
 
     for pyq in pyq_bank:
         pyq_id = pyq.get("id")
         if not pyq_id or pyq_id in used_pyq_ids:
             continue
-        if level == 1 and match_level_1(pyq, topic, marks, bloom_level):
+        if level == 1 and match_level_1(pyq, topic, marks_value, bloom_level_value):
             return pyq
-        elif level == 2 and match_level_2(pyq, topic, bloom_level):
+        elif level == 2 and match_level_2(pyq, topic, bloom_level_value):
             return pyq
         elif level == 3 and match_level_3(pyq, topic):
             return pyq
@@ -123,7 +125,7 @@ MARKS_STRUCTURE = {
     "4-6": {
         "label":           "4–6 marks",
         "answer_length":   "half a page in the answer booklet",
-        "question_length": "ONE line stictly — may be a slightly deeper single concept",
+        "question_length": "ONE line stictly. Less than 75 characters.",
         "concepts":        "ONE concept with depth, OR one concept + one brief example",
         "sub_parts":       "At most ONE sub-part, only if absolutely necessary. Prefer no sub-parts.",
         "style":           "explanation / working / brief comparison of two closely related ideas",
@@ -143,7 +145,7 @@ MARKS_STRUCTURE = {
     "8-10": {
         "label":           "8–10 marks",
         "answer_length":   "full page in the answer booklet",
-        "question_length": "1–1.5 lines strictly, may include one subpart",
+        "question_length": "1–1.5 lines strictly, may or may not include one subpart. Less than 100 characters.",
         "concepts":        "one main concept with detailed explanation",
         "sub_parts":       "At most 1 sub-parts. No more.",
         "style":           "detailed explanation / comparison / application with example or calculation",
@@ -193,65 +195,35 @@ _BLOOM_VERBS = {
 
 
 # ============================================================================
-# HISTORY TRACKING — Soft verb-class fingerprinting  (Change #4)
+# HISTORY TRACKING — Complete question list  (Change #4)
 # ============================================================================
 
-# Verb classes used to fingerprint each generated question
-_VERB_CLASSES = {
-    "define":    ["define", "what is", "what are", "state", "name", "identify", "list"],
-    "explain":   ["explain", "describe", "how does", "how do", "elaborate"],
-    "compare":   ["compare", "differentiate", "distinguish", "contrast"],
-    "apply":     ["calculate", "solve", "demonstrate", "show", "compute", "derive"],
-    "discuss":   ["discuss", "analyze", "examine", "evaluate", "assess", "justify"],
-    "outline":   ["outline", "summarize", "briefly", "write a short note", "short note"],
-}
-
-def _detect_verb_class(question_text: str) -> Optional[str]:
-    """Detect the verb class of a question from its first 60 characters."""
-    prefix = question_text.lower()[:60]
-    for cls, verbs in _VERB_CLASSES.items():
-        if any(v in prefix for v in verbs):
-            return cls
-    return None
-
-def _build_history_fingerprints(history: List[Dict]) -> List[Tuple[str, str]]:
-    """Returns list of (verb_class, topic) pairs from history."""
-    result = []
-    for h in history:
-        vc = _detect_verb_class(h.get("text", ""))
-        if vc:
-            result.append((vc, normalize(h.get("topic", ""))))
-    return result
-
 def _build_soft_history_instruction(
-    history: List[Dict],
-    current_topic: str,
-    marks: int,
+    history: List[str],
 ) -> str:
     """
-    Soft nudge: if the same (verb_class, topic) pair appeared in the last 2
-    questions, ask model to vary. Does NOT hard-block — allows natural balance.
+    Complete-history nudge: show every prior question in the current run.
+    The prompt should contain only the question texts, in order.
     """
     if not history:
         return ""
 
-    fingerprints = _build_history_fingerprints(history)
-    recent = fingerprints[-2:]  # only look at last 2
-
-    current_topic_norm = normalize(current_topic)
-    same_topic_recent_verbs = [
-        vc for vc, t in recent if t == current_topic_norm
-    ]
-
-    if not same_topic_recent_verbs:
-        return ""
-
     lines = [
-        "\nVARIETY NUDGE (soft — do not hard-repeat these for the same topic):",
-        f"  Recent verb classes used for '{current_topic}': {same_topic_recent_verbs}",
-        "  Try a different opening verb class if naturally possible.",
-        "  It is acceptable to repeat if no other verb fits the bloom level.",
+        "\nCOMPLETE HISTORY (all previous questions in this run, oldest to newest):",
+        "  Review the entire list before generating the next question.",
     ]
+
+    for index, entry in enumerate(history, 1):
+        if isinstance(entry, dict):
+            entry = entry.get("text") or entry.get("question_text") or entry.get("question") or ""
+        cleaned = re.sub(r"\s+", " ", str(entry)).strip()
+        if cleaned:
+            lines.append(f"  {index}. {cleaned}")
+
+    lines.extend([
+        "  Do not repeat or paraphrase any question above.",
+        "  If a similar idea is unavoidable, change the opening verb and wording as much as possible.",
+    ])
     return "\n".join(lines)
 
 
@@ -401,15 +373,15 @@ def rephrase_pyq(
     topic: str,
     bloom_level: str,
     question_type: str = "short_answer",
-    history: List[Dict] = None,
-    enriched_topic: str = None,
+    history: Optional[List[str]] = None,
+    enriched_topic: Optional[str] = None,
 ) -> str:
     """
     Rephrase / scale an existing PYQ to the target marks and bloom level.
 
     Changes:
     - Injects MARKS_STRUCTURE hard constraint block (Change #1)
-    - Soft history nudge via verb-class fingerprinting (Change #4)
+    - Soft history nudge via complete question list (Change #4)
     - STRIP RULE for large downscaling (Change #3 — no extra LLM call)
     - Uses enriched_topic if provided (Change #5)
     """
@@ -432,7 +404,7 @@ STRIP RULE (target is 2–3 marks):
 """
 
     type_instructions = _question_type_instruction(question_type)
-    history_nudge     = _build_soft_history_instruction(history or [], topic, target_marks)
+    history_nudge     = _build_soft_history_instruction(history or [])
 
     prompt = f"""You are a Mumbai University question paper setter.
 Rewrite the given question so it fits exactly {target_marks} marks at {bloom_level} Bloom level.
@@ -486,17 +458,17 @@ def generate_new_question(
     marks: int,
     bloom_level: str,
     question_number: str,
-    teacher_input: dict = None,
+    teacher_input: Optional[dict] = None,
     question_type: str = "short_answer",
-    history: List[Dict] = None,
-    enriched_topic: str = None,
+    history: Optional[List[str]] = None,
+    enriched_topic: Optional[str] = None,
 ) -> str:
     """
     Generate a brand-new Mumbai University style question.
 
     Changes:
     - Injects MARKS_STRUCTURE hard constraint block (Change #1)
-    - Soft history nudge via verb-class fingerprinting (Change #4)
+    - Soft history nudge via complete question list (Change #4)
     - Uses enriched_topic if provided (Change #5)
     """
     ms            = _get_marks_structure(marks)
@@ -506,7 +478,7 @@ def generate_new_question(
 
     teacher_context   = _build_teacher_context(teacher_input)
     type_instructions = _question_type_instruction(question_type)
-    history_nudge     = _build_soft_history_instruction(history or [], topic, marks)
+    history_nudge     = _build_soft_history_instruction(history or [])
 
     prompt = f"""You are a Mumbai University question paper setter.
 Generate ONE exam question for the specification below.
@@ -537,13 +509,10 @@ GOOD QUESTION EXAMPLES for {ms['label']}:
 ══════════════════════════════════════════════════════
 {history_nudge}
 
-{_GENERATE_FEW_SHOTS}
-
 STRICT RULES:
   1. Match LENGTH to mark range — see constraint block above. Non-negotiable.
   2. Match VERB to bloom level ({bloom_level}): {bloom_verb}
-  3. Do NOT generate numerical/calculation problems unless teacher explicitly asked.
-  4. Do NOT invent sub-topics outside the given topic.
+  3. Do NOT generate numerical/calculation problems unless teacher explicitly asked. If teacher input says to include numerical problems, you may include ONE numerical problem for appropriate mark ranges which does not require table, graph or diagram. 
   5. Keep language natural and direct.
   6. VARIETY: Vary your opening verb. Do not start with the same word as the nudge hints above.
 
@@ -569,7 +538,7 @@ def _question_type_instruction(question_type: str) -> str:
         return "\nQUESTION FORMAT: 'Write a short note on...' style."
     return ""
 
-def _build_teacher_context(teacher_input: dict) -> str:
+def _build_teacher_context(teacher_input: Optional[dict]) -> str:
     if not teacher_input:
         return ""
     t_text = (teacher_input.get("input") or teacher_input.get("preferences") or "").strip()
@@ -637,9 +606,9 @@ def _pyq_bank_available(pyq_bank: List[Dict]) -> bool:
 def select_questions(
     blueprint: Dict,
     pyq_bank: List[Dict],
-    teacher_input: dict = None,
-    qp_pattern: dict = None,
-    knowledge_graph: Dict = None,        # Change #5 — new optional param
+    teacher_input: Optional[dict] = None,
+    qp_pattern: Optional[dict] = None,
+    knowledge_graph: Optional[Dict] = None,        # Change #5 — new optional param
 ) -> Dict:
     """
     Main question selection function.
@@ -656,8 +625,8 @@ def select_questions(
     draft_sections = []
     selection_log  = []
 
-    # History now stores dicts with 'text' and 'topic' for fingerprinting (Change #4)
-    history: List[Dict] = []
+    # History now stores plain question texts for the current run (Change #4)
+    history: List[str] = []
 
     stats = {
         "total_questions":      0,
@@ -797,10 +766,10 @@ def select_questions(
                     selection_method = "generated_fallback"
                     stats["generated_new"] += 1
 
-            # Append to history with topic for fingerprinting (Change #4)
+            # Append question text to the in-run history list (Change #4)
             if selected_text:
                 selected_text = _compact_question_text(selected_text, marks)
-                history.append({"text": selected_text, "topic": topic})
+                history.append(selected_text)
 
             draft_q = {
                 "id":               str(uuid.uuid4())[:8],
@@ -836,6 +805,7 @@ def select_questions(
         "selection_stats":    stats,
         "selection_log":      selection_log,
         "used_pyq_ids":       list(used_pyq_ids),
+        "question_history":   history,
     }
 
     print("\n" + "=" * 70)

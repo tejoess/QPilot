@@ -22,9 +22,24 @@ from backend.services.paper_pdf_gen import format_paper_to_pdf
 from backend.database import get_db, engine
 from backend.models import Base, User, Project, PipelineData, Document, TemplateData
 from sqlalchemy.orm import Session
+from sqlalchemy import text
 
 # Create DB tables
 Base.metadata.create_all(bind=engine)
+
+# Add new columns to existing pipeline_data tables (idempotent migration)
+_NEW_PIPELINE_COLS = [
+    "ALTER TABLE pipeline_data ADD COLUMN IF NOT EXISTS teacher_inputs_json JSON",
+    "ALTER TABLE pipeline_data ADD COLUMN IF NOT EXISTS bloom_distribution_json JSON",
+    "ALTER TABLE pipeline_data ADD COLUMN IF NOT EXISTS paper_pattern_json JSON",
+]
+try:
+    with engine.connect() as _conn:
+        for _stmt in _NEW_PIPELINE_COLS:
+            _conn.execute(text(_stmt))
+        _conn.commit()
+except Exception as _e:
+    print(f"[DB migration] Could not add new pipeline columns (may already exist): {_e}")
 
 backend = FastAPI()
 
@@ -552,7 +567,11 @@ async def generate_paper(
                 pld.blueprint_verification_json = load_json("blueprint_verification.json")
                 pld.draft_paper_json = load_json("draft_paper.json")
                 pld.final_paper_json = load_json("final_paper.json")
-                
+                # Save teacher/exam configuration inputs
+                pld.teacher_inputs_json = load_json("teacher_inputs.json")
+                pld.bloom_distribution_json = load_json("bloom_distribution.json")
+                pld.paper_pattern_json = load_json("paper_pattern.json")
+
                 db_session.commit()
                 print("✅ Successfully saved paper data to database")
             except Exception as db_err:

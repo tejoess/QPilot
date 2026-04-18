@@ -29,7 +29,7 @@ GLOBAL_PLACEHOLDERS = {
 BRACKET_RE = re.compile(r'\[([^\[\]]+)\]')
 
 # Regex for question id: 1-2 digits followed by a letter(s) — e.g. [1a], [2b], [10a]
-QUESTION_ID_RE = re.compile(r'^(\d{1,2})([a-z]+)$')
+QUESTION_ID_RE = re.compile(r'^(\d{1,2})([a-z]+)$', re.IGNORECASE)
 
 # Regex for a marks cell: only a number inside brackets, like [2] or [05]
 MARKS_RE = re.compile(r'^\d+$')
@@ -110,44 +110,74 @@ def extract_pattern(docx_path: str) -> List[Dict]:
     """
     doc = Document(docx_path)
 
-    # Build: question_num → {parts: [letter...], marks_per_part: int}
+    # Build: question_num -> {parts: [letter...], marks_per_part: int}
     sections: Dict[int, Dict] = {}
 
-    # Also collect (row_cells_text, question_id) pairs to find marks in same row
-    row_data = []  # list of (list_of_cell_texts_in_row, question_token)
+    def _ensure_section(qnum: int):
+        if qnum not in sections:
+            sections[qnum] = {"parts": [], "marks_per_part": 0}
 
+    # Pass 1: detect question IDs from all text blocks (paragraphs + table-cell paragraphs).
+    # This enables pattern extraction even when placeholders are not in tables.
+    for text, _ in _iter_all_text_in_doc(doc):
+        if not text:
+            continue
+
+        found_qids = []
+        local_marks = []
+
+        for match in BRACKET_RE.finditer(text):
+            inner = match.group(1).strip()
+            qid_match = QUESTION_ID_RE.match(inner)
+            if qid_match:
+                qnum = int(qid_match.group(1))
+                part = qid_match.group(2).lower()
+                found_qids.append((qnum, part))
+            elif MARKS_RE.match(inner):
+                local_marks.append(int(inner))
+
+        if not found_qids:
+            continue
+
+        for qnum, part in found_qids:
+            _ensure_section(qnum)
+            if part not in sections[qnum]["parts"]:
+                sections[qnum]["parts"].append(part)
+
+        # If a paragraph contains both a question id and numeric mark, use it as fallback.
+        if local_marks:
+            for qnum, _ in found_qids:
+                if sections[qnum]["marks_per_part"] == 0:
+                    sections[qnum]["marks_per_part"] = local_marks[0]
+
+    # Pass 2: preserve row-aware marks inference for table templates where marks appear
+    # in a neighboring cell of the same row.
     for table in doc.tables:
         for row in table.rows:
             cell_texts = [" ".join(p.text.strip() for p in cell.paragraphs) for cell in row.cells]
             row_full_text = " ".join(cell_texts)
 
-            # Find question IDs in this row
             found_qids = []
             for match in BRACKET_RE.finditer(row_full_text):
-                token = f"[{match.group(1)}]"
-                inner = match.group(1)
-                if QUESTION_ID_RE.match(inner):
-                    found_qids.append(inner)
+                inner = match.group(1).strip()
+                qid_match = QUESTION_ID_RE.match(inner)
+                if qid_match:
+                    qnum = int(qid_match.group(1))
+                    part = qid_match.group(2).lower()
+                    found_qids.append((qnum, part))
 
-            # Find numeric marks in this row
             row_marks = []
             for cell_text in cell_texts:
                 for match in BRACKET_RE.finditer(cell_text):
-                    inner = match.group(1)
+                    inner = match.group(1).strip()
                     if MARKS_RE.match(inner):
                         row_marks.append(int(inner))
 
-            for qid_inner in found_qids:
-                m = QUESTION_ID_RE.match(qid_inner)
-                qnum = int(m.group(1))
-                part = m.group(2)
-
-                if qnum not in sections:
-                    sections[qnum] = {"parts": [], "marks_per_part": 0}
+            for qnum, part in found_qids:
+                _ensure_section(qnum)
                 if part not in sections[qnum]["parts"]:
                     sections[qnum]["parts"].append(part)
 
-                # Assign marks from this row if found and not yet assigned
                 if row_marks and sections[qnum]["marks_per_part"] == 0:
                     sections[qnum]["marks_per_part"] = row_marks[0]
 

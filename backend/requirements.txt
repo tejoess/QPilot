@@ -15,10 +15,8 @@ langchain_google_genai
 langgraph
 pymupdf4llm
 pymupdf
-easyocr
-opencv-python-headless
+google-genai
 Pillow
-numpy
 python-docx
 reportlab
 docling

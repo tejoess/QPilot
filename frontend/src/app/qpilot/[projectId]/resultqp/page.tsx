@@ -470,11 +470,6 @@ export default function ResultQPPage() {
         toast.success("Copied successfully");
     };
 
-    const handleSave = () => {
-        toast.info("Saving paper… (Simulated)");
-        setTimeout(() => toast.success("Paper saved to your projects"), 1000);
-    };
-
     return (
         <SidebarProvider style={{
             "--sidebar-width": "240px",
@@ -611,10 +606,7 @@ export default function ResultQPPage() {
                                         <Copy className="h-4 w-4" />
                                         Copy Plain Text
                                     </Button>
-                                    <Button variant="ghost" onClick={handleSave} className="w-full justify-start h-11 px-4 font-bold gap-3 uppercase tracking-widest hover:bg-green-500/5 hover:text-green-600 transition-all">
-                                        <Save className="h-4 w-4" />
-                                        Save to Projects
-                                    </Button>
+
                                     <div className="pt-4">
                                         <Button
                                             variant="outline"

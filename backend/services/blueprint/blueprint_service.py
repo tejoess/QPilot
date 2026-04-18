@@ -13,6 +13,72 @@ from langchain_core.messages import HumanMessage
 from backend.services.llm_service import openai4o_llm as llm2
 
 
+def compute_bloom_question_counts(bloom_coverage: Dict, total_questions: int) -> Dict[str, int]:
+    """
+    Convert percentage-based bloom distribution to exact question counts.
+
+    Uses the largest-remainder method so the counts always sum to total_questions
+    without drifting due to floating-point rounding.
+
+    Skips levels with 0% so the LLM isn't told "0 questions of Create".
+    Keys are returned with proper capitalisation (Remember, Understand, …).
+    """
+    CANONICAL = ["Remember", "Understand", "Apply", "Analyze", "Evaluate", "Create"]
+
+    # Accept both lowercase ("remember") and capitalised ("Remember") keys
+    pct_map: Dict[str, float] = {}
+    for level in CANONICAL:
+        pct = bloom_coverage.get(level.lower(), 0) or bloom_coverage.get(level, 0) or 0
+        if pct > 0:
+            pct_map[level] = float(pct)
+
+    if not pct_map:
+        # Fallback: four equal buckets if caller sent nothing useful
+        base = total_questions // 4
+        rem  = total_questions % 4
+        fallback = {l: base for l in ["Remember", "Understand", "Apply", "Analyze"]}
+        fallback["Remember"] += rem
+        return fallback
+
+    total_pct = sum(pct_map.values())
+    floats    = {l: (p / total_pct) * total_questions for l, p in pct_map.items()}
+    floors    = {l: int(v) for l, v in floats.items()}
+    remainders = {l: floats[l] - floors[l] for l in floors}
+
+    # Distribute remaining question slots to levels with the highest fractional parts
+    shortage = total_questions - sum(floors.values())
+    for level in sorted(remainders, key=lambda x: remainders[x], reverse=True):
+        if shortage <= 0:
+            break
+        floors[level] += 1
+        shortage -= 1
+
+    return floors
+
+
+def build_bloom_instruction(bloom_counts: Dict[str, int], total_questions: int) -> str:
+    """
+    Build the prompt block that tells the LLM exactly how many questions
+    to assign per Bloom level. Passed as a HARD CONSTRAINT, not a soft target.
+    """
+    lines = [
+        "BLOOM'S DISTRIBUTION — EXACT QUESTION COUNTS (HARD CONSTRAINT):",
+        f"You MUST assign bloom_level so the finished blueprint has EXACTLY:",
+    ]
+    for level, count in bloom_counts.items():
+        lines.append(f"  • {level}: {count} question{'s' if count != 1 else ''}")
+    lines.append(f"  ─────────────────────────────")
+    lines.append(f"  Total: {sum(bloom_counts.values())} (must equal {total_questions})")
+    lines.append("")
+    lines.append("HOW TO APPLY:")
+    lines.append("  - Keep a running tally of bloom_level assignments as you fill each section.")
+    lines.append("  - Spread the levels naturally — do NOT cluster all low-level questions in one section.")
+    lines.append("  - If a level's quota is already met, do NOT add more questions of that level.")
+    lines.append("  - For short-answer sections prefer Remember/Understand; for long-answer prefer Apply/Analyze/Evaluate.")
+    lines.append("  - These counts are non-negotiable. Zero deviation is expected.")
+    return "\n".join(lines)
+
+
 def create_fallback_blueprint(paper_pattern: Dict) -> Dict:
     sections = []
     for sp in paper_pattern.get("sections", []):
@@ -50,19 +116,24 @@ def fix_incomplete_json(json_str: str) -> str:
 
 
 def _pyq_available(pyq_analysis: Dict) -> bool:
-    """
-    Returns True only if the PYQ analysis contains actual questions.
-    Handles: empty dict, missing keys, zero totals, null values.
-    """
     if not pyq_analysis:
         return False
+    
+    # Check total_pyqs field
     total = pyq_analysis.get("total_pyqs", 0) or 0
     if total > 0:
         return True
-    # Also check module_wise_count sums
+    
+    # Check module_wise_count sums
     for mod_data in pyq_analysis.get("module_wise_count", {}).values():
         if isinstance(mod_data, dict) and (mod_data.get("total", 0) or 0) > 0:
             return True
+    
+    # ✅ ADD THIS: Check for a populated questions list directly
+    questions = pyq_analysis.get("questions", [])
+    if isinstance(questions, list) and len(questions) > 0:
+        return True
+    
     return False
 
 def _flatten_kg(kg: Dict) -> Dict[str, List[str]]:
@@ -220,6 +291,11 @@ def generate_blueprint(
         flat_kg = {k: v for k, v in flat_kg.items() 
                         if k in constraints["allowed_modules"]}
 
+    # Pre-compute exact bloom question counts (do the math so LLM doesn't have to)
+    total_qs = paper_pattern.get('total_questions', 0)
+    bloom_counts = compute_bloom_question_counts(bloom_coverage, total_qs)
+    bloom_instruction = build_bloom_instruction(bloom_counts, total_qs)
+
     # Compute target PYQ count
     pyq_wt = constraints.get("pyq_weightage")
     if pyq_wt is None:
@@ -258,8 +334,7 @@ Your ONLY job: produce a list of questions. Do NOT compute totals, percentages, 
 
 **{pyq_instructions}**
 
-**BLOOM'S TARGET DISTRIBUTION:**
-{json.dumps(bloom_coverage, indent=2)}
+**{bloom_instruction}**
 
 TEACHER PREFERENCES:
 {json.dumps(teacher_input, indent=2)}
@@ -291,10 +366,8 @@ MODULE BALANCE:
 - Min per module: {paper_pattern['module_weightage_range']['min'] * 100:.0f}%
 - Max per module: {paper_pattern['module_weightage_range']['max'] * 100:.0f}%
 
-BLOOM'S — assign levels to match target distribution within ±5%:
-- Use given bloom_coverage distribution as target. For example, if target is 20% Analyze, then 2 out of 10 questions should be Analyze. You can deviate by ±5% (i.e. 1-3 Analyze questions would be acceptable in this case).
-- If multiple section, Distribute accordingly but ensure overall distribution matches target.
-
+BLOOM'S — follow the exact question counts in the BLOOM'S DISTRIBUTION block above.
+No deviation. Count as you go; stop assigning a level once its quota is filled.
 
 TOPIC FIELD:
 - Must exactly match a topic or subtopic name from the knowledge graph above
@@ -302,6 +375,8 @@ TOPIC FIELD:
 
 IMPORTANT INSTRUCTIONS: 
 - Blueprint must be balanced according to given constraints and follow the given pattern, marks, dstribution and importantly teachers input.
+- Follow the weightage distrubition strictly considering teacher input as well. 
+- Ensure Questions are not repeated and are from different modules as much as possible. Keep variety in modules and topics according to weightage assigned. 
 - Teachers input should be always priotized and followed. 
 - If teacher wants more questions from a module, or want question paper from specific modules only, then follow that strictly even if it skews the distribution.
 - If teacher has given specific topics, ensure those topics are included. 

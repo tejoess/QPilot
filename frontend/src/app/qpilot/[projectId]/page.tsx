@@ -58,11 +58,16 @@ import { useTemplateStore, templatePatternToSections } from "@/store/templateSto
 import { useQPilotConfigStore } from "@/store/qpilotConfigStore";
 import { useQPilotStore } from "@/store/qpilotStore";
 
-function Typewriter({ text, delay = 10 }: { text: string; delay?: number }) {
-    const [currentText, setCurrentText] = useState("");
-    const [currentIndex, setCurrentIndex] = useState(0);
+function Typewriter({ text, delay = 10, animate = true }: { text: string; delay?: number; animate?: boolean }) {
+    const [currentText, setCurrentText] = useState(animate ? "" : text);
+    const [currentIndex, setCurrentIndex] = useState(animate ? 0 : text.length);
 
     useEffect(() => {
+        if (!animate) {
+            setCurrentText(text);
+            setCurrentIndex(text.length);
+            return;
+        }
         if (currentIndex < text.length) {
             const timeout = setTimeout(() => {
                 setCurrentText(prevText => prevText + text[currentIndex]);
@@ -70,12 +75,12 @@ function Typewriter({ text, delay = 10 }: { text: string; delay?: number }) {
             }, delay);
             return () => clearTimeout(timeout);
         }
-    }, [currentIndex, delay, text]);
+    }, [currentIndex, delay, text, animate]);
 
     return (
         <span>
             {currentText}
-            {currentIndex < text.length && <span className="animate-pulse font-black text-primary ml-[2px]">|</span>}
+            {animate && currentIndex < text.length && <span className="animate-pulse font-black text-primary ml-[2px]">|</span>}
         </span>
     );
 }
@@ -111,7 +116,7 @@ const Bubble = ({ icon: Icon, title, content, color, children, isWorking = false
     </div>
 );
 
-function RenderAgentTemplate({ file, content }: { file: string; content: any }) {
+function RenderAgentTemplate({ file, content, isLatest = true }: { file: string; content: any; isLatest?: boolean }) {
     if (file === "syllabus.json") {
         const modules = content?.modules || [];
         return (
@@ -119,7 +124,7 @@ function RenderAgentTemplate({ file, content }: { file: string; content: any }) 
                 icon={BookOpen}
                 title="Syllabus Agent: Extracted Successfully"
                 color="bg-primary/5 border-primary/20 text-primary"
-                content={<Typewriter text={`I have successfully extracted ${modules.length} modules from your provided syllabus. Wait a moment while I proceed to build the Knowledge Graph.`} />}
+                content={<Typewriter text={`I have successfully extracted ${modules.length} modules from your provided syllabus. Wait a moment while I proceed to build the Knowledge Graph.`} animate={isLatest} />}
             >
                 <div className="flex flex-wrap gap-1">
                     {modules.slice(0, 3).map((m: any, idx: number) => (
@@ -139,7 +144,7 @@ function RenderAgentTemplate({ file, content }: { file: string; content: any }) 
                 icon={Network}
                 title="Data Agent: Knowledge Graph Built"
                 color="bg-blue-500/5 border-blue-500/20 text-blue-500"
-                content={<Typewriter text={`I just finished drawing the topic relationships into a structured graph! (${keys.length} core concepts mapped).`} />}
+                content={<Typewriter text={`I just finished drawing the topic relationships into a structured graph! (${keys.length} core concepts mapped).`} animate={isLatest} />}
             >
                 <div className="pl-2 border-l-2 border-blue-500/20 space-y-1">
                     {keys.slice(0, 3).map((k: string, i: number) => (
@@ -158,7 +163,7 @@ function RenderAgentTemplate({ file, content }: { file: string; content: any }) 
                     icon={AlertTriangle}
                     title="Data Agent: Skipping PYQ Matching"
                     color="bg-amber-500/5 border-amber-500/20 text-amber-600"
-                    content={<Typewriter text="No usable questions were found in the provided PYQ data (empty / insufficient length). I will be generating 100% fresh questions directly from the syllabus!" />}
+                    content={<Typewriter text="No usable questions were found in the provided PYQ data (empty / insufficient length). I will be generating 100% fresh questions directly from the syllabus!" animate={isLatest} />}
                 />
             );
         }
@@ -167,7 +172,7 @@ function RenderAgentTemplate({ file, content }: { file: string; content: any }) 
                 icon={FileText}
                 title="Data Agent: Past Questions Analyzed"
                 color="bg-rose-500/5 border-rose-500/20 text-rose-600"
-                content={<Typewriter text={`I successfully extracted and analyzed ${qCount} unique questions from your past papers. Patterns have been loaded to shape the final blueprint.`} />}
+                content={<Typewriter text={`I successfully extracted and analyzed ${qCount} unique questions from your past papers. Patterns have been loaded to shape the final blueprint.`} animate={isLatest} />}
             />
         );
     }
@@ -178,7 +183,7 @@ function RenderAgentTemplate({ file, content }: { file: string; content: any }) 
                 icon={FileText}
                 title="Blueprint Agent: Drafting Exam Matrix"
                 color="bg-emerald-500/5 border-emerald-500/20 text-emerald-600"
-                content={<Typewriter text="I am analyzing your course outcomes and constraints. Producing the mathematical distribution matrix! Here is a glimpse:" />}
+                content={<Typewriter text="I am analyzing your course outcomes and constraints. Producing the mathematical distribution matrix! Here is a glimpse:" animate={isLatest} />}
             >
                 <div className="grid grid-cols-2 gap-2 mt-1">
                     {sections.slice(0, 4).map((s: any, idx: number) => (
@@ -202,7 +207,7 @@ function RenderAgentTemplate({ file, content }: { file: string; content: any }) 
                     icon={CheckCircle2}
                     title={`Verifier Agent: ${isBlueprint ? "Blueprint" : "Exam Paper"} Approved!`}
                     color="bg-green-500/5 border-green-500/20 text-green-600"
-                    content={<Typewriter text={`I meticulously reviewed the draft and it perfectly matches the parameters and constraints. Validation successful!`} />}
+                    content={<Typewriter text={`I meticulously reviewed the draft and it perfectly matches the parameters and constraints. Validation successful!`} animate={isLatest} />}
                 />
             );
         } else {
@@ -212,7 +217,7 @@ function RenderAgentTemplate({ file, content }: { file: string; content: any }) 
                     title={`Repair Agent: Analyzing and Fixing Draft...`}
                     color="bg-violet-500/5 border-violet-500/20 text-violet-600"
                     isWorking={true}
-                    content={<Typewriter text={`I detected some minor imbalances during validation. No problem! I am stepping in to actively reconstruct and repair the draft to perfectly align with your exact constraints right now. Please wait...`} />}
+                    content={<Typewriter text={`I detected some minor imbalances during validation. No problem! I am stepping in to actively reconstruct and repair the draft to perfectly align with your exact constraints right now. Please wait...`} animate={isLatest} />}
                 />
             );
         }
@@ -223,7 +228,7 @@ function RenderAgentTemplate({ file, content }: { file: string; content: any }) 
                 icon={BrainCircuit}
                 title="Generation Agent: Synthesizing Final Questions"
                 color="bg-indigo-500/5 border-indigo-500/20 text-indigo-600"
-                content={<Typewriter text="I am actively fetching relevant context, cross-referencing your PYQs, and translating Bloom's Taxonomy into varied natural language questions for each section!" />}
+                content={<Typewriter text="I am actively fetching relevant context, cross-referencing your PYQs, and translating Bloom's Taxonomy into varied natural language questions for each section!" animate={isLatest} />}
             />
         );
     }
@@ -233,7 +238,7 @@ function RenderAgentTemplate({ file, content }: { file: string; content: any }) 
                 icon={CheckCircle2}
                 title="SUCCESS: Generation Complete Payload Verified!"
                 color="bg-primary/10 border-primary/30 text-primary"
-                content={<Typewriter text="Your paper has been officially compiled! Please wait a moment while I prepare the 3D-interactive preview dashboard..." />}
+                content={<Typewriter text="Your paper has been officially compiled! Please wait a moment while I prepare the 3D-interactive preview dashboard..." animate={isLatest} />}
             />
         );
     }
@@ -663,7 +668,7 @@ export default function QPilotBuilderPage() {
     useEffect(() => {
         if (isDone) {
             toast.success("Paper generated!", { description: "You can now download it in your template, or view the paper." });
-            const t = setTimeout(() => router.push(`/qpilot/${projectId}/resultqp`), 8000);
+            const t = setTimeout(() => router.push(`/qpilot/${projectId}/resultqp`), 2000);
             return () => clearTimeout(t);
         }
     }, [isDone, projectId, router]);
@@ -672,7 +677,10 @@ export default function QPilotBuilderPage() {
     const syllabusOk = syllabusMode === "file" ? !!syllabusFile : syllabusText.trim().length > 20;
     const pyqsOk = !hasPyq || (pyqsMode === "file" ? !!pyqsFile : pyqsText.trim().length > 20);
     const bloomTotal = Object.values(bloomLevels).reduce((a, b) => a + b, 0);
-    const canGenerate = syllabusOk && pyqsOk && bloomTotal === 100 && !isRunning;
+    const hasPattern = sections.length > 0;
+    const totalQCount = getTotalQuestions() || sections.reduce((s, sec) => s + sec.numQuestions, 0);
+    const patternOk = hasPattern && totalQCount > 0;
+    const canGenerate = syllabusOk && pyqsOk && bloomTotal === 100 && patternOk && !isRunning;
 
     const handleGenerate = async () => {
         if (!canGenerate) return;
@@ -1011,11 +1019,18 @@ export default function QPilotBuilderPage() {
                         {/* ════ RIGHT: Log panel ════ */}
                         <div className="w-[440px] border-l border-border/50 bg-card/20 flex flex-col overflow-hidden">
                             {/* Panel header */}
-                            <div className="px-4 py-3 border-b border-border/40 flex items-center justify-between">
-                                <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
-                                    Live Logs
-                                </span>
-                                <PhaseBadge phase={phase} />
+                            <div className="px-4 py-3 border-b border-border/40 flex flex-col gap-2">
+                                <div className="flex items-center justify-between">
+                                    <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                                        Live Logs
+                                    </span>
+                                    <PhaseBadge phase={phase} />
+                                </div>
+                                {(isRunning || isDone) && (
+                                    <div className="w-full bg-muted rounded-full h-1.5 overflow-hidden">
+                                        <div className="bg-primary h-full transition-all duration-500 ease-in-out" style={{ width: `${Math.round((progressUpdates.filter(p => p.status === 'completed').length / Object.keys(STEP_LABELS).length) * 100)}%` }} />
+                                    </div>
+                                )}
                             </div>
 
                             {/* Logs */}
@@ -1025,7 +1040,7 @@ export default function QPilotBuilderPage() {
                                         Starting up agents. Live updates will appear here.
                                     </p>
                                 ) : (
-                                    combinedTimeline.map((item) => {
+                                    combinedTimeline.map((item, idx) => {
                                         if (item.kind === "progress") {
                                             const label = STEP_LABELS[item.step] || "Working";
                                             const done = item.status === "completed";
@@ -1046,8 +1061,9 @@ export default function QPilotBuilderPage() {
                                         const isJson = item.message.startsWith("JSON_DATA:");
                                         if (isJson) {
                                             try {
+                                                const isLatest = idx === combinedTimeline.length - 1;
                                                 const payload = JSON.parse(item.message.replace("JSON_DATA:", ""));
-                                            const displayContent = <RenderAgentTemplate file={payload.file} content={payload.content} />;
+                                                const displayContent = <RenderAgentTemplate file={payload.file} content={payload.content} isLatest={isLatest} />;
                                             
                                             // Don't render empty shells if RenderAgentTemplate returns null (e.g. for silent JSONs)
                                             if (!displayContent) return null;

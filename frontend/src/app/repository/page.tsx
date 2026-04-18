@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { motion } from "framer-motion";
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import { QPilotSidebar } from "@/components/qpilot/QPilotSidebar";
 import { FileText, Database, Plus, Search, Calendar, Download, Eye, Trash, Loader2 } from "lucide-react";
@@ -132,25 +133,27 @@ export default function RepositoryPage() {
                                                 <Eye className="h-3 w-3 mr-1" /> View
                                             </Button>
                                             <Button variant="outline" size="sm" className="flex-1 text-xs shadow-none" onClick={() => window.open(doc.url, '_blank')}>
-                                                <Download className="h-3 w-3 mr-1" /> Link
+                                                <Download className="h-3 w-3 mr-1" /> Download
                                             </Button>
                                         </div>
-                                        <Button 
-                                            variant="ghost" 
-                                            size="sm" 
-                                            className="w-full text-xs text-destructive hover:bg-destructive/10 mt-1"
-                                            onClick={async () => {
-                                                const ok = await deleteDocumentAndBlob(doc.id, doc.url);
-                                                if(ok) {
-                                                    setDocuments(documents.filter(d => d.id !== doc.id));
-                                                    toast.success("Document deleted permanently.");
-                                                } else {
-                                                    toast.error("Deletion failed.");
-                                                }
-                                            }}
-                                        >
-                                            <Trash className="h-3 w-3 mr-1" /> Delete
-                                        </Button>
+                                        <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                                            <Button 
+                                                variant="ghost" 
+                                                size="sm" 
+                                                className="w-full text-xs text-destructive hover:bg-destructive/10 mt-1"
+                                                onClick={async () => {
+                                                    const ok = await deleteDocumentAndBlob(doc.id, doc.url);
+                                                    if(ok) {
+                                                        setDocuments(documents.filter(d => d.id !== doc.id));
+                                                        toast.success("Document deleted permanently.");
+                                                    } else {
+                                                        toast.error("Deletion failed.");
+                                                    }
+                                                }}
+                                            >
+                                                <Trash className="h-3 w-3 mr-1" /> Delete
+                                            </Button>
+                                        </motion.div>
                                     </CardContent>
                                 </Card>
                             ))}

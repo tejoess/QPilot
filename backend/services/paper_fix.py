@@ -141,6 +141,31 @@ def _collect_used_pyq_ids(draft_paper: Dict, skip_questions: List[str]) -> Set[s
     return used
 
 
+def _build_question_history(draft_paper: Dict) -> List[str]:
+    """Build the current complete question history from the paper itself."""
+    history: List[str] = []
+    for section in draft_paper.get("sections", []):
+        for q in section.get("questions", []):
+            text = q.get("question_text", "")
+            if not str(text).strip():
+                continue
+            history.append(str(text).strip())
+    if history:
+        return history
+
+    stored_history = draft_paper.get("question_history", [])
+    if isinstance(stored_history, list):
+        normalized: List[str] = []
+        for item in stored_history:
+            if isinstance(item, dict):
+                item = item.get("text") or item.get("question_text") or item.get("question") or ""
+            text = str(item).strip()
+            if text:
+                normalized.append(text)
+        return normalized
+    return []
+
+
 def _get_blueprint_question(blueprint: Dict, question_number: str) -> Optional[Dict]:
     for section in blueprint.get("sections", []):
         for q in section.get("questions", []):
@@ -154,6 +179,7 @@ def _reselect_one_question(
     pyq_bank: List[Dict],
     used_pyq_ids: Set[str],
     teacher_input: Optional[Dict] = None,
+    history: Optional[List[str]] = None,
 ) -> Dict:
     """Re-run PYQ-first selection for a single question spec."""
     topic       = blueprint_q.get("topic", "")
@@ -169,7 +195,7 @@ def _reselect_one_question(
     source_pyq_id    = None
 
     if not is_pyq:
-        selected_text    = generate_new_question(topic, subtopic, module, marks, bloom_level, q_num, teacher_input)
+        selected_text    = generate_new_question(topic, subtopic, module, marks, bloom_level, q_num, teacher_input, history=history)
         selection_method = "generated_direct"
     else:
         # Level 1 — exact match
@@ -186,7 +212,7 @@ def _reselect_one_question(
             match = find_match(pyq_bank, used_pyq_ids, level=2, topic=topic, bloom_level=bloom_level)
             if match:
                 mid  = match.get("id", "unknown")
-                selected_text    = rephrase_pyq(match.get("text", match.get("question", "")), marks, topic, bloom_level)
+                selected_text    = rephrase_pyq(match.get("text", match.get("question", "")), marks, topic, bloom_level, history=history)
                 selection_method = "pyq_rephrased_marks"
                 source_pyq_id    = mid
                 if mid != "unknown": used_pyq_ids.add(mid)
@@ -196,14 +222,14 @@ def _reselect_one_question(
             match = find_match(pyq_bank, used_pyq_ids, level=3, topic=topic)
             if match:
                 mid  = match.get("id", "unknown")
-                selected_text    = rephrase_pyq(match.get("text", match.get("question", "")), marks, topic, bloom_level)
+                selected_text    = rephrase_pyq(match.get("text", match.get("question", "")), marks, topic, bloom_level, history=history)
                 selection_method = "pyq_rephrased_bloom"
                 source_pyq_id    = mid
                 if mid != "unknown": used_pyq_ids.add(mid)
 
         # Fallback
         if not match:
-            selected_text    = generate_new_question(topic, subtopic, module, marks, bloom_level, q_num, teacher_input)
+            selected_text    = generate_new_question(topic, subtopic, module, marks, bloom_level, q_num, teacher_input, history=history)
             selection_method = "generated_fallback"
 
     return {
@@ -313,6 +339,7 @@ def fix_paper(
         stats = synced_paper.get("selection_stats", {})
         stats["repair_iterations"] = stats.get("repair_iterations", 0) + 1
         synced_paper["selection_stats"] = stats
+        synced_paper["question_history"] = _build_question_history(synced_paper)
         return synced_paper, corrected_blueprint, change_log
 
     print(f"  📌 Questions to re-select: {all_flagged}")
@@ -339,7 +366,8 @@ def fix_paper(
                 }
 
             old_method = q.get("selection_method", "unknown")
-            new_q      = _reselect_one_question(bp_q, pyq_bank, used_pyq_ids, teacher_input)
+            current_history = _build_question_history(synced_paper)
+            new_q      = _reselect_one_question(bp_q, pyq_bank, used_pyq_ids, teacher_input, history=current_history)
             section["questions"][i] = new_q
 
             msg = f"Q{q_num}: {old_method} → {new_q['selection_method']}"
@@ -350,6 +378,7 @@ def fix_paper(
     stats["repair_iterations"] = stats.get("repair_iterations", 0) + 1
     synced_paper["selection_stats"] = stats
     synced_paper["used_pyq_ids"] = list(used_pyq_ids)
+    synced_paper["question_history"] = _build_question_history(synced_paper)
 
     print(f"\n  📊 Re-selected {len(all_flagged)} question(s)")
     return synced_paper, corrected_blueprint, change_log

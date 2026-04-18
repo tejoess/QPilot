@@ -57,6 +57,10 @@ class PipelineData(Base):
     draft_paper_json = Column(JSON, nullable=True)
     final_paper_json = Column(JSON, nullable=True)
     answer_key_json = Column(JSON, nullable=True)
+    # Teacher/exam configuration inputs
+    teacher_inputs_json = Column(JSON, nullable=True)
+    bloom_distribution_json = Column(JSON, nullable=True)
+    paper_pattern_json = Column(JSON, nullable=True)
 
     project = relationship("Project", back_populates="pipeline")
 

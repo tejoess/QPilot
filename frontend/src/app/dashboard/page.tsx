@@ -9,6 +9,7 @@
  */
 
 import { useEffect } from "react";
+import { motion } from "framer-motion";
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import { QPilotSidebar } from "@/components/qpilot/QPilotSidebar";
 import { QuickActionCard } from "@/components/dashboard/QuickActionCard";
@@ -132,24 +133,26 @@ export default function DashboardPage() {
                                                 </div>
                                                 <div className="flex gap-2 w-full">
                                                     <Button variant="outline" size="sm" className="flex-1 text-xs shadow-none px-2" onClick={() => router.push(`/qpilot/${paper.id}/resultqp`)}><Eye className="h-3 w-3 mr-1 shrink-0"/> View</Button>
-                                                    <Button variant="outline" size="sm" className="flex-1 text-xs shadow-none px-2" onClick={() => window.open(paper.pdfUrl, '_blank')} disabled={!paper.pdfUrl}><Download className="h-3 w-3 mr-1 shrink-0"/> Link</Button>
+                                                    <Button variant="outline" size="sm" className="flex-1 text-xs shadow-none px-2" onClick={() => window.open(paper.pdfUrl, '_blank')} disabled={!paper.pdfUrl}><Download className="h-3 w-3 mr-1 shrink-0"/> Download</Button>
                                                 </div>
-                                                <Button 
-                                                    variant="ghost" 
-                                                    size="sm" 
-                                                    className="w-full text-xs text-destructive hover:bg-destructive/10 mt-2"
-                                                    onClick={async () => {
-                                                        const ok = await deleteProjectFromDb(paper.id);
-                                                        if (ok) {
-                                                            setRecentPapers(recentPapers.filter(p => p.id !== paper.id));
-                                                            toast.success("Deleted project");
-                                                        } else {
-                                                            toast.error("Failed to delete project");
-                                                        }
-                                                    }}
-                                                >
-                                                    <Trash className="h-3 w-3 mr-1"/> Delete Project
-                                                </Button>
+                                                <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                                                    <Button 
+                                                        variant="ghost" 
+                                                        size="sm" 
+                                                        className="w-full text-xs text-destructive hover:bg-destructive/10 mt-2"
+                                                        onClick={async () => {
+                                                            const ok = await deleteProjectFromDb(paper.id);
+                                                            if (ok) {
+                                                                setRecentPapers(recentPapers.filter(p => p.id !== paper.id));
+                                                                toast.success("Deleted project");
+                                                            } else {
+                                                                toast.error("Failed to delete project");
+                                                            }
+                                                        }}
+                                                    >
+                                                        <Trash className="h-3 w-3 mr-1"/> Delete Project
+                                                    </Button>
+                                                </motion.div>
                                             </CardContent>
                                         </Card>
                                     ))}
