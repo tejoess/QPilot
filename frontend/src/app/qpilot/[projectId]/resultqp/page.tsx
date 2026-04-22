@@ -32,9 +32,7 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
-import {
-    LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-} from "recharts";
+import { GDTRenderer } from "@/components/qpilot/GDTRenderer";
 import { cn } from "@/lib/utils";
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import { QPilotSidebar } from "@/components/qpilot/QPilotSidebar";
@@ -768,94 +766,7 @@ export default function ResultQPPage() {
                                                                         >
                                                                             {question.text}
                                                                         </p>
-                                                                        {question.gdt && question.gdt.length > 0 && (
-                                                                            <div className="mt-2 space-y-2">
-                                                                                {question.gdt.map((block, bi) => {
-                                                                                    if (block.type === "table" && block.content?.headers) {
-                                                                                        return (
-                                                                                            <div key={bi} className="overflow-x-auto">
-                                                                                                <table className="text-xs border-collapse w-full print:text-black">
-                                                                                                    <thead>
-                                                                                                        <tr>
-                                                                                                            {block.content.headers.map((h: string, hi: number) => (
-                                                                                                                <th key={hi} className="border border-zinc-300 dark:border-zinc-600 bg-zinc-100 dark:bg-zinc-800 px-3 py-1.5 text-left font-semibold">{h}</th>
-                                                                                                            ))}
-                                                                                                        </tr>
-                                                                                                    </thead>
-                                                                                                    <tbody>
-                                                                                                        {block.content.rows.map((row: any[], ri: number) => (
-                                                                                                            <tr key={ri} className="even:bg-zinc-50 dark:even:bg-zinc-800/40">
-                                                                                                                {row.map((cell: any, ci: number) => (
-                                                                                                                    <td key={ci} className="border border-zinc-300 dark:border-zinc-600 px-3 py-1.5 min-w-[60px]">{String(cell)}</td>
-                                                                                                                ))}
-                                                                                                            </tr>
-                                                                                                        ))}
-                                                                                                    </tbody>
-                                                                                                </table>
-                                                                                            </div>
-                                                                                        );
-                                                                                    }
-                                                                                    if (block.type === "plot" && block.content?.x) {
-                                                                                        const chartData = block.content.x.map((xv: number, i: number) => ({ x: xv, y: block.content.y[i] ?? 0 }));
-                                                                                        return (
-                                                                                            <div key={bi} className="my-2 print:hidden">
-                                                                                                {block.content.title && <p className="text-[11px] font-semibold text-zinc-500 mb-1">{block.content.title}</p>}
-                                                                                                <ResponsiveContainer width="100%" height={160}>
-                                                                                                    <LineChart data={chartData} margin={{ top: 4, right: 12, left: 0, bottom: 4 }}>
-                                                                                                        <CartesianGrid strokeDasharray="3 3" stroke="#d4d4d8" />
-                                                                                                        <XAxis dataKey="x" tick={{ fontSize: 10 }} label={{ value: block.content.xlabel || "x", position: "insideBottom", offset: -2, fontSize: 10 }} />
-                                                                                                        <YAxis tick={{ fontSize: 10 }} label={{ value: block.content.ylabel || "y", angle: -90, position: "insideLeft", fontSize: 10 }} />
-                                                                                                        <Tooltip />
-                                                                                                        <Line type="monotone" dataKey="y" stroke="#6366f1" dot={{ r: 3 }} strokeWidth={2} />
-                                                                                                    </LineChart>
-                                                                                                </ResponsiveContainer>
-                                                                                            </div>
-                                                                                        );
-                                                                                    }
-                                                                                    if (block.type === "graph_ds" && block.content?.edges) {
-                                                                                        return (
-                                                                                            <div key={bi} className="my-2 space-y-1">
-                                                                                                <p className="text-[11px] font-semibold text-zinc-500">
-                                                                                                    Graph ({block.content.directed ? "Directed" : "Undirected"}) — edge list:
-                                                                                                </p>
-                                                                                                <div className="overflow-x-auto">
-                                                                                                    <table className="text-xs border-collapse print:text-black">
-                                                                                                        <thead>
-                                                                                                            <tr>
-                                                                                                                <th className="border border-zinc-300 dark:border-zinc-600 bg-zinc-100 dark:bg-zinc-800 px-2 py-1">From</th>
-                                                                                                                <th className="border border-zinc-300 dark:border-zinc-600 bg-zinc-100 dark:bg-zinc-800 px-2 py-1">To</th>
-                                                                                                                {block.content.edge_labels && <th className="border border-zinc-300 dark:border-zinc-600 bg-zinc-100 dark:bg-zinc-800 px-2 py-1">Weight</th>}
-                                                                                                            </tr>
-                                                                                                        </thead>
-                                                                                                        <tbody>
-                                                                                                            {block.content.edges.map(([from, to]: [string, string], ei: number) => {
-                                                                                                                const lk = Object.keys(block.content.edge_labels || {}).find((k: string) => k.includes(`"${from}"`) && k.includes(`"${to}"`));
-                                                                                                                return (
-                                                                                                                    <tr key={ei} className="even:bg-zinc-50 dark:even:bg-zinc-800/40">
-                                                                                                                        <td className="border border-zinc-300 dark:border-zinc-600 px-2 py-1">{from}</td>
-                                                                                                                        <td className="border border-zinc-300 dark:border-zinc-600 px-2 py-1">{to}</td>
-                                                                                                                        {block.content.edge_labels && <td className="border border-zinc-300 dark:border-zinc-600 px-2 py-1">{lk ? String(block.content.edge_labels[lk]) : "—"}</td>}
-                                                                                                                    </tr>
-                                                                                                                );
-                                                                                                            })}
-                                                                                                        </tbody>
-                                                                                                    </table>
-                                                                                                </div>
-                                                                                                <p className="text-[10px] text-zinc-400 italic print:hidden">Full graph diagram rendered in PDF/DOCX download.</p>
-                                                                                            </div>
-                                                                                        );
-                                                                                    }
-                                                                                    if (block.type === "formula") {
-                                                                                        return (
-                                                                                            <div key={bi} className="font-mono text-sm bg-zinc-100 dark:bg-zinc-800 rounded px-3 py-1.5 inline-block print:text-black">
-                                                                                                {String(block.content)}
-                                                                                            </div>
-                                                                                        );
-                                                                                    }
-                                                                                    return null;
-                                                                                })}
-                                                                            </div>
-                                                                        )}
+                                                                        <GDTRenderer blocks={question.gdt ?? []} />
                                                                     </div>
                                                                     {question.marks > 0 && (
                                                                         <span className="text-[11px] font-black text-zinc-400 dark:text-zinc-500 tabular-nums shrink-0 print:text-black">

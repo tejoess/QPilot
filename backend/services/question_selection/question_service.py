@@ -559,6 +559,7 @@ def generate_new_question(
 Generate ONE exam question for the specification below.
 
 SPECIFICATION:
+  Question No : {question_number}
   Module      : {module}
   Topic       : {display_topic}
   Marks       : {marks}  (mark range: {mark_range})
@@ -600,6 +601,8 @@ STRICT RULES:
   5. Keep language natural and direct.
   6. VARIETY: Vary your opening verb. Do not start with the same word as the nudge hints above.
 
+{_GENERATE_FEW_SHOTS}
+
 OUTPUT: Write ONLY the question text. No preamble, no label, no explanation.
 """
     msg = HumanMessage(content=prompt)
@@ -640,6 +643,7 @@ def generate_new_question_with_gdt(
 Generate ONE exam question. You MAY include a GDT element ONLY when it is the INPUT DATA that the student must work with.
 
 SPECIFICATION:
+  Question No : {question_number}
   Module      : {module}
   Topic       : {display_topic}
   Marks       : {marks}  (mark range: {mark_range})
@@ -682,6 +686,11 @@ Quality bar — keep it minimal and purposeful:
   - A plot: only the data points that define the problem
 
 The GDT is never the answer. It is the starting material the student works with.
+
+Type matching: if the question is about a graph algorithm (shortest path, MST, BFS,
+DFS, topological sort, etc.), the GDT must be graph_ds — not a distance matrix or
+adjacency table. A distance/adjacency table already encodes the answer structure;
+the raw graph (nodes + weighted edges) is the correct question input.
 
 ══════════════════════════════════════════════════════
 
