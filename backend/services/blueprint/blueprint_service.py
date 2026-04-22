@@ -61,6 +61,9 @@ def build_bloom_instruction(bloom_counts: Dict[str, int], total_questions: int) 
     Build the prompt block that tells the LLM exactly how many questions
     to assign per Bloom level. Passed as a HARD CONSTRAINT, not a soft target.
     """
+    CANONICAL = ["Remember", "Understand", "Apply", "Analyze", "Evaluate", "Create"]
+    forbidden = [l for l in CANONICAL if l not in bloom_counts]
+
     lines = [
         "BLOOM'S DISTRIBUTION — EXACT QUESTION COUNTS (HARD CONSTRAINT):",
         f"You MUST assign bloom_level so the finished blueprint has EXACTLY:",
@@ -69,12 +72,14 @@ def build_bloom_instruction(bloom_counts: Dict[str, int], total_questions: int) 
         lines.append(f"  • {level}: {count} question{'s' if count != 1 else ''}")
     lines.append(f"  ─────────────────────────────")
     lines.append(f"  Total: {sum(bloom_counts.values())} (must equal {total_questions})")
+    if forbidden:
+        lines.append(f"  FORBIDDEN (0 questions — do NOT use): {', '.join(forbidden)}")
     lines.append("")
     lines.append("HOW TO APPLY:")
     lines.append("  - Keep a running tally of bloom_level assignments as you fill each section.")
-    lines.append("  - Spread the levels naturally — do NOT cluster all low-level questions in one section.")
+    lines.append("  - Spread the allowed levels naturally across all sections.")
     lines.append("  - If a level's quota is already met, do NOT add more questions of that level.")
-    lines.append("  - For short-answer sections prefer Remember/Understand; for long-answer prefer Apply/Analyze/Evaluate.")
+    lines.append("  - Use ONLY the levels listed above. Any other bloom level is forbidden regardless of section type.")
     lines.append("  - These counts are non-negotiable. Zero deviation is expected.")
     return "\n".join(lines)
 
@@ -185,13 +190,17 @@ def _infer_allowed_modules_from_text(text: str, flat_kg: Dict[str, List]) -> Opt
     if not names:
         return None
     tl = text.lower()
-    for pattern in (r"last\s+(\d+)\s+modules?", r"last\s+(\d+)\s+module"):
+
+    # Accept a few frequent typos so deterministic extraction still works.
+    module_word = r"(?:modules?|mdoules?|moduels?)"
+
+    for pattern in (rf"last\s+(\d+)\s+{module_word}",):
         m = re.search(pattern, tl)
         if m:
             n = int(m.group(1))
             n = max(0, min(n, len(names)))
             return names[-n:] if n else None
-    for pattern in (r"first\s+(\d+)\s+modules?", r"first\s+(\d+)\s+module"):
+    for pattern in (rf"first\s+(\d+)\s+{module_word}",):
         m = re.search(pattern, tl)
         if m:
             n = int(m.group(1))
@@ -331,6 +340,9 @@ Your ONLY job: produce a list of questions. Do NOT compute totals, percentages, 
 
 **KNOWLEDGE GRAPH (VALID topic/subtopic labels — copy names exactly):**
 {json.dumps(flat_kg, indent=2)}
+
+If module nodes include `Weightage_Hours`, treat it as module weightage tied to module names.
+Use this module weightage while balancing marks/questions across modules.
 
 **{pyq_instructions}**
 

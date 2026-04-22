@@ -34,6 +34,15 @@ from typing import Dict, List, Any, Optional
 from docx import Document
 from docx.oxml.ns import qn
 
+try:
+    from backend.services.question_selection.gdt_module import (
+        add_text_with_formula_block,
+        render_gdt_to_docx,
+    )
+    _GDT_AVAILABLE = True
+except Exception:
+    _GDT_AVAILABLE = False
+
 
 BLOOM_TO_CL: Dict[str, str] = {
     "remember":   "L1",
@@ -81,7 +90,7 @@ def _build_question_map(paper_json: Dict) -> Dict[str, Dict]:
     """
     qmap: Dict[str, Dict] = {}
 
-    def _add(q_id: Any, text: str, bloom: str):
+    def _add(q_id: Any, text: str, bloom: str, gdt: list = None):
         cid = str(q_id).lower().strip()
         if not cid:
             return
@@ -89,6 +98,7 @@ def _build_question_map(paper_json: Dict) -> Dict[str, Dict]:
             "text": text or "",
             "bloom": bloom,
             "cl": bloom_to_cl(bloom),
+            "gdt": gdt or [],
         }
 
     sections = paper_json.get("sections", [])
@@ -119,7 +129,7 @@ def _build_question_map(paper_json: Dict) -> Dict[str, Dict]:
                     or q.get("cognitive_level")
                     or "remember"
                 )
-                _add(q_id, text, bloom)
+                _add(q_id, text, bloom, q.get("gdt") or [])
     else:
         # Flat list fallback
         flat = paper_json.get("questions", [])
@@ -142,7 +152,7 @@ def _build_question_map(paper_json: Dict) -> Dict[str, Dict]:
                 or "remember"
             )
             if q_id:
-                _add(q_id, text, bloom)
+                _add(q_id, text, bloom, q.get("gdt") or [])
 
     print(f"[renderer] Built qmap with {len(qmap)} questions: {list(qmap.keys())}")
     return qmap
@@ -184,12 +194,136 @@ def _replace_paragraph_placeholders(para, replacements: Dict[str, str]):
         wt.text = ''
 
 
+def _insert_nested_table(cell, headers: list, rows: list) -> None:
+    """
+    Insert a properly bordered table directly inside a DOCX table cell using
+    lxml XML manipulation (python-docx has no cell.add_table() API).
+    """
+    from docx.oxml import OxmlElement
+    from docx.oxml.ns import qn
+
+    def _border_elem(tag: str) -> Any:
+        el = OxmlElement(tag)
+        el.set(qn("w:val"), "single")
+        el.set(qn("w:sz"), "4")
+        el.set(qn("w:color"), "000000")
+        return el
+
+    def _make_cell_xml(value: str, bold: bool = False):
+        tc = OxmlElement("w:tc")
+        tcPr = OxmlElement("w:tcPr")
+        tcBorders = OxmlElement("w:tcBorders")
+        for edge in ("top", "left", "bottom", "right"):
+            tcBorders.append(_border_elem(f"w:{edge}"))
+        tcPr.append(tcBorders)
+        tc.append(tcPr)
+        p = OxmlElement("w:p")
+        r = OxmlElement("w:r")
+        if bold:
+            rPr = OxmlElement("w:rPr")
+            rPr.append(OxmlElement("w:b"))
+            r.append(rPr)
+        t = OxmlElement("w:t")
+        t.text = value
+        t.set("{http://www.w3.org/XML/1998/namespace}space", "preserve")
+        r.append(t)
+        p.append(r)
+        tc.append(p)
+        return tc
+
+    # Build <w:tbl>
+    tbl = OxmlElement("w:tbl")
+
+    tblPr = OxmlElement("w:tblPr")
+    tblBorders = OxmlElement("w:tblBorders")
+    for edge in ("top", "left", "bottom", "right", "insideH", "insideV"):
+        tblBorders.append(_border_elem(f"w:{edge}"))
+    tblPr.append(tblBorders)
+    tblStyle = OxmlElement("w:tblStyle")
+    tblStyle.set(qn("w:val"), "TableGrid")
+    tblPr.append(tblStyle)
+    tbl.append(tblPr)
+
+    tblGrid = OxmlElement("w:tblGrid")
+    for _ in headers:
+        gridCol = OxmlElement("w:gridCol")
+        tblGrid.append(gridCol)
+    tbl.append(tblGrid)
+
+    # Header row
+    tr = OxmlElement("w:tr")
+    for h in headers:
+        tr.append(_make_cell_xml(str(h), bold=True))
+    tbl.append(tr)
+
+    # Data rows
+    for row_data in rows:
+        tr = OxmlElement("w:tr")
+        for val in row_data:
+            tr.append(_make_cell_xml(str(val)))
+        tbl.append(tr)
+
+    # Append the nested table into the parent cell's XML
+    cell._tc.append(tbl)
+
+
+def _add_gdt_inline(cell, gdt_blocks: list, q_id: str) -> None:
+    """
+    Append GDT content (table / plot / graph_ds / formula) directly into a
+    python-docx table cell, immediately after the question text.
+    """
+    if not _GDT_AVAILABLE or not gdt_blocks:
+        return
+
+    from docx.shared import Inches
+    try:
+        from backend.services.question_selection.gdt_module import (
+            generate_plot, generate_graph_ds, generate_formula,
+        )
+    except Exception:
+        return
+
+    for idx, block in enumerate(gdt_blocks):
+        btype = block.get("type", "")
+        content = block.get("content", {})
+
+        if btype == "table" and isinstance(content, dict):
+            headers = content.get("headers", [])
+            rows    = content.get("rows", [])
+            _insert_nested_table(cell, headers, rows)
+
+        elif btype == "plot":
+            try:
+                img_path = generate_plot(content, f"{q_id}_plot_{idx}.png")
+                p = cell.add_paragraph()
+                p.add_run().add_picture(img_path, width=Inches(3))
+            except Exception as e:
+                print(f"[renderer] GDT plot render failed: {e}")
+
+        elif btype == "graph_ds":
+            try:
+                img_path = generate_graph_ds(content, f"{q_id}_graph_{idx}.png")
+                p = cell.add_paragraph()
+                p.add_run().add_picture(img_path, width=Inches(3))
+            except Exception as e:
+                print(f"[renderer] GDT graph render failed: {e}")
+
+        elif btype == "formula" and isinstance(content, str):
+            try:
+                img_path = generate_formula(content, f"{q_id}_formula_{idx}.png")
+                p = cell.add_paragraph()
+                p.add_run().add_picture(img_path, width=Inches(2))
+            except Exception as e:
+                print(f"[renderer] GDT formula render failed: {e}")
+
+
 def _process_table(table, global_replacements: Dict[str, str], qmap: Dict[str, Dict]):
     """
     Process a table's rows. For each row:
     1. Find question ID placeholders in the row → look up question text and CL.
     2. Build row-specific replacements (question text + [cl] for that row's question).
     3. Apply all replacements to every cell in the row.
+    4. Append any GDT blocks inline into the question cell.
     """
     for row in table.rows:
         # Collect all text in this row to check for question IDs
@@ -208,8 +342,10 @@ def _process_table(table, global_replacements: Dict[str, str], qmap: Dict[str, D
         # Build row-level replacements on top of globals
         row_replacements = dict(global_replacements)
 
+        gdt_cell: Any = None   # cell that holds the primary question placeholder
+        primary_q_info: Any = None
+
         if row_qids:
-            # Use the first question ID in this row for [cl] mapping
             primary_qid = row_qids[0]
             q_info = qmap.get(primary_qid)
 
@@ -217,22 +353,32 @@ def _process_table(table, global_replacements: Dict[str, str], qmap: Dict[str, D
 
             if q_info:
                 row_replacements[f"[{primary_qid}]"] = q_info["text"]
-                # Override the global [cl] fallback with the question's actual CL
                 row_replacements["[cl]"] = q_info["cl"]
 
-                # Also handle additional question IDs in same row (rare)
                 for qid in row_qids[1:]:
                     q2 = qmap.get(qid)
                     if q2:
                         row_replacements[f"[{qid}]"] = q2["text"]
+
+                # Identify which cell has the question placeholder (scan BEFORE replacement)
+                if q_info.get("gdt"):
+                    for cell in row.cells:
+                        cell_raw = " ".join(p.text for p in cell.paragraphs)
+                        if f"[{primary_qid}]" in cell_raw.lower():
+                            gdt_cell = cell
+                            primary_q_info = q_info
+                            break
             else:
-                # Question ID found in template but not in paper → keep [cl] fallback from globals
                 print(f"[renderer] WARNING: '{primary_qid}' not found in qmap. Available keys: {list(qmap.keys())[:10]}")
 
         # Apply replacements to all paragraphs in all cells in this row
         for cell in row.cells:
             for para in cell.paragraphs:
                 _replace_paragraph_placeholders(para, row_replacements)
+
+        # Append GDT content inline into the question cell (after text replacement)
+        if gdt_cell is not None and primary_q_info is not None:
+            _add_gdt_inline(gdt_cell, primary_q_info["gdt"], primary_qid)
 
 
 def render_template(
@@ -280,7 +426,7 @@ def render_template(
     for para in doc.paragraphs:
         _replace_paragraph_placeholders(para, global_replacements)
 
-    # Process all tables (questions + [cl] per-row)
+    # Process all tables — GDT is now appended inline into each question's cell
     for table in doc.tables:
         _process_table(table, global_replacements, qmap)
 

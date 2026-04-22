@@ -42,7 +42,7 @@ def repair_blueprint_loop(
     bloom_coverage: Dict,
     teacher_input: Dict,
     paper_pattern: Dict,
-) -> Tuple[Dict, Dict]:
+) -> Tuple[Dict, Dict, Dict]:
     """
     Run fix → critique → repeat until:
       - Verdict is ACCEPTED, OR
@@ -52,7 +52,7 @@ def repair_blueprint_loop(
         { metrics, score, verdict, issues, summary }
 
     Returns:
-        (best_blueprint, repair_summary)
+        (best_blueprint, repair_summary, best_critique)
         repair_summary = {
             iterations_run, final_verdict, converged,
             change_log, score_history
@@ -65,8 +65,9 @@ def repair_blueprint_loop(
     current_bp      = copy.deepcopy(blueprint)
     current_critique = critique
 
-    best_bp    = copy.deepcopy(blueprint)
-    best_score = critique.get("score", 0.0)
+    best_bp      = copy.deepcopy(blueprint)
+    best_score   = critique.get("score", 0.0)
+    best_critique = critique
 
     summary = {
         "iterations_run": 0,
@@ -79,7 +80,7 @@ def repair_blueprint_loop(
     if critique.get("verdict") == BLUEPRINT_ACCEPT_VERDICT:
         print(f"  ✅ Blueprint already ACCEPTED (score: {best_score}) — skipping")
         summary["converged"] = True
-        return current_bp, summary
+        return current_bp, summary, best_critique
 
     for iteration in range(1, BLUEPRINT_MAX_ITERATIONS + 1):
         print(f"\n  ── Iteration {iteration}/{BLUEPRINT_MAX_ITERATIONS} ──")
@@ -118,8 +119,9 @@ def repair_blueprint_loop(
 
         # Track best
         if new_score > best_score:
-            best_score = new_score
-            best_bp    = copy.deepcopy(fixed_bp)
+            best_score    = new_score
+            best_bp       = copy.deepcopy(fixed_bp)
+            best_critique = new_critique
 
         current_bp       = fixed_bp
         current_critique = new_critique
@@ -135,7 +137,7 @@ def repair_blueprint_loop(
         summary["final_verdict"] = current_critique.get("verdict", "UNKNOWN")
 
     _print_repair_summary("BLUEPRINT", summary)
-    return best_bp, summary
+    return best_bp, summary, best_critique
 
 
 # ─────────────────────────────────────────────────────────────
@@ -153,12 +155,12 @@ def repair_paper_loop(
     bloom_coverage: Dict,
     paper_pattern: Dict,
     teacher_input: Dict,
-) -> Tuple[Dict, Dict]:
+) -> Tuple[Dict, Dict, Dict]:
     """
     Run fix → verify → repeat until ACCEPTED or max iterations.
 
     Returns:
-        (best_draft_paper, repair_summary)
+        (best_draft_paper, repair_summary, best_verdict)
     """
     print("\n" + "=" * 65)
     print("🔁  PAPER REPAIR LOOP")
@@ -167,8 +169,9 @@ def repair_paper_loop(
     current_paper   = copy.deepcopy(draft_paper)
     current_verdict = paper_verdict
 
-    best_paper  = copy.deepcopy(draft_paper)
-    best_rating = paper_verdict.get("rating", 0)
+    best_paper   = copy.deepcopy(draft_paper)
+    best_rating  = paper_verdict.get("score", paper_verdict.get("rating", 0))
+    best_verdict = paper_verdict
 
     summary = {
         "iterations_run": 0,
@@ -179,9 +182,9 @@ def repair_paper_loop(
     }
 
     if paper_verdict.get("verdict") == PAPER_ACCEPT_VERDICT:
-        print(f"  ✅ Paper already ACCEPTED (rating: {best_rating}) — skipping")
+        print(f"  ✅ Paper already ACCEPTED (score: {best_rating}) — skipping")
         summary["converged"] = True
-        return current_paper, summary
+        return current_paper, summary, best_verdict
 
     for iteration in range(1, PAPER_MAX_ITERATIONS + 1):
         print(f"\n  ── Iteration {iteration}/{PAPER_MAX_ITERATIONS} ──")
@@ -209,16 +212,17 @@ def repair_paper_loop(
             teacher_input  = teacher_input,
         )
 
-        new_rating  = new_verdict.get("rating", 0)
+        new_rating  = new_verdict.get("score", new_verdict.get("rating", 0))
         new_v_label = new_verdict.get("verdict", "UNKNOWN")
         summary["rating_history"].append(new_rating)
         summary["iterations_run"] = iteration
 
-        print(f"  📊 Rating: {new_rating}/10  |  Verdict: {new_v_label}")
+        print(f"  📊 Score: {new_rating}/10  |  Verdict: {new_v_label}")
 
         if new_rating > best_rating:
-            best_rating = new_rating
-            best_paper  = copy.deepcopy(fixed_paper)
+            best_rating  = new_rating
+            best_paper   = copy.deepcopy(fixed_paper)
+            best_verdict = new_verdict
 
         current_paper   = fixed_paper
         current_verdict = new_verdict
@@ -234,7 +238,7 @@ def repair_paper_loop(
         summary["final_verdict"] = current_verdict.get("verdict", "UNKNOWN")
 
     _print_repair_summary("PAPER", summary)
-    return best_paper, summary
+    return best_paper, summary, best_verdict
 
 
 # ─────────────────────────────────────────────────────────────

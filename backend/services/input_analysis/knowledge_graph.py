@@ -88,6 +88,8 @@ Return this in structured knowledge graph in the JSON format.
 Ensure the subtopic is part of the topic and topic is part of the module.
 Do not output general subtopics only architecture types. always output the topic name with it. for e.g "GAN architecture" can be a subtoptic, but not only "Types".
 Ensure types, variants are subtopic not topic. 
+If a module has `weightage_hours` in input, keep it on that module node as `Weightage_Hours`.
+Do not add weightage fields to Topic or Subtopic nodes.
 
 Example output:
 
@@ -96,6 +98,7 @@ Example output:
   "Modules": [
     {{
       "Module_Name": "Machine Learning",
+      "Weightage_Hours": 10,
       "Topics": [
         {{
           "Topic_Name": "Classification",

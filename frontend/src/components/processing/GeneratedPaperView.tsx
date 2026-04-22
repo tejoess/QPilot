@@ -1,3 +1,5 @@
+"use client";
+
 /**
  * components/processing/GeneratedPaperView.tsx
  * ─────────────────────────────────────────────────────────────────────────────
@@ -9,7 +11,131 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { FileText, Award, BookOpen, Brain } from "lucide-react";
-import type { DraftPaper } from "@/types/api";
+import {
+    LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+} from "recharts";
+import type { DraftPaper, GDTBlock, GDTTableContent, GDTPlotContent, GDTGraphContent } from "@/types/api";
+
+// ─────────────────────────────────────────────────────────────
+// GDT sub-renderers
+// ─────────────────────────────────────────────────────────────
+
+function GDTTableRenderer({ content }: { content: GDTTableContent }) {
+    return (
+        <div className="overflow-x-auto my-2">
+            <table className="text-xs border-collapse w-full">
+                <thead>
+                    <tr>
+                        {content.headers.map((h, i) => (
+                            <th key={i} className="border border-border bg-muted px-3 py-1.5 text-left font-semibold">
+                                {h}
+                            </th>
+                        ))}
+                    </tr>
+                </thead>
+                <tbody>
+                    {content.rows.map((row, ri) => (
+                        <tr key={ri} className="even:bg-muted/30">
+                            {row.map((cell, ci) => (
+                                <td key={ci} className="border border-border px-3 py-1.5 min-w-[60px]">
+                                    {String(cell)}
+                                </td>
+                            ))}
+                        </tr>
+                    ))}
+                </tbody>
+            </table>
+        </div>
+    );
+}
+
+function GDTPlotRenderer({ content }: { content: GDTPlotContent }) {
+    const data = content.x.map((xv, i) => ({ x: xv, y: content.y[i] ?? 0 }));
+    return (
+        <div className="my-2">
+            {content.title && (
+                <p className="text-[11px] font-semibold text-muted-foreground mb-1">{content.title}</p>
+            )}
+            <ResponsiveContainer width="100%" height={180}>
+                <LineChart data={data} margin={{ top: 4, right: 16, left: 0, bottom: 4 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                    <XAxis dataKey="x" label={{ value: content.xlabel || "x", position: "insideBottom", offset: -2, fontSize: 10 }} tick={{ fontSize: 10 }} />
+                    <YAxis label={{ value: content.ylabel || "y", angle: -90, position: "insideLeft", fontSize: 10 }} tick={{ fontSize: 10 }} />
+                    <Tooltip />
+                    <Line type="monotone" dataKey="y" stroke="hsl(var(--primary))" dot={{ r: 3 }} strokeWidth={2} />
+                </LineChart>
+            </ResponsiveContainer>
+        </div>
+    );
+}
+
+function GDTGraphRenderer({ content }: { content: GDTGraphContent }) {
+    // Render as an edge list table — actual graph image is in PDF/DOCX
+    return (
+        <div className="my-2 space-y-1">
+            <p className="text-[11px] font-semibold text-muted-foreground">
+                Graph ({content.directed ? "Directed" : "Undirected"}) — edge list:
+            </p>
+            <div className="overflow-x-auto">
+                <table className="text-xs border-collapse">
+                    <thead>
+                        <tr>
+                            <th className="border border-border bg-muted px-2 py-1">From</th>
+                            <th className="border border-border bg-muted px-2 py-1">To</th>
+                            {content.edge_labels && <th className="border border-border bg-muted px-2 py-1">Weight</th>}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {content.edges.map(([from, to], ei) => {
+                            const labelKey = Object.keys(content.edge_labels || {}).find(k =>
+                                k.includes(`"${from}"`) && k.includes(`"${to}"`)
+                            );
+                            return (
+                                <tr key={ei} className="even:bg-muted/30">
+                                    <td className="border border-border px-2 py-1">{from}</td>
+                                    <td className="border border-border px-2 py-1">{to}</td>
+                                    {content.edge_labels && (
+                                        <td className="border border-border px-2 py-1">
+                                            {labelKey ? String(content.edge_labels[labelKey]) : "—"}
+                                        </td>
+                                    )}
+                                </tr>
+                            );
+                        })}
+                    </tbody>
+                </table>
+            </div>
+            <p className="text-[10px] text-muted-foreground italic">Full graph diagram rendered in PDF/DOCX download.</p>
+        </div>
+    );
+}
+
+function GDTRenderer({ blocks }: { blocks: GDTBlock[] }) {
+    if (!blocks || blocks.length === 0) return null;
+    return (
+        <div className="mt-2 space-y-2 pl-4 border-l-2 border-primary/30">
+            {blocks.map((block, idx) => {
+                if (block.type === "table") {
+                    return <GDTTableRenderer key={idx} content={block.content as GDTTableContent} />;
+                }
+                if (block.type === "plot") {
+                    return <GDTPlotRenderer key={idx} content={block.content as GDTPlotContent} />;
+                }
+                if (block.type === "graph_ds") {
+                    return <GDTGraphRenderer key={idx} content={block.content as GDTGraphContent} />;
+                }
+                if (block.type === "formula") {
+                    return (
+                        <div key={idx} className="my-2 font-mono text-sm bg-muted/50 rounded px-3 py-1.5 inline-block">
+                            {String(block.content)}
+                        </div>
+                    );
+                }
+                return null;
+            })}
+        </div>
+    );
+}
 
 interface GeneratedPaperViewProps {
     paper: DraftPaper;
@@ -143,6 +269,7 @@ export function GeneratedPaperView({ paper }: GeneratedPaperViewProps) {
                                         <p className="text-sm leading-relaxed whitespace-pre-wrap">
                                             {q.question_text}
                                         </p>
+                                        <GDTRenderer blocks={q.gdt ?? []} />
                                     </div>
 
                                     {/* Source Info */}

@@ -280,7 +280,6 @@ async def syllabus_fetch(state: PipelineState):
 async def syllabus_format(state: PipelineState):
     session_id = state["session_id"]
     await manager.send_progress(session_id, "syllabus_format", "running", 0, "Starting syllabus parsing")
-    await asyncio.sleep(1.5)
 
     syllabus_json = get_syllabus_json(SYLLABUS_PROMPT, state.get("syllabus_text") or "")
     if not syllabus_json or not isinstance(syllabus_json, dict):
@@ -305,14 +304,18 @@ async def knowledge_graph_build_node(state: PipelineState):
     course_name = syllabus.get("course_name", "")
     modules = syllabus.get("modules", []) or []
 
-    # Minimal syllabus subset for KG generation: course_name + module_name -> topics[]
+    # Minimal syllabus subset for KG generation: course_name + module_name -> topics[] + module weightage
     module_topics_map = {}
     if isinstance(modules, list):
         for m in modules:
             module_name = m.get("module_name") or f"Module {m.get('module_number', '')}".strip()
             if not module_name:
                 continue
-            module_topics_map[module_name] = {"topics": m.get("topics", []) or []}
+            module_topics_map[module_name] = {
+                "module_number": m.get("module_number"),
+                "weightage_hours": m.get("weightage_hours"),
+                "topics": m.get("topics", []) or [],
+            }
 
     kg_input = {"course_name": course_name, "modules": module_topics_map}
 
@@ -430,7 +433,6 @@ async def pyqs_format_node(state: PipelineState):
 async def blueprint_build_node(state: PipelineState):
     session_id = state["session_id"]
     await manager.send_progress(session_id, "blueprint_build", "running", 0, "Starting blueprint generation")
-    await asyncio.sleep(2)
 
     syllabus      = state.get("syllabus") or {}
     knowledge_graph = state.get("knowledge_graph") or {}
@@ -457,7 +459,6 @@ async def blueprint_build_node(state: PipelineState):
 async def blueprint_verify_node(state: PipelineState):
     session_id = state["session_id"]
     await manager.send_progress(session_id, "blueprint_verify", "running", 0, "Starting blueprint verification")
-    await asyncio.sleep(1)
 
     blueprint     = state.get("blueprint") or {}
     syllabus      = state.get("syllabus") or {}
@@ -487,7 +488,7 @@ async def blueprint_verify_node(state: PipelineState):
         await manager.send_log(session_id, "warning",
                                f"⚠️ Blueprint verdict '{initial_verdict}' — starting repair loop")
 
-        final_blueprint, repair_summary = repair_blueprint_loop(
+        final_blueprint, repair_summary, final_critique = repair_blueprint_loop(
             blueprint     = blueprint,
             critique      = initial_critique,
             syllabus      = syllabus,
@@ -507,24 +508,20 @@ async def blueprint_verify_node(state: PipelineState):
     else:
         await manager.send_log(session_id, "info", "✅ Blueprint acceptable — no repair needed")
         final_blueprint  = blueprint
+        final_critique   = initial_critique  # reuse — no extra LLM call needed
         repair_summary   = {
             "iterations_run": 0,
             "converged": True,
             "final_verdict": initial_verdict,
             "change_log": [],
-            "score_history": [],
+            "score_history": [initial_critique.get("score", 0)],
         }
 
     # Deterministic post-processing: ensure blueprint `topic` is always a valid KG label.
     # Without this, blueprint may mistakenly put PYQ question text into `topic`, breaking PYQ matching.
     final_blueprint = map_blueprint_topics_to_knowledge_graph(final_blueprint, knowledge_graph)
 
-    # ── Step 3: Final critique on the (possibly repaired) blueprint ──────────
-    await manager.send_progress(session_id, "blueprint_verify", "running", 85,
-                                "Running final critique on repaired blueprint...")
-    final_critique = critique_blueprint(
-        final_blueprint, syllabus, knowledge_graph, pyqs_analysis, bloom_levels, teacher_inputs, qp_pattern
-    )
+    # Step 3 (final critique) is now reused from repair loop or initial — no extra LLM call.
 
     # ── Step 4: Persist ──────────────────────────────────────────────────────
     await save_json_data(state["session_id"], "blueprint.json",              final_blueprint, silent=True)
@@ -550,7 +547,6 @@ async def blueprint_verify_node(state: PipelineState):
 async def question_select_node(state: PipelineState):
     session_id = state["session_id"]
     await manager.send_progress(session_id, "question_select", "running", 0, "Starting question selection")
-    await asyncio.sleep(2)
 
     blueprint = state.get("blueprint") or {}
     pyqs      = state.get("pyqs", {})
@@ -559,7 +555,12 @@ async def question_select_node(state: PipelineState):
     await manager.send_log(session_id, "info", f"Available PYQ pool: {len(pyq_list)} questions")
     await manager.send_progress(session_id, "question_select", "running", 40, "Selecting questions...")
 
-    draft_paper = select_questions(cast(dict, blueprint), pyq_list, teacher_input=state.get("teacher_inputs") or {}, qp_pattern=state.get("qp_pattern") or {})
+    draft_paper = select_questions(
+        cast(dict, blueprint), pyq_list,
+        teacher_input=state.get("teacher_inputs") or {},
+        qp_pattern=state.get("qp_pattern") or {},
+        knowledge_graph=state.get("knowledge_graph") or {},
+    )
 
     if not isinstance(draft_paper, dict):
         draft_paper = {"sections": [], "error": "Failed to select questions"}
@@ -576,7 +577,6 @@ async def question_select_node(state: PipelineState):
 async def paper_verify_node(state: PipelineState):
     session_id = state["session_id"]
     await manager.send_progress(session_id, "paper_verify", "running", 0, "Starting paper verification")
-    await asyncio.sleep(2)
 
     draft_paper   = state.get("draft_paper") or {}
     syllabus      = state.get("syllabus") or {}
@@ -605,9 +605,9 @@ async def paper_verify_node(state: PipelineState):
     )
 
     initial_label = initial_verdict.get("verdict", "UNKNOWN")
-    initial_rating= initial_verdict.get("rating", 0)
+    initial_rating= initial_verdict.get("score", initial_verdict.get("rating", 0))
     await manager.send_log(session_id, "info",
-                           f"Initial verdict: {initial_label} (rating: {initial_rating}/10)")
+                           f"Initial verdict: {initial_label} (score: {initial_rating}/10)")
 
     # ── Step 2: Repair loop if needed ────────────────────────────────────────
     if initial_label != "ACCEPTED":
@@ -616,7 +616,7 @@ async def paper_verify_node(state: PipelineState):
         await manager.send_log(session_id, "warning",
                                f"⚠️ Paper verdict '{initial_label}' — starting repair loop")
 
-        final_paper, repair_summary = repair_paper_loop(
+        final_paper, repair_summary, final_verdict = repair_paper_loop(
             draft_paper   = draft_paper,
             paper_verdict = initial_verdict,
             blueprint     = blueprint,
@@ -638,6 +638,7 @@ async def paper_verify_node(state: PipelineState):
     else:
         await manager.send_log(session_id, "info", "✅ Paper accepted on first pass — no repair needed")
         final_paper    = draft_paper
+        final_verdict  = initial_verdict  # reuse — no extra LLM call needed
         repair_summary = {
             "iterations_run": 0,
             "converged": True,
@@ -646,31 +647,12 @@ async def paper_verify_node(state: PipelineState):
             "rating_history": [initial_rating],
         }
 
-    # ── Step 3: Final verification on the (possibly repaired) paper ──────────
-    if initial_label != "ACCEPTED" and int(repair_summary.get("iterations_run", 0)) > 0:
-        # Paper was repaired — need a fresh verdict on the new paper
-        await manager.send_progress(session_id, "paper_verify", "running", 85,
-                                    "Re-verifying repaired paper...")
-        final_verdict = verify_question_paper(
-            paper=final_paper,
-            syllabus=syllabus,
-            knowledge_graph=knowledge_graph,
-            pyq_analysis=pyqs_analysis,
-            blueprint=blueprint,
-            bloom_coverage=bloom_levels,
-            paper_pattern=qp_pattern,
-            teacher_input=teacher_inputs,
-        )
-    else:
-        # No repair ran — reuse the verdict we already have, no extra LLM call
-        final_verdict = initial_verdict
-        await manager.send_log(session_id, "info",
-                               "Reusing initial verdict — no repair was performed")
+    # Step 3 (re-verification) is now reused from repair loop or initial — no extra LLM call.
 
     final_label  = final_verdict.get("verdict", "UNKNOWN")
-    final_rating = final_verdict.get("rating", 0)
+    final_rating = final_verdict.get("score", final_verdict.get("rating", 0))
     await manager.send_log(session_id, "info",
-                           f"Final paper verdict: {final_label} (rating: {final_rating}/10)")
+                           f"Final paper verdict: {final_label} (score: {final_rating}/10)")
 
     # ── Step 4: Persist ──────────────────────────────────────────────────────
     await save_json_data(state["session_id"], "draft_paper.json",          final_paper, silent=True)
@@ -713,7 +695,7 @@ async def final_generate_node(state: PipelineState):
         "total_marks":      sum(q.get("marks", 0) for s in draft_paper_dict.get("sections", []) for q in s.get("questions", [])),
         "total_questions":  sum(len(s.get("questions", [])) for s in draft_paper_dict.get("sections", [])),
         "verdict":          (state.get("paper_verdict") or {}).get("verdict", "unknown"),
-        "rating":           (state.get("paper_verdict") or {}).get("rating", 0),
+        "rating":           (state.get("paper_verdict") or {}).get("score", (state.get("paper_verdict") or {}).get("rating", 0)),
         # ── NEW: repair audit trail ──────────────────────────────────────────
         "blueprint_repair": {
             "iterations":      bp_repair.get("iterations_run", 0),
@@ -1020,7 +1002,7 @@ async def generate_paper_workflow(
             "allowed_marks_per_question": [2, 5, 6, 10, 15],
             "sections":          paper_sections,
         },
-        "pyqs_analysis":              None,
+        "pyqs_analysis":              pyqs_analysis,
         "blueprint":                  None,
         "blueprint_verdict":          None,
         "draft_paper":                None,

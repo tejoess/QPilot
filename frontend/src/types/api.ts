@@ -53,6 +53,34 @@ export interface PaperSection {
     questions: PaperQuestion[];
 }
 
+// ─── GDT (Graph / Data-structure / Table) types ───────────────────────────────
+
+export interface GDTTableContent {
+    headers: string[];
+    rows: (string | number)[][];
+}
+
+export interface GDTPlotContent {
+    x: number[];
+    y: number[];
+    xlabel?: string;
+    ylabel?: string;
+    title?: string;
+}
+
+export interface GDTGraphContent {
+    directed: boolean;
+    edges: [string, string][];
+    edge_labels?: Record<string, number | string>;
+}
+
+export type GDTContent = GDTTableContent | GDTPlotContent | GDTGraphContent | string;
+
+export interface GDTBlock {
+    type: "table" | "plot" | "graph_ds" | "formula";
+    content: GDTContent;
+}
+
 export interface PaperQuestion {
     question_number: string;
     module: string;
@@ -63,6 +91,7 @@ export interface PaperQuestion {
     question_text: string;
     selection_method: string;
     source_pyq_id?: string | null;
+    gdt?: GDTBlock[];
 }
 
 // ─── Domain types (NOT in guide – frontend stubs) ─────────────────────────────

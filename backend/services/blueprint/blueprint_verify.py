@@ -87,12 +87,78 @@ def _compute_verdict(metrics: Dict, score: float) -> str:
             return False
 
     high_priority_pass = (
+        at_least_2(metrics.get("teacher_input_followed", 1)) and
         at_least_2(metrics.get("module_weightage",        1)) and
         is_yes(metrics.get("syllabus_oriented",  "no"))      and
         is_yes(metrics.get("pattern_followed",   "no"))
     )
 
     return "ACCEPTED" if (high_priority_pass and score >= 6.0) else "REJECTED"
+
+
+# ─────────────────────────────────────────────────────────────
+# DETERMINISTIC BLOOM CHECK  (fast, no LLM)
+# ─────────────────────────────────────────────────────────────
+
+def _check_blueprint_bloom(blueprint: Dict, bloom_coverage: Dict) -> tuple:
+    """
+    Detect questions assigned a bloom level that has 0% allocation.
+    Returns (issues_list, has_violations).
+    """
+    CANONICAL = ["Remember", "Understand", "Apply", "Analyze", "Evaluate", "Create"]
+    allowed = set()
+    for level in CANONICAL:
+        pct = bloom_coverage.get(level.lower(), 0) or bloom_coverage.get(level, 0) or 0
+        if pct > 0:
+            allowed.add(level)
+
+    if not allowed:
+        return [], False
+
+    issues = []
+    for section in blueprint.get("sections", []):
+        for q in section.get("questions", []):
+            bloom = (q.get("bloom_level") or "").strip()
+            q_num = str(q.get("question_number", "?"))
+            if bloom and bloom not in allowed:
+                issues.append({
+                    "question": f"Q{q_num}",
+                    "problem":  f"bloom_level '{bloom}' has 0% allocation — forbidden",
+                    "fix":      f"Change to one of: {', '.join(sorted(allowed))}",
+                })
+
+    return issues, len(issues) > 0
+
+
+# ─────────────────────────────────────────────────────────────
+# DETERMINISTIC UNIQUENESS CHECK  (fast, no LLM)
+# ─────────────────────────────────────────────────────────────
+
+def _check_blueprint_uniqueness(blueprint: Dict) -> tuple:
+    """
+    Detect repeated topics and repeated question assignments in the blueprint.
+    Returns (issues_list, has_repeats) where issues_list is [{question, problem, fix}].
+    """
+    topic_to_qs: Dict[str, list] = {}
+    for section in blueprint.get("sections", []):
+        for q in section.get("questions", []):
+            topic = (q.get("topic") or "").strip()
+            q_num = str(q.get("question_number", "?"))
+            if topic:
+                topic_to_qs.setdefault(topic, []).append(q_num)
+
+    issues = []
+    for topic, q_nums in topic_to_qs.items():
+        if len(q_nums) > 1:
+            repeated = ", ".join(f"Q{n}" for n in q_nums[1:])
+            first    = f"Q{q_nums[0]}"
+            issues.append({
+                "question": repeated,
+                "problem":  f"Repeated topic '{topic}' already used in {first}",
+                "fix":      "Replace with a different topic from the same module",
+            })
+
+    return issues, len(issues) > 0
 
 
 # ─────────────────────────────────────────────────────────────
@@ -170,6 +236,24 @@ def critique_blueprint(
     total_marks     = sum(q["marks"] for q in q_list)
     total_questions = len(q_list)
 
+    # ── Deterministic bloom check (before LLM) ──────────────────────────────
+    bloom_issues, has_bloom_violations = _check_blueprint_bloom(blueprint, bloom_coverage)
+    bloom_check_summary = (
+        f"FORBIDDEN BLOOM LEVELS DETECTED (deterministic): {len(bloom_issues)} violation(s). "
+        + " | ".join(f"'{iss['problem']}'" for iss in bloom_issues)
+        if has_bloom_violations else "No forbidden bloom levels detected."
+    )
+    print(f"  {'❌' if has_bloom_violations else '✅'} Bloom check: {bloom_check_summary}")
+
+    # ── Deterministic uniqueness check (before LLM) ──────────────────────────
+    repeat_issues, has_repeats = _check_blueprint_uniqueness(blueprint)
+    repeat_summary = (
+        f"REPEATED TOPICS DETECTED (deterministic): {len(repeat_issues)} violation(s). "
+        + " | ".join(f"'{iss['problem']}'" for iss in repeat_issues)
+        if has_repeats else "No repeated topics detected."
+    )
+    print(f"  {'❌' if has_repeats else '✅'} Uniqueness check: {repeat_summary}")
+
     # Syllabus metadata only (not full module list — that lives in knowledge_graph)
     syllabus_meta = {
         "course_name": syllabus.get("course_name", ""),
@@ -180,6 +264,13 @@ def critique_blueprint(
     prompt = f"""You are a Mumbai University question paper blueprint reviewer.
 
 Evaluate the blueprint below against the given context and return a scorecard.
+
+━━━ PRE-CHECKED ISSUES (deterministic — treat as ground truth) ━━━
+BLOOM: {bloom_check_summary}
+If forbidden bloom levels are listed above, you MUST score bloom_balanced as 1 and include those in issues.
+
+UNIQUENESS: {repeat_summary}
+If repeated topics are listed above, you MUST score module_weightage as 1 and include those repeats in issues.
 
 ━━━ BLUEPRINT ━━━
 Total marks    : {total_marks}  (expected: {paper_pattern.get('total_marks')})
@@ -194,6 +285,9 @@ Paper Pattern (sections, marks): {json.dumps(paper_pattern, indent=2)}
 Bloom Target Distribution: {json.dumps(bloom_coverage, indent=2)}
 PYQ Analysis: {json.dumps(pyq_analysis, indent=2)}
 Teacher Input: {json.dumps(teacher_input, indent=2)}
+
+If module nodes include `Weightage_Hours`, treat it as syllabus module weightage mapped to module names.
+Use it while scoring `module_weightage` balance.
 
 Pre-parsed Hard Constraints (ground truth — use this for scoring):
 {json.dumps(constraints, indent=2)}
@@ -285,8 +379,23 @@ Return ONLY valid JSON. No markdown. No extra text.
             raise ValueError("Missing 'metrics' key in LLM response")
 
         metrics = raw["metrics"]
+
+        # Hard deterministic overrides — LLM cannot ignore these
+        if has_repeats:
+            metrics["module_weightage"] = 1  # repeated topics = severe imbalance
+        if has_bloom_violations:
+            metrics["bloom_balanced"] = 1   # forbidden bloom level used
+
         score   = _compute_score(metrics)
         verdict = _compute_verdict(metrics, score)
+
+        # Force REJECTED if bloom levels violate the 0% constraint
+        if has_bloom_violations:
+            verdict = "REJECTED"
+
+        # Merge deterministic issues (bloom first, then repeats, then LLM)
+        llm_issues = raw.get("issues", [])
+        merged_issues = bloom_issues + repeat_issues + [i for i in llm_issues if i not in repeat_issues and i not in bloom_issues]
 
         # Hard PYQ constraint — override verdict if PYQs exist but none used
         pyqs_exist = bool((pyq_analysis or {}).get("total_pyqs", 0) > 0)
@@ -305,7 +414,7 @@ Return ONLY valid JSON. No markdown. No extra text.
             "metrics": metrics,
             "score":   score,
             "verdict": verdict,
-            "issues":  raw.get("issues", [])[:3],
+            "issues":  merged_issues[:5],
             "summary": raw.get("summary", ""),
         }
 
@@ -313,12 +422,32 @@ Return ONLY valid JSON. No markdown. No extra text.
         print(f"⚠️  Critique JSON parse error: {e}")
         raw_text = str(getattr(response, "content", ""))
         print(f"    Raw (first 300): {raw_text[:300]}")
-        return _fallback_critique(blueprint)
+        result = _fallback_critique(blueprint)
+        if has_repeats:
+            result["metrics"]["module_weightage"] = 1
+        if has_bloom_violations:
+            result["metrics"]["bloom_balanced"] = 1
+        result["score"]   = _compute_score(result["metrics"])
+        result["verdict"] = _compute_verdict(result["metrics"], result["score"])
+        if has_bloom_violations:
+            result["verdict"] = "REJECTED"
+        result["issues"] = (bloom_issues + repeat_issues + result.get("issues", []))[:5]
+        return result
 
     except Exception as e:
         print(f"⚠️  Unexpected critique error: {e}")
         import traceback; traceback.print_exc()
-        return _fallback_critique(blueprint)
+        result = _fallback_critique(blueprint)
+        if has_repeats:
+            result["metrics"]["module_weightage"] = 1
+        if has_bloom_violations:
+            result["metrics"]["bloom_balanced"] = 1
+        result["score"]   = _compute_score(result["metrics"])
+        result["verdict"] = _compute_verdict(result["metrics"], result["score"])
+        if has_bloom_violations:
+            result["verdict"] = "REJECTED"
+        result["issues"] = (bloom_issues + repeat_issues + result.get("issues", []))[:5]
+        return result
 
 
 # ─────────────────────────────────────────────────────────────

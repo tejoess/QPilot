@@ -21,6 +21,13 @@ from typing import Dict, List, Optional, Tuple
 from backend.services.llm_service import openai_llm as llm
 from langchain_core.messages import HumanMessage
 
+# GDT bloom levels that trigger structured visual output (Apply / Analyze, marks >= 5)
+_GDT_BLOOM_LEVELS = {"apply", "analyze", "analyse"}
+
+
+def _needs_gdt(bloom_level: str, marks: int) -> bool:
+    return str(bloom_level).lower().strip() in _GDT_BLOOM_LEVELS and marks >= 5
+
 
 # ============================================================================
 # CORE MATCHING HELPERS
@@ -28,6 +35,16 @@ from langchain_core.messages import HumanMessage
 
 def normalize(text: str) -> str:
     return re.sub(r"\s+", " ", text.lower().strip())
+
+
+# Generic CS words that appear in almost every topic name — too common to use
+# as matching signals, would cause false positives (e.g. "algorithm" matches
+# Floyd-Warshall slot against KMP PYQ).
+_TOPIC_MATCH_STOPWORDS = {
+    "algorithm", "algorithms", "problem", "problems", "method", "methods",
+    "approach", "approaches", "technique", "techniques", "concept", "concepts",
+    "strategy", "analysis", "design", "study", "using", "based", "introduction",
+}
 
 
 def _topic_match(pyq_field: str, blueprint_topic: str) -> bool:
@@ -41,10 +58,44 @@ def _topic_match(pyq_field: str, blueprint_topic: str) -> bool:
         return True
     if pt in bt:
         return True
-    bt_words = {w for w in bt.split() if len(w) >= 5}
+    bt_words = {w for w in bt.split() if len(w) >= 5 and w not in _TOPIC_MATCH_STOPWORDS}
     if bt_words and any(w in pt for w in bt_words):
         return True
     return False
+
+
+# Patterns that indicate a question references external data (table, figure,
+# "following strings/input/data") which cannot appear inline on the paper.
+_DATALESS_PATTERNS = [
+    r"\bfor\s+(?:the\s+)?following\b",
+    r"\bsolve\s+(?:the\s+)?following\b",
+    r"\bconsider\s+(?:the\s+)?following\b",
+    r"\bapply\s+(?:\w+\s+)?(?:to\s+)?(?:the\s+)?following\b",
+    r"\bgiven\s+(?:in\s+)?(?:the\s+)?(?:table|figure|diagram|below|above)\b",
+    r"\bgiven\s+(?:the\s+)?following\b",
+    r"\bshown\s+in\s+(?:the\s+)?(?:figure|table|diagram)\b",
+    r"\bas\s+shown\s+(?:in\s+)?(?:the\s+)?(?:figure|table|diagram|below|above)\b",
+    r"\brefer\s+(?:to\s+)?(?:the\s+)?(?:figure|table|diagram)\b",
+    r"\bwith\s+reference\s+to\s+(?:the\s+)?(?:figure|table|diagram)\b",
+    r"\bfrom\s+(?:the\s+)?(?:following|given|above|below)\b",
+    r"\busing\s+(?:the\s+)?(?:following|given|above)\b",
+    r"\bfollowing\s+(?:strings?|arrays?|inputs?|data|graph|table|numbers?|values?|sequences?|examples?|instances?)\b",
+    r"\bobtain\s+(?:the\s+)?solution\s+to\s+(?:the\s+)?following\b",
+    r"\bcalculate\s+(?:\w+\s+){0,4}(?:for\s+)?(?:the\s+)?following\b",
+    r"\bfind\s+(?:\w+\s+){0,4}(?:for\s+)?(?:the\s+)?following\b",
+    r"\bcompute\s+(?:\w+\s+){0,4}(?:for\s+)?(?:the\s+)?following\b",
+    r"\bdata\s+(?:is\s+)?given\s+(?:in|below|above)\b",
+]
+
+
+def _is_dataless(text: str) -> bool:
+    """
+    Returns True when the question text references external data (table, figure,
+    'following strings', etc.) that is not embedded in the question itself.
+    Such questions cannot be used verbatim on a paper — they must be rephrased.
+    """
+    tl = text.lower()
+    return any(re.search(p, tl) for p in _DATALESS_PATTERNS)
 
 
 def _pyq_topic_match(pyq: Dict, blueprint_topic: str) -> bool:
@@ -406,6 +457,26 @@ STRIP RULE (target is 2–3 marks):
     type_instructions = _question_type_instruction(question_type)
     history_nudge     = _build_soft_history_instruction(history or [])
 
+    # Special instruction when the original PYQ references missing external data
+    dataless_note = ""
+    if _is_dataless(pyq_text):
+        dataless_note = """
+⚠️  DATALESS ORIGINAL — MANDATORY REWRITE RULES (strictly enforced):
+The original question references external data (tables, figures, strings, arrays)
+that is NOT available on this paper.
+You MUST produce a SELF-CONTAINED question. Rules:
+  1. FORBIDDEN output phrases: "for the following", "given below", "consider the following",
+     "solve the following", "refer to figure/table", "as shown", "the data given",
+     "obtain solution to following", or ANY phrase implying input data not in the question.
+  2. Do NOT require any table, graph, diagram, or supplementary data to answer.
+  3. Convert numerical/trace questions into conceptual form:
+     Ask to EXPLAIN the algorithm, DESCRIBE the approach, or DEMONSTRATE with a
+     self-chosen example (student picks the example — do NOT leave blank inputs).
+  4. Example rewrite: "Find LCS for following strings." →
+     "Explain the Longest Common Subsequence algorithm and trace it with a suitable example."
+  5. The output question must be fully answerable from memory alone.
+"""
+
     prompt = f"""You are a Mumbai University question paper setter.
 Rewrite the given question so it fits exactly {target_marks} marks at {bloom_level} Bloom level.
 
@@ -431,6 +502,7 @@ GOOD QUESTION EXAMPLES for {ms['label']}:
 {chr(10).join(f"  ✓ {e}" for e in ms['examples'])}
 ══════════════════════════════════════════════════════
 {strip_rule}
+{dataless_note}
 {history_nudge}
 
 ORIGINAL QUESTION:
@@ -442,7 +514,10 @@ BLOOM ADJUSTMENT:
   - Remember/Understand → theoretical ("explain", "describe", "define", "what is")
   - Apply → add a small practical task ("demonstrate", "calculate", "show with example")
   - Analyze → add comparison ("compare", "differentiate", "examine")
-  - Do NOT add numerical problems unless the original already has them.
+  - Do NOT add numerical problems unless the original already has them AND includes all required data inline.
+  - NEVER write "for the following", "given below", "consider the following", "solve the following",
+    or any phrase that implies external data not present in the question text itself.
+  - If the original is a trace/solve question with missing data, convert it to an EXPLAIN/DESCRIBE question.
 
 OUTPUT: Write ONLY the rewritten question text. No preamble, no explanation.
 """
@@ -512,7 +587,16 @@ GOOD QUESTION EXAMPLES for {ms['label']}:
 STRICT RULES:
   1. Match LENGTH to mark range — see constraint block above. Non-negotiable.
   2. Match VERB to bloom level ({bloom_level}): {bloom_verb}
-  3. Do NOT generate numerical/calculation problems unless teacher explicitly asked. If teacher input says to include numerical problems, you may include ONE numerical problem for appropriate mark ranges which does not require table, graph or diagram. 
+  3. Do NOT generate numerical/calculation problems unless teacher explicitly asked. If teacher input says to include numerical problems, you may include ONE numerical problem for appropriate mark ranges which does not require table, graph or diagram.
+  4. SELF-CONTAINED — this is non-negotiable:
+     The question must be fully answerable from memory alone, with NO external data.
+     FORBIDDEN phrases: "for the following", "given below", "consider the following",
+     "solve the following", "refer to figure/table", "from the table", "as shown",
+     "the data given", "obtain solution to following", or ANY phrase implying missing input.
+     If the topic normally involves a worked example (LCS, knapsack, sorting, etc.),
+     ask the student to EXPLAIN the algorithm or DEMONSTRATE it with a self-chosen example.
+     Example — WRONG: "Find LCS for following strings."
+     Example — RIGHT: "Explain the LCS algorithm with a suitable example of your choice."
   5. Keep language natural and direct.
   6. VARIETY: Vary your opening verb. Do not start with the same word as the nudge hints above.
 
@@ -521,6 +605,123 @@ OUTPUT: Write ONLY the question text. No preamble, no label, no explanation.
     msg = HumanMessage(content=prompt)
     response = llm.invoke([msg])
     return str(getattr(response, "content", "") or "").strip()
+
+
+def generate_new_question_with_gdt(
+    topic: str,
+    subtopic: str,
+    module: str,
+    marks: int,
+    bloom_level: str,
+    question_number: str,
+    teacher_input: Optional[dict] = None,
+    question_type: str = "short_answer",
+    history: Optional[List[str]] = None,
+    enriched_topic: Optional[str] = None,
+) -> Tuple[str, List[dict]]:
+    """
+    Generate a new question with optional GDT blocks (table / plot / graph_ds).
+    Only called when _needs_gdt(bloom_level, marks) is True.
+
+    Returns:
+        (question_text, gdt_blocks)
+        gdt_blocks is [] when the LLM decides no visual is needed or parsing fails.
+    """
+    ms            = _get_marks_structure(marks)
+    mark_range    = _mark_range_label(marks)
+    bloom_verb    = _BLOOM_VERBS.get(bloom_level, "Ask an appropriate question.")
+    display_topic = enriched_topic or (f"{topic} (focus: {subtopic})" if subtopic else topic)
+
+    teacher_context   = _build_teacher_context(teacher_input)
+    type_instructions = _question_type_instruction(question_type)
+    history_nudge     = _build_soft_history_instruction(history or [])
+
+    prompt = f"""You are a Mumbai University question paper setter specialised in numerical/applied questions.
+Generate ONE exam question. You MAY include a GDT element ONLY when it is the INPUT DATA that the student must work with.
+
+SPECIFICATION:
+  Module      : {module}
+  Topic       : {display_topic}
+  Marks       : {marks}  (mark range: {mark_range})
+  Bloom Level : {bloom_level}  — {bloom_verb}
+{teacher_context}
+{type_instructions}
+
+══════════════════════════════════════════════════════
+MARKS CONSTRAINT — FOLLOW EXACTLY, NO EXCEPTIONS
+══════════════════════════════════════════════════════
+Mark range  : {ms['label']}
+Answer size : {ms['answer_length']}
+Question    : {ms['question_length']}
+Concepts    : {ms['concepts']}
+Sub-parts   : {ms['sub_parts']}
+Style       : {ms['style']}
+══════════════════════════════════════════════════════
+{history_nudge}
+
+══════════════════════════════════════════════════════
+GDT — USE ONLY WHEN IT GENUINELY ADDS VALUE
+══════════════════════════════════════════════════════
+A GDT element is raw input data the question is based on — nothing more.
+Ask yourself: "Does the question become clearer with this visual, or can the
+data be stated naturally in a sentence?" If a sentence works, use no GDT.
+
+GDT is appropriate when:
+  - The question operates on a specific graph/tree structure (run algorithm on it)
+  - The question involves multiple numeric data points that a plot makes clearer
+  - The question gives a dataset that is too large or structured to state inline
+
+GDT is NOT appropriate when:
+  - The question is conceptual, comparative, or explanatory
+  - The data fits naturally in one sentence of question text
+  - The topic is an algorithm description or design question
+
+Quality bar — keep it minimal and purposeful:
+  - A graph for Dijkstra: provide the exact graph, no more nodes than needed
+  - A table: only the columns and rows the question directly refers to
+  - A plot: only the data points that define the problem
+
+The GDT is never the answer. It is the starting material the student works with.
+
+══════════════════════════════════════════════════════
+
+OUTPUT FORMAT — strict JSON only, no markdown, no explanation:
+{{
+  "question_text": "<the exam question>",
+  "gdt": [
+    {{
+      "type": "table | plot | graph_ds",
+      "content": {{ ... }}
+    }}
+  ]
+}}
+
+table content schema:   {{"headers": [...], "rows": [[...], ...]}}
+  → Answer cells must be "" (empty string), not filled with answers.
+plot content schema:    {{"x": [...], "y": [...], "xlabel": "...", "ylabel": "...", "title": "..."}}
+graph_ds content schema:{{"directed": true|false, "edges": [["A","B"], ...], "edge_labels": {{"(\\"A\\",\\"B\\")": 4}}}}
+"""
+    msg = HumanMessage(content=prompt)
+    response = llm.invoke([msg])
+    raw = str(getattr(response, "content", "") or "").strip()
+
+    # Strip markdown fences if present
+    clean = re.sub(r"^```(?:json)?\s*", "", raw, flags=re.IGNORECASE)
+    clean = re.sub(r"\s*```$", "", clean).strip()
+
+    try:
+        data = json.loads(clean)
+        q_text = str(data.get("question_text", "")).strip()
+        gdt_blocks = data.get("gdt", [])
+        if not isinstance(gdt_blocks, list):
+            gdt_blocks = []
+        if q_text:
+            return q_text, gdt_blocks
+    except (json.JSONDecodeError, AttributeError, TypeError):
+        pass
+
+    # Fall back: return raw text with no GDT
+    return raw, []
 
 
 # ============================================================================
@@ -680,20 +881,31 @@ def select_questions(
             selected_text    = None
             selection_method = None
             source_pyq_id    = None
+            gdt_result       = []   # GDT blocks; populated only for Apply/Analyze new-gen
 
             # ────────────────────────────────────────────────────────────────
             # CASE A: Generate directly
             # ────────────────────────────────────────────────────────────────
             if not is_pyq:
-                selected_text = generate_new_question(
-                    topic, subtopic, module, marks, bloom_level, q_num,
-                    teacher_input, section_type,
-                    history=history,                  # Change #4
-                    enriched_topic=enriched_topic,    # Change #5
-                )
+                if _needs_gdt(bloom_level, marks):
+                    selected_text, gdt_result = generate_new_question_with_gdt(
+                        topic, subtopic, module, marks, bloom_level, q_num,
+                        teacher_input, section_type,
+                        history=history,
+                        enriched_topic=enriched_topic,
+                    )
+                    print(f"     → Generated with GDT ({len(gdt_result)} block(s))")
+                else:
+                    selected_text = generate_new_question(
+                        topic, subtopic, module, marks, bloom_level, q_num,
+                        teacher_input, section_type,
+                        history=history,
+                        enriched_topic=enriched_topic,
+                    )
+                    gdt_result = []
+                    print(f"     → Generated directly (is_pyq=False or no PYQ bank)")
                 selection_method = "generated_direct"
                 stats["direct_generated"] += 1
-                print(f"     → Generated directly (is_pyq=False or no PYQ bank)")
 
             # ────────────────────────────────────────────────────────────────
             # CASE B: PYQ-first matching hierarchy
@@ -708,12 +920,23 @@ def select_questions(
                 if match:
                     mid  = match.get("id", "unknown")
                     text = match.get("text", match.get("question", ""))
-                    print(f"     ✅ L1 match (topic+marks+bloom) → PYQ #{mid} used as-is")
-                    selected_text    = text
-                    selection_method = "pyq_exact"
-                    source_pyq_id    = mid
+                    if _is_dataless(text):
+                        # PYQ references external data — rephrase to make self-contained
+                        print(f"     ⚠️  L1 match PYQ #{mid} is dataless → rephrasing to self-contained")
+                        selected_text = rephrase_pyq(
+                            text, marks, topic, bloom_level, section_type,
+                            history=history,
+                            enriched_topic=enriched_topic,
+                        )
+                        selection_method = "pyq_rephrased_marks"
+                        stats["pyq_rephrased_marks"] += 1
+                    else:
+                        print(f"     ✅ L1 match (topic+marks+bloom) → PYQ #{mid} used as-is")
+                        selected_text    = text
+                        selection_method = "pyq_exact"
+                        stats["pyq_exact_match"] += 1
+                    source_pyq_id = mid
                     if mid != "unknown": used_pyq_ids.add(mid)
-                    stats["pyq_exact_match"] += 1
 
                 if not match:
                     match = find_match(
@@ -757,14 +980,44 @@ def select_questions(
 
                 if not match:
                     print(f"     ⚡ No PYQ match → generating fresh question")
+                    if _needs_gdt(bloom_level, marks):
+                        selected_text, gdt_result = generate_new_question_with_gdt(
+                            topic, subtopic, module, marks, bloom_level, q_num,
+                            teacher_input, section_type,
+                            history=history,
+                            enriched_topic=enriched_topic,
+                        )
+                        print(f"     → Fallback generated with GDT ({len(gdt_result)} block(s))")
+                    else:
+                        selected_text = generate_new_question(
+                            topic, subtopic, module, marks, bloom_level, q_num,
+                            teacher_input, section_type,
+                            history=history,
+                            enriched_topic=enriched_topic,
+                        )
+                    selection_method = "generated_fallback"
+                    stats["generated_new"] += 1
+
+            # Post-selection dataless guard — catches cases where rephrase/generate
+            # still output a dataless question despite the instruction.
+            if selected_text and _is_dataless(selected_text):
+                print(f"     ⚠️  Output is still dataless after selection → regenerating fresh")
+                if _needs_gdt(bloom_level, marks):
+                    selected_text, gdt_result = generate_new_question_with_gdt(
+                        topic, subtopic, module, marks, bloom_level, q_num,
+                        teacher_input, section_type,
+                        history=history,
+                        enriched_topic=enriched_topic,
+                    )
+                else:
                     selected_text = generate_new_question(
                         topic, subtopic, module, marks, bloom_level, q_num,
                         teacher_input, section_type,
                         history=history,
                         enriched_topic=enriched_topic,
                     )
-                    selection_method = "generated_fallback"
-                    stats["generated_new"] += 1
+                    gdt_result = []
+                selection_method = (selection_method or "generated_direct") + "_regen"
 
             # Append question text to the in-run history list (Change #4)
             if selected_text:
@@ -783,6 +1036,7 @@ def select_questions(
                 "selection_method": selection_method,
                 "source_pyq_id":    source_pyq_id,
                 "is_pyq_sourced":   source_pyq_id is not None,
+                "gdt":              gdt_result,
             }
             draft_questions.append(draft_q)
             selection_log.append({

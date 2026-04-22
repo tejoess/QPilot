@@ -24,46 +24,6 @@ from backend.models import Base, User, Project, PipelineData, Document, Template
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 
-MAX_GENERATED_PAPERS_PER_USER = 3
-
-
-def enforce_generation_click_limit(db_session: Session, user_id: Optional[str], project_id: Optional[str] = None):
-    """
-    Restrict users to at most MAX_GENERATED_PAPERS_PER_USER paper-generation clicks.
-    This is enforced at /generate-paper request time (before workflow starts).
-    """
-    uid = (user_id or "").strip()
-    if not uid:
-        return
-
-    # Backward compatibility: include legacy generated-paper records.
-    click_count = (
-        db_session.query(Document)
-        .filter(
-            Document.user_id == uid,
-            Document.doc_type.in_(["paper_generation_attempt", "final_pdf"]),
-        )
-        .count()
-    )
-
-    if click_count >= MAX_GENERATED_PAPERS_PER_USER:
-        raise HTTPException(
-            status_code=403,
-            detail=f"Generation limit reached. You can start generation only {MAX_GENERATED_PAPERS_PER_USER} times.",
-        )
-
-    # Record this click immediately so repeated clicks cannot bypass the cap.
-    ensure_db_user_project(db_session, uid, project_id)
-    attempt_doc = Document(
-        user_id=uid,
-        project_id=project_id,
-        name=f"paper_generation_attempt_{click_count + 1}",
-        doc_type="paper_generation_attempt",
-        azure_url="",
-    )
-    db_session.add(attempt_doc)
-    db_session.commit()
-
 # Create DB tables
 Base.metadata.create_all(bind=engine)
 
@@ -307,13 +267,48 @@ async def analyze_pyqs(
     # Clean up empty strings to None
     if text_content and not text_content.strip():
         text_content = None
+
+    print(
+        "🔍 PYQ input debug:",
+        {
+            "has_file": bool(file),
+            "file_name": getattr(file, "filename", None) if file else None,
+            "has_text_content": bool(text_content),
+            "text_preview": (text_content or "")[:80],
+        },
+    )
     
     pyq_text = (text_content or "").strip()
     no_pyq_sentinel = pyq_text.lower().startswith("no pyqs available")
     has_real_pyq_input = bool(file) or (bool(pyq_text) and not no_pyq_sentinel)
 
-    if not file and not text_content:
-        raise HTTPException(status_code=400, detail="Either 'file' or 'text_content' must be provided")
+    # No PYQ provided at all, or the frontend sent the "no pyqs available" sentinel.
+    # Return a valid empty-PYQ session so the pipeline can still run without PYQs.
+    if not has_real_pyq_input:
+        if not session_id or not session_id.strip():
+            pyqs_session_id = str(uuid.uuid4())
+        else:
+            pyqs_session_id = session_id.strip()
+
+        empty_pyqs = {"questions": [], "total_pyqs": 0, "module_wise_count": {}}
+        empty_analysis = {"total_pyqs": 0, "module_wise_count": {}, "bloom_distribution": {}}
+
+        session_folder = os.path.join("backend", "services", "data", pyqs_session_id)
+        os.makedirs(session_folder, exist_ok=True)
+        with open(os.path.join(session_folder, "pyqs.json"), "w") as f:
+            json_lib.dump(empty_pyqs, f)
+        with open(os.path.join(session_folder, "pyqs_analysis.json"), "w") as f:
+            json_lib.dump(empty_analysis, f)
+
+        print(f"ℹ️  No PYQ input provided — returning empty PYQ session: {pyqs_session_id}")
+        return JSONResponse(content={
+            "status": "success",
+            "session_id": pyqs_session_id,
+            "pyqs": empty_pyqs,
+            "azure_url": None,
+            "total_questions": 0,
+            "message": "No PYQs provided — paper will be generated without previous year questions",
+        })
     
     # Verify syllabus session exists
     syllabus_folder = os.path.join("backend", "services", "data", syllabus_session_id)
@@ -340,7 +335,10 @@ async def analyze_pyqs(
             
             with open(pdf_path, "wb") as f:
                 content = await file.read()
+                if not content:
+                    raise HTTPException(status_code=400, detail="Uploaded PYQ file is empty.")
                 f.write(content)
+            print(f"📁 Saved PYQ file to: {pdf_path} ({len(content)} bytes)")
         
         # Run PYQ analysis workflow
         result = await analyze_pyqs_workflow(
@@ -508,16 +506,6 @@ async def generate_paper(
     else:
         paper_session_id = session_id.strip()
 
-    # Enforce generation-click limit before expensive workflow starts.
-    if user_id and user_id.strip():
-        try:
-            db_session = next(get_db())
-            enforce_generation_click_limit(db_session, user_id, project_id)
-        except HTTPException:
-            raise
-        except Exception as limit_check_err:
-            print(f"⚠️ Paper generation limit check failed, allowing request: {limit_check_err}")
-    
     print(f"📄 Using paper generation session_id: {paper_session_id}")
     
     try:

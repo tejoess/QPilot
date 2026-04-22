@@ -7,6 +7,15 @@ from reportlab.lib.units import cm
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, HRFlowable, Table, TableStyle
 from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
 
+try:
+    from backend.services.question_selection.gdt_module import (
+        parse_text_with_formula_pdf,
+        render_gdt_to_pdf,
+    )
+    _GDT_AVAILABLE = True
+except Exception:
+    _GDT_AVAILABLE = False
+
 def format_paper_to_pdf(paper_json, output_path):
     """
     Converts a Paper JSON (sections with questions) into a formatted PDF.
@@ -93,13 +102,26 @@ def format_paper_to_pdf(paper_json, output_path):
         for q_idx, q in enumerate(questions):
             q_text = q.get("question_text") or q.get("text") or ""
             q_marks = q.get("marks") or ""
-            
-            # Format as "1. Define ... [5M]"
-            full_q_text = f"<b>Q{q_idx+1}.</b> {q_text}"
+            q_id = q.get("id") or q.get("question_number") or str(q_idx)
+            gdt_blocks = q.get("gdt") or []
+
+            # Question label line
+            label = f"<b>Q{q_idx+1}.</b>"
             if q_marks:
-                full_q_text += f" <font color='grey'>[{q_marks}M]</font>"
-            
-            story.append(Paragraph(full_q_text, question_style))
+                label += f" <font color='grey'>[{q_marks}M]</font>"
+            story.append(Paragraph(label, question_style))
+
+            # Question text — split on $...$ formulas if GDT module available
+            if _GDT_AVAILABLE and "$" in q_text:
+                parse_text_with_formula_pdf(q_text, story)
+            else:
+                story.append(Paragraph(q_text, question_style))
+
+            # GDT blocks (table / plot / graph_ds / formula)
+            if gdt_blocks and _GDT_AVAILABLE:
+                render_gdt_to_pdf(gdt_blocks, story, f"q{q_id}")
+
+            story.append(Spacer(1, 6))
 
     # 3. Footer
     story.append(Spacer(1, 40))

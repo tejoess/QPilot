@@ -14,9 +14,11 @@ are then spliced back into the blueprint — untouched questions are preserved.
 
 import json
 import copy
+import re
 from typing import Dict, List, Tuple, Optional
 from backend.services.llm_service import openai_llm as llm
 from langchain_core.messages import HumanMessage
+from backend.services.blueprint.blueprint_service import compute_bloom_question_counts, build_bloom_instruction
 
 
 # ─────────────────────────────────────────────────────────────
@@ -65,7 +67,7 @@ def _decide_repair_mode(critique: Dict) -> str:
     ])
 
     has_specific_issues = any(
-        iss.get("question", "overall").startswith("Q")
+        re.search(r"\bQ?\d+[A-Za-z]?\b", str(iss.get("question", "")))
         for iss in critique.get("issues", [])
     )
 
@@ -83,12 +85,20 @@ def _extract_flagged_q_numbers(critique: Dict) -> List[str]:
     """Pull explicit question numbers from issues list."""
     flagged = set()
     for iss in critique.get("issues", []):
-        q_ref = iss.get("question", "")
-        # Accepts formats: "Q2a", "Q1b", "Q10"
-        for token in q_ref.replace(",", " ").split():
-            if token.upper().startswith("Q") and len(token) > 1:
-                flagged.add(token[1:])
+        q_ref = str(iss.get("question", ""))
+        for token in re.findall(r"\bQ?\d+[A-Za-z]?\b", q_ref):
+            flagged.add(_normalize_question_number(token))
     return list(flagged)
+
+
+def _normalize_question_number(value: object) -> str:
+    raw = str(value or "").strip()
+    raw = re.sub(r"^[Qq]\s*", "", raw)
+    raw = re.sub(r"[^0-9A-Za-z]", "", raw)
+    m = re.match(r"^(\d+)([A-Za-z]?)$", raw)
+    if not m:
+        return raw.lower()
+    return f"{m.group(1)}{m.group(2).lower()}"
 
 
 def _all_questions_list(blueprint: Dict) -> List[Dict]:
@@ -109,11 +119,16 @@ def _all_questions_list(blueprint: Dict) -> List[Dict]:
 
 def _merge_fixes(blueprint: Dict, fixed_questions: List[Dict]) -> Dict:
     """Splice fixed questions back by question_number. Deep-copies first."""
-    fixed_map = {str(q["question_number"]): q for q in fixed_questions}
+    fixed_map = {}
+    for q in fixed_questions:
+        if "question_number" not in q:
+            continue
+        fixed_map[_normalize_question_number(q["question_number"])] = q
+
     new_bp = copy.deepcopy(blueprint)
     for section in new_bp.get("sections", []):
         for q in section.get("questions", []):
-            num = str(q.get("question_number", ""))
+            num = _normalize_question_number(q.get("question_number", ""))
             if num in fixed_map:
                 fix = fixed_map[num]
                 for field in ("module", "topic", "marks", "bloom_level", "is_pyq", "rationale"):
@@ -139,7 +154,9 @@ def _build_local_prompt(
     all_qs   = _all_questions_list(blueprint)
     metrics  = critique.get("metrics", {})
     issues   = critique.get("issues", [])
-    bloom_req = bloom_coverage.get("required_distribution", bloom_coverage)
+    total_qs = paper_pattern.get("total_questions", len(all_qs))
+    bloom_counts = compute_bloom_question_counts(bloom_coverage, total_qs)
+    bloom_instr  = build_bloom_instruction(bloom_counts, total_qs)
 
     return f"""Repair iteration {iteration} — LOCAL MODE.
 Only the flagged questions need changing.
@@ -158,7 +175,7 @@ CONSTRAINTS:
 - Total marks must stay exactly {paper_pattern['total_marks']}
 - Total questions must stay exactly {paper_pattern['total_questions']}
 - Module range: {paper_pattern['module_weightage_range']['min']*100:.0f}%–{paper_pattern['module_weightage_range']['max']*100:.0f}% per module
-- Bloom target: {json.dumps({k: f"{v*100:.0f}%" for k, v in bloom_req.items()})}
+- {bloom_instr}
 - Teacher instructions: {json.dumps(teacher_input)}
 - topic must exactly match a name from knowledge graph: {json.dumps(_flatten_kg(knowledge_graph))}
 
@@ -167,6 +184,7 @@ RULES:
 2. Do NOT change question_number values
 3. topic must be copied exactly from the knowledge graph
 4. After changes total marks and question count must stay the same
+5. bloom_level must be one of the ALLOWED levels listed above — never use a FORBIDDEN level
 
 Return ONLY a JSON list of the changed questions. No markdown. No explanation.
 [
@@ -194,7 +212,9 @@ def _build_hard_prompt(
     all_qs   = _all_questions_list(blueprint)
     metrics  = critique.get("metrics", {})
     issues   = critique.get("issues", [])
-    bloom_req = bloom_coverage.get("required_distribution", bloom_coverage)
+    total_qs = paper_pattern.get("total_questions", len(all_qs))
+    bloom_counts = compute_bloom_question_counts(bloom_coverage, total_qs)
+    bloom_instr  = build_bloom_instruction(bloom_counts, total_qs)
 
     return f"""Repair iteration {iteration} — HARD MODE.
 The blueprint has fundamental problems. Propose replacements for ALL questions
@@ -214,7 +234,7 @@ CONSTRAINTS (must all be satisfied after fix):
 - Total questions: exactly {paper_pattern['total_questions']}
 - Allowed mark values: {paper_pattern.get('allowed_marks_per_question')}
 - Module range: {paper_pattern['module_weightage_range']['min']*100:.0f}%–{paper_pattern['module_weightage_range']['max']*100:.0f}% per module
-- Bloom target: {json.dumps({k: f"{v*100:.0f}%" for k, v in bloom_req.items()})}
+- {bloom_instr}
 - Sections: {json.dumps([{s['section_name']: {'count': s['question_count'], 'marks_each': s['marks_per_question']}} for s in paper_pattern.get('sections', [])])}
 - Teacher instructions: {json.dumps(teacher_input)}
 - topic must be copied exactly from knowledge graph: {json.dumps(_flatten_kg(knowledge_graph), indent=2)}
@@ -222,8 +242,9 @@ CONSTRAINTS (must all be satisfied after fix):
 RULES:
 1. Do NOT change question_number values — only change module/topic/marks/bloom_level/is_pyq
 2. Fix ALL failing high-priority metrics:
-   teacher_input_followed, syllabus_oriented, pattern_followed, module_weightage
+   teacher_input_followed, syllabus_oriented, pattern_followed, module_weightage, bloom_balanced
 3. topic must exactly match a node in the knowledge graph
+4. bloom_level must be one of the ALLOWED levels listed above — never use a FORBIDDEN level
 
 Return ONLY a JSON list of ALL changed questions. No markdown. No explanation.
 [

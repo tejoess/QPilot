@@ -24,6 +24,8 @@ from typing import Dict, List, Set, Tuple, Optional
 
 from backend.services.question_selection.question_service import (
     generate_new_question,
+    generate_new_question_with_gdt,
+    _needs_gdt,
     rephrase_pyq,
     find_match,
 )
@@ -195,9 +197,17 @@ def _reselect_one_question(
     source_pyq_id    = None
 
     if not is_pyq:
-        selected_text    = generate_new_question(topic, subtopic, module, marks, bloom_level, q_num, teacher_input, history=history)
+        if _needs_gdt(bloom_level, marks):
+            selected_text, gdt_blocks = generate_new_question_with_gdt(
+                topic, subtopic, module, marks, bloom_level, q_num,
+                teacher_input, history=history,
+            )
+        else:
+            selected_text = generate_new_question(topic, subtopic, module, marks, bloom_level, q_num, teacher_input, history=history)
+            gdt_blocks = []
         selection_method = "generated_direct"
     else:
+        gdt_blocks = []
         # Level 1 — exact match
         match = find_match(pyq_bank, used_pyq_ids, level=1, topic=topic, marks=marks, bloom_level=bloom_level)
         if match:
@@ -229,7 +239,13 @@ def _reselect_one_question(
 
         # Fallback
         if not match:
-            selected_text    = generate_new_question(topic, subtopic, module, marks, bloom_level, q_num, teacher_input, history=history)
+            if _needs_gdt(bloom_level, marks):
+                selected_text, gdt_blocks = generate_new_question_with_gdt(
+                    topic, subtopic, module, marks, bloom_level, q_num,
+                    teacher_input, history=history,
+                )
+            else:
+                selected_text = generate_new_question(topic, subtopic, module, marks, bloom_level, q_num, teacher_input, history=history)
             selection_method = "generated_fallback"
 
     return {
@@ -244,6 +260,7 @@ def _reselect_one_question(
         "selection_method": selection_method,
         "source_pyq_id":    source_pyq_id,
         "is_pyq_sourced":   source_pyq_id is not None,
+        "gdt":              gdt_blocks,
     }
 
 

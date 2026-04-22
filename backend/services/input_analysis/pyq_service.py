@@ -102,6 +102,10 @@ STRICT RULES:
    - Remove numbering artifacts.
    - Normalize spacing and broken words.
 
+7. Numerical questions:
+    - If you think a question is incomplete due to missing numerical data, do not return it. 
+    - Only return questions that are fully self-contained and make sense on their own.
+
 { "KNOWLEDGE GRAPH:" if use_kg else "SYLLABUS (fallback):" }
 ---
 {knowledge_graph_text if use_kg else syllabus_text}

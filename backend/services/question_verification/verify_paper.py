@@ -19,9 +19,14 @@ score is computed in Python from the five metrics (0–10).
 """
 
 import json
+import re
 from typing import Dict, List, Tuple
 from backend.services.llm_service import openai_llm as llm
 from langchain_core.messages import HumanMessage
+
+
+# Automated verifier ceiling: keep room for human moderation.
+MAX_AUTOMATED_SCORE = 9.5
 
 
 # ─────────────────────────────────────────────────────────────
@@ -79,6 +84,212 @@ def _check_pattern(paper: Dict, paper_pattern: Dict) -> Tuple[bool, List[str]]:
                 )
 
     return len(issues) == 0, issues
+
+
+# ─────────────────────────────────────────────────────────────
+# DETERMINISTIC UNIQUENESS CHECK  (fast, no LLM)
+# ─────────────────────────────────────────────────────────────
+
+def _check_paper_uniqueness(paper: Dict) -> Tuple[List[str], List[Dict]]:
+    """
+    Detect repeated topics and near-duplicate question texts in the paper.
+    Returns (text_issues_list, structured_issues_list).
+    """
+    import re
+
+    def _norm(text: str) -> str:
+        text = (text or "").lower().strip()
+        text = re.sub(r"[^a-z0-9\s]", " ", text)
+        return re.sub(r"\s+", " ", text).strip()
+
+    topic_to_qs: Dict[str, List[str]] = {}
+    text_to_q:   Dict[str, str]       = {}
+    issues:      List[Dict]           = []
+    text_issues: List[str]            = []
+
+    for section in paper.get("sections", []):
+        for q in section.get("questions", []):
+            q_num  = str(q.get("question_number", "?"))
+            topic  = (q.get("topic") or "").strip()
+            q_text = (q.get("question_text") or "").strip()
+
+            # Repeated topic
+            if topic:
+                topic_to_qs.setdefault(topic, []).append(q_num)
+
+            # Near-duplicate text (first 80 normalised chars as fingerprint)
+            if q_text:
+                fp = _norm(q_text)[:80]
+                if fp in text_to_q:
+                    first = text_to_q[fp]
+                    msg = f"Q{q_num}: question text nearly identical to Q{first}"
+                    text_issues.append(msg)
+                    issues.append({
+                        "question": f"Q{q_num}",
+                        "problem":  f"Duplicate question text (same as Q{first})",
+                        "fix":      "Replace with a distinct question on a related subtopic",
+                    })
+                else:
+                    text_to_q[fp] = q_num
+
+    for topic, q_nums in topic_to_qs.items():
+        if len(q_nums) > 1:
+            repeated = ", ".join(f"Q{n}" for n in q_nums[1:])
+            first    = f"Q{q_nums[0]}"
+            msg = f"Repeated topic '{topic}': {repeated} (first use: {first})"
+            text_issues.append(msg)
+            issues.append({
+                "question": repeated,
+                "problem":  f"Repeated topic '{topic}' (already in {first})",
+                "fix":      "Replace with a different topic from the same module",
+            })
+
+    return text_issues, issues
+
+
+def _flatten_kg_topics(knowledge_graph: Dict) -> set:
+    """Return a set of valid topic labels from KG topics + subtopics."""
+    labels = set()
+    modules = knowledge_graph.get("Modules", []) if isinstance(knowledge_graph, dict) else []
+    if not isinstance(modules, list):
+        return labels
+
+    for m in modules:
+        if not isinstance(m, dict):
+            continue
+        topics = m.get("Topics", [])
+        if not isinstance(topics, list):
+            continue
+        for t in topics:
+            if isinstance(t, dict):
+                topic_name = (t.get("Topic_Name") or "").strip()
+                if topic_name:
+                    labels.add(topic_name)
+                for st in t.get("Subtopics", []) or []:
+                    if isinstance(st, str) and st.strip():
+                        labels.add(st.strip())
+            elif isinstance(t, str) and t.strip():
+                labels.add(t.strip())
+    return labels
+
+
+def _infer_allowed_modules(teacher_input: Dict, knowledge_graph: Dict) -> List[str] | None:
+    """Deterministically infer allowed modules from teacher text like first/last N modules."""
+    text = str((teacher_input or {}).get("input") or (teacher_input or {}).get("preferences") or "").lower()
+    modules = knowledge_graph.get("Modules", []) if isinstance(knowledge_graph, dict) else []
+    ordered_names: List[str] = [
+        str(m.get("Module_Name")).strip()
+        for m in modules
+        if isinstance(m, dict) and m.get("Module_Name")
+    ]
+    if not text or not ordered_names:
+        return None
+
+    module_word = r"(?:modules?|mdoules?|moduels?)"
+    m_first = re.search(rf"first\s+(\d+)\s+{module_word}", text)
+    if m_first:
+        n = max(0, min(int(m_first.group(1)), len(ordered_names)))
+        return ordered_names[:n] if n else None
+
+    m_last = re.search(rf"last\s+(\d+)\s+{module_word}", text)
+    if m_last:
+        n = max(0, min(int(m_last.group(1)), len(ordered_names)))
+        return ordered_names[-n:] if n else None
+
+    return None
+
+
+def _deterministic_teacher_syllabus_issues(
+    paper: Dict,
+    knowledge_graph: Dict,
+    teacher_input: Dict,
+) -> Tuple[List[Dict], bool, bool]:
+    """
+    Returns (issues, has_constraint_violation, has_syllabus_violation).
+    """
+    issues: List[Dict] = []
+    allowed_modules = _infer_allowed_modules(teacher_input, knowledge_graph)
+    valid_topics = _flatten_kg_topics(knowledge_graph)
+
+    has_constraint_violation = False
+    has_syllabus_violation = False
+
+    for section in paper.get("sections", []):
+        for q in section.get("questions", []):
+            q_num = str(q.get("question_number", "?"))
+            module = str(q.get("module", "")).strip()
+            topic = str(q.get("topic", "")).strip()
+
+            if allowed_modules and module and module not in allowed_modules:
+                has_constraint_violation = True
+                issues.append({
+                    "question": f"Q{q_num}",
+                    "problem": "Module violates teacher module restriction",
+                    "fix": "Replace with a question from allowed modules",
+                })
+
+            if valid_topics and topic and topic not in valid_topics:
+                has_syllabus_violation = True
+                issues.append({
+                    "question": f"Q{q_num}",
+                    "problem": "Topic not found in syllabus knowledge graph",
+                    "fix": "Use a topic/subtopic label present in knowledge graph",
+                })
+
+    return issues, has_constraint_violation, has_syllabus_violation
+
+
+def _bloom_deviation_issue(paper: Dict, bloom_coverage: Dict) -> Tuple[List[Dict], bool, bool]:
+    """
+    Compare achieved Bloom distribution with target.
+    Returns (issues, hard_violation, soft_violation).
+    hard_violation: any level deviates > 15 percentage points
+    soft_violation: any level deviates > 8 percentage points
+    """
+    questions = [
+        q for s in paper.get("sections", []) for q in s.get("questions", [])
+    ]
+    total = len(questions)
+    if total == 0:
+        return [], True, False
+
+    # Canonical target map in fractions (0-1)
+    canonical = ["remember", "understand", "apply", "analyze", "evaluate", "create"]
+    target = {k: float((bloom_coverage or {}).get(k, 0) or (bloom_coverage or {}).get(k.title(), 0) or 0) for k in canonical}
+    target_sum = sum(target.values())
+    if target_sum <= 0:
+        return [], False, False
+
+    # normalize target to 1.0
+    target = {k: v / target_sum for k, v in target.items()}
+
+    achieved_counts = {k: 0 for k in canonical}
+    for q in questions:
+        level = str(q.get("bloom_level", "")).strip().lower()
+        if level in achieved_counts:
+            achieved_counts[level] += 1
+
+    max_dev_pp = 0.0
+    for k in canonical:
+        achieved = achieved_counts[k] / total
+        dev_pp = abs(achieved - target[k]) * 100
+        max_dev_pp = max(max_dev_pp, dev_pp)
+
+    if max_dev_pp <= 8:
+        return [], False, False
+
+    issues = [{
+        "question": "overall",
+        "problem": f"Bloom distribution deviation too high ({max_dev_pp:.1f}pp)",
+        "fix": "Adjust bloom levels to match target distribution",
+    }]
+    return issues, (max_dev_pp > 15), (max_dev_pp > 8)
+
+
+def _build_summary(metrics: Dict, issues: List[Dict], score: float, verdict: str) -> str:
+    if issues:
+        return f"{verdict} with score {score}/10. Found {len(issues)} critical issue(s) to fix."
+    return f"{verdict} with score {score}/10. Deterministic checks and quality criteria are satisfied."
 
 
 # ─────────────────────────────────────────────────────────────
@@ -197,7 +408,33 @@ def verify_question_paper(
     pattern_detail = "Pattern OK" if pattern_ok else "; ".join(pattern_issues)
     print(f"  {'✅' if pattern_ok else '❌'} Pattern check: {pattern_detail}")
 
-    # Build compact paper view for LLM
+    # ── Step 1b: Deterministic uniqueness check ──────────────────────────────
+    unique_text_issues, unique_struct_issues = _check_paper_uniqueness(paper)
+    has_uniqueness_issues = len(unique_struct_issues) > 0
+    uniqueness_summary = (
+        f"UNIQUENESS VIOLATIONS DETECTED: {'; '.join(unique_text_issues)}"
+        if has_uniqueness_issues else "No repeated topics or duplicate questions detected."
+    )
+    print(f"  {'❌' if has_uniqueness_issues else '✅'} Uniqueness check: {uniqueness_summary}")
+
+    # ── Step 1c: Deterministic teacher/syllabus checks ───────────────────────
+    hard_issues, has_constraint_violation, has_syllabus_violation = _deterministic_teacher_syllabus_issues(
+        paper=paper,
+        knowledge_graph=knowledge_graph,
+        teacher_input=teacher_input,
+    )
+    bloom_issues, has_bloom_hard_violation, has_bloom_soft_violation = _bloom_deviation_issue(
+        paper=paper,
+        bloom_coverage=bloom_coverage,
+    )
+    hard_issues.extend(bloom_issues)
+    has_constraint_violation = has_constraint_violation or has_bloom_hard_violation
+    if hard_issues:
+        print(f"  ❌ Teacher/Syllabus hard checks found {len(hard_issues)} issue(s)")
+    else:
+        print("  ✅ Teacher/Syllabus hard checks passed")
+
+    # Build compact paper view for LLM (300 char preview to catch near-duplicates)
     q_list = [
         {
             "q":      q.get("question_number"),
@@ -206,7 +443,7 @@ def verify_question_paper(
             "topic":  q.get("topic"),
             "marks":  q.get("marks"),
             "bloom":  q.get("bloom_level"),
-            "text_preview": (q.get("question_text", "") or "")[:120],
+            "text_preview": (q.get("question_text", "") or "")[:300],
         }
         for s in paper.get("sections", [])
         for q in s.get("questions", [])
@@ -223,9 +460,15 @@ def verify_question_paper(
     # ── Step 2: LLM qualitative evaluation ──────────────────────────────────
     prompt = f"""You are a Mumbai University question paper quality judge.
 
-Evaluate the question paper below. The PATTERN CHECK has already been run:
+Evaluate the question paper below. The following checks have already been run deterministically — treat them as ground truth:
+
+PATTERN CHECK:
   pattern_followed = {"yes" if pattern_ok else "no"}
   pattern issues   = {json.dumps(pattern_issues)}
+
+UNIQUENESS CHECK (deterministic — must reflect in balanced_coverage score):
+  {uniqueness_summary}
+  If violations are listed above, score balanced_coverage as 1 and include each violation in issues.
 
 ━━━ PAPER ━━━
 Total marks    : {total_marks}  (expected: {paper_pattern.get('total_marks')})
@@ -239,6 +482,9 @@ Knowledge Graph (valid topics): {json.dumps(knowledge_graph, indent=2)}
 Paper Pattern: {json.dumps(paper_pattern, indent=2)}
 Bloom Target: {json.dumps(bloom_coverage, indent=2)}
 Teacher Input: {json.dumps(teacher_input, indent=2)}
+
+If module nodes include `Weightage_Hours`, treat it as syllabus module weightage by module name.
+Consider it while judging `balanced_coverage` and constraints alignment.
 
 ━━━ YOUR TASK ━━━
 Score the paper on these 4 metrics (pattern_followed is already computed above — copy it as-is):
@@ -305,22 +551,38 @@ Return ONLY valid JSON. No markdown.
         if "metrics" not in raw:
             raise ValueError("Missing 'metrics' key")
 
-        # Always enforce the deterministic pattern result — LLM cannot override it
+        # Always enforce deterministic results — LLM cannot override these
         raw["metrics"]["pattern_followed"] = "yes" if pattern_ok else "no"
+        if has_uniqueness_issues:
+            raw["metrics"]["balanced_coverage"] = 1  # repeats = major imbalance
+        if has_constraint_violation:
+            raw["metrics"]["constraints_followed"] = 1
+        elif has_bloom_soft_violation:
+            try:
+                raw["metrics"]["constraints_followed"] = min(2, int(raw["metrics"].get("constraints_followed", 2)))
+            except Exception:
+                raw["metrics"]["constraints_followed"] = 2
+        if has_syllabus_violation:
+            raw["metrics"]["syllabus_oriented"] = "no"
 
-        # If pattern failed, add pattern issues to the issues list
+        # Merge deterministic issues (pattern + uniqueness) first, then LLM issues
+        deterministic_issues: List[Dict] = []
         if not pattern_ok:
             for pi in pattern_issues:
-                raw.setdefault("issues", [])
-                if len(raw["issues"]) < 3:
-                    raw["issues"].append({
-                        "question": "overall",
-                        "problem":  pi[:80],
-                        "fix":      "Fix marks/counts to match paper pattern"
-                    })
+                deterministic_issues.append({
+                    "question": "overall",
+                    "problem":  pi[:80],
+                    "fix":      "Fix marks/counts to match paper pattern",
+                })
+        deterministic_issues.extend(unique_struct_issues)
+        deterministic_issues.extend(hard_issues)
+
+        llm_issues = raw.get("issues", [])
+        merged_issues = deterministic_issues + [i for i in llm_issues if i not in deterministic_issues]
 
         metrics = raw["metrics"]
         score   = _compute_score(metrics)
+        score   = min(score, MAX_AUTOMATED_SCORE)
         verdict = _compute_verdict(metrics, score)
 
         print(f"  📊 Score: {score}/10  |  Verdict: {verdict}")
@@ -330,29 +592,51 @@ Return ONLY valid JSON. No markdown.
             "metrics": metrics,
             "score":   score,
             "verdict": verdict,
-            "issues":  raw.get("issues", [])[:3],
-            "summary": raw.get("summary", ""),
+            "issues":  merged_issues[:5],
+            "summary": _build_summary(metrics, merged_issues[:5], score, verdict),
         }
 
     except json.JSONDecodeError as e:
         raw_text = str(getattr(response, "content", ""))
         print(f"⚠️  Verifier JSON parse error: {e} | Raw (first 300): {raw_text[:300]}")
-        # Still enforce pattern check in fallback
+        # Still enforce deterministic checks in fallback
         result = _fallback_result(paper)
         result["metrics"]["pattern_followed"] = "yes" if pattern_ok else "no"
-        if not pattern_ok:
-            result["score"] = _compute_score(result["metrics"])
-            result["verdict"] = _compute_verdict(result["metrics"], result["score"])
-            result["issues"] = [
-                {"question": "overall", "problem": pi[:80], "fix": "Fix marks/counts to match pattern"}
-                for pi in pattern_issues[:3]
-            ]
+        if has_uniqueness_issues:
+            result["metrics"]["balanced_coverage"] = 1
+        if has_constraint_violation:
+            result["metrics"]["constraints_followed"] = 1
+        if has_syllabus_violation:
+            result["metrics"]["syllabus_oriented"] = "no"
+        result["score"]   = _compute_score(result["metrics"])
+        result["score"]   = min(result["score"], MAX_AUTOMATED_SCORE)
+        result["verdict"] = _compute_verdict(result["metrics"], result["score"])
+        fallback_issues: List[Dict] = [
+            {"question": "overall", "problem": pi[:80], "fix": "Fix marks/counts to match pattern"}
+            for pi in pattern_issues
+        ] + unique_struct_issues + hard_issues
+        result["issues"] = fallback_issues[:5]
+        result["summary"] = _build_summary(result["metrics"], result["issues"], result["score"], result["verdict"])
         return result
 
     except Exception as e:
         print(f"⚠️  Unexpected verifier error: {e}")
         import traceback; traceback.print_exc()
-        return _fallback_result(paper)
+        result = _fallback_result(paper)
+        if has_constraint_violation:
+            result["metrics"]["constraints_followed"] = 1
+        elif has_bloom_soft_violation:
+            result["metrics"]["constraints_followed"] = 2
+        if has_syllabus_violation:
+            result["metrics"]["syllabus_oriented"] = "no"
+        if has_uniqueness_issues:
+            result["metrics"]["balanced_coverage"] = 1
+        result["score"] = _compute_score(result["metrics"])
+        result["score"] = min(result["score"], MAX_AUTOMATED_SCORE)
+        result["verdict"] = _compute_verdict(result["metrics"], result["score"])
+        result["issues"] = (hard_issues + unique_struct_issues)[:5]
+        result["summary"] = _build_summary(result["metrics"], result["issues"], result["score"], result["verdict"])
+        return result
 
 
 # ─────────────────────────────────────────────────────────────
